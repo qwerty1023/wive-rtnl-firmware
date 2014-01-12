@@ -1,0 +1,176 @@
+#!/bin/sh
+
+# only clean load start this
+if [ -f /tmp/nvram_checked ] || [ -f /var/run/goahead.pid ]; then
+    exit 0
+fi
+
+LOG="echo CHECKCONF"
+
+start() {
+    # get variables
+    get_param
+
+    # include kernel config
+    . /etc/scripts/config.sh
+
+    echo "Check firmware update or clean boot."
+    if [ "$IS_WIVE" = "YES" ]; then
+	$LOG ">>>> NORMAL BOOT <<<<"
+    else
+	$LOG "Burn RF template to flash"
+	fs burnrf
+	$LOG ">>>> RESTORE NVRAM <<<<"
+	    if [ -f /etc/backup/nvram_backup.dat ]; then
+		$LOG "Load backuped setting to nvram."
+    		fs load_nvram
+	    else
+		$LOG "Clear and load defaults to nvram."
+    		fs nvramreset
+	    fi
+	    get_param
+	    $LOG "Reset OK. Continue boot..."
+    fi
+
+######################################## MINIMAL CONFIG FOR NORMAL START #########################################
+    #
+    # chech mac correct set if check mac in nvram set to not NO and web not start
+    #
+    if [ "$CHECKMAC" != "NO" ] && [ ! -f /var/run/goahead.pid ]; then
+	if [ $MAC_TEST = "0" ] || [ $WMAC_TEST = "0" ] || [ $WMAC2_TEST = "0" ] || [ $LANMAC_TEST = "0" ]; then
+	    $LOG "MAC is not set - start MAC setting..."
+	    nvram_set 2860 WAN_MAC_ADDR   "cc:b2:55:98:74:61"
+	    nvram_set 2860 LAN_MAC_ADDR   "cc:b2:55:98:74:60"
+	    nvram_set 2860 WLAN_MAC_ADDR  "cc:b2:55:98:74:60"
+	    nvram_set 2860 WLAN2_MAC_ADDR "cc:b2:55:98:74:62"
+	    echo "Set new mac!"
+	fi
+    fi
+
+    #
+    # OperationMode adjustment:
+    #   if AP client was not compiled and operation mode was set "3" -> set $OperationMode "1"
+    #   if Station was not compiled and operation mode was set "2" -> set $OperationMode "1"
+    #   if OperationMode = "4" and chilli spot daemon not exist -> set $OperationMode "1"
+    if   [ "$OperationMode" = "3" ] && [ "$CONFIG_RT2860V2_AP_APCLI" = "" ]; then
+	nvram_set 2860 OperationMode 1
+	OperationMode="1"
+    elif [ "$OperationMode" = "2" ] && [ "$CONFIG_RT2860V2_STA" = "" ]; then
+	nvram_set 2860 OperationMode 1
+	OperationMode="1"
+    elif [ "$OperationMode" = "4" ] && [ ! -f /bin/chilli ]; then
+	nvram_set 2860 OperationMode 1
+	OperationMode="1"
+    fi
+
+    #
+    #	drop apcli specific flags in not apcli enabled modes
+    #
+    if [ "$OperationMode" != "3" ]; then
+	if [ "$ApCliBridgeOnly" != "0" ] || [ "$ApCliClientOnly" != "0" ]; then
+	    nvram_set ApCliBridgeOnly 0
+	    nvram_set ApCliClientOnly 0
+	fi
+    fi
+
+    #
+    # timezone
+    #
+    if [ "$TZ" = "" ]; then
+        nvram_set 2860 "EET-2EEST,M3.5.0/3,M10.5.0/4"
+    fi
+
+    #
+    # user and password need set
+    #
+    if [ "$Login" = "" ] || [ "$Password" = "" ]; then
+        nvram_set 2860 Login "admin"
+        nvram_set 2860 Password "admin"
+    fi
+
+    #
+    # dafault lan ip/mask
+    #
+    if [ "$lan_ipaddr" = "" ] || [ "$lan_netmask" = "" ]; then
+	nvram_set 2860 lan_ipaddr 192.168.0.1
+	nvram_set 2860 lan_netmask 255.255.255.0
+    fi
+
+    #
+    # need hostname
+    #
+    if [ "$HostName" = "" ]; then
+	HostName="Wive-RTNL"
+	nvram_set 2860 HostName "$HostName"
+    fi
+    echo "$HostName" > /etc/hostname
+    hostname -F /etc/hostname
+
+    #
+    # samba configs to
+    #
+    if [ -f /bin/smbd ] || [ -f /bin/nmbd ]; then
+	if [ "$WorkGroup" = "" ] || [ "$SmbNetBIOS" = "" ] || [ "$SmbString" = "" ]; then
+	    WorkGroup="HOME"
+	    SmbNetBIOS="$HostName"
+	    SmbString="$HostName-SERVER"
+	    nvram_set 2860 WorkGroup "$WorkGroup" 
+	    nvram_set 2860 SmbNetBIOS "$SmbNetBIOS"
+	    nvram_set 2860 SmbString "$SmbString"
+	fi
+    fi
+
+    #
+    # Udpxy default port
+    #
+    if [ -f /bin/udpxy ] && [ "$UDPXYPort" = "" ]; then
+	nvram_set 2860 UDPXYPort 81
+    fi
+
+    #
+    # WebUI default port
+    #
+    if [ "$RemoteManagementPort" = "" ]; then
+	nvram_set 2860 RemoteManagementPort 80
+    fi
+
+    # set checked flag
+    touch /tmp/nvram_checked
+}
+
+get_param() {
+    # get parametrs
+    eval `nvram_buf_get 2860 IS_WIVE CHECKMAC Login Password OperationMode lan_ipaddr lan_netmask TZ \
+	    WorkGroup SmbNetBIOS SmbString HostName UDPXYPort RemoteManagementPort ApCliBridgeOnly ApCliClientOnly`
+
+    # set mask for macs generate and vendor name
+    VENDMASK="cc:b2:55"
+
+    # test vendor macs range
+    MAC_TEST=`nvram_get 2860 WAN_MAC_ADDR | grep "$VENDMASK" -c`
+    WMAC_TEST=`nvram_get 2860 WLAN_MAC_ADDR | grep "$VENDMASK" -c`
+    WMAC2_TEST=`nvram_get 2860 WLAN2_MAC_ADDR | grep "$VENDMASK" -c`
+    LANMAC_TEST=`nvram_get 2860 LAN_MAC_ADDR | grep "$VENDMASK" -c`
+}
+
+stop() {
+    :
+}
+
+case "$1" in
+	start)
+	    start
+	    ;;
+
+	stop)
+	    stop
+	    ;;
+
+	restart)
+	    stop
+	    start
+	    ;;
+	*)
+	    echo $"Usage: $0 {start|stop|restart}"
+	    exit 1
+esac

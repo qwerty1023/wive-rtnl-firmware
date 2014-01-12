@@ -1,0 +1,61 @@
+#!/bin/sh
+
+#include global config
+. /etc/scripts/global.sh
+
+PPP_IFACE="$1"
+PPP_TTY="$2"
+PPP_SPEED="$3"
+PPP_LOCAL="$4"
+PPP_REMOTE="$5"
+PPP_IPPARAM="$6"
+PPP_NUM=`echo $PPP_IFACE | sed 's/[^0-65535]//g'`
+LOG="logger -t L2TP server"
+
+# get some variables
+eval `nvram_buf_get 2860 l2tp_srv_nat_enabled l2tp_srv_proxyarp parproutedEnabled`
+
+if [ "$l2tp_srv_proxyarp" != "1" ] && [ "$parproutedEnabled" != "1" ]; then
+    #disable multicast on $PPP_IFACE interface
+    ifconfig $PPP_IFACE -allmulti
+    ifconfig $PPP_IFACE -multicast
+fi
+
+#add rules
+if [ "$l2tp_srv_nat_enabled" != "" ] && [ "$l2tp_srv_nat_enabled" != "0" ]; then
+    $LOG "Add masqrade for client $PPP_REMOTE"
+    iptables -A l2tpsrvfwd -i $PPP_IFACE -j ACCEPT > /dev/null 2>&1
+    iptables -A l2tpsrvfwd -o $PPP_IFACE -j ACCEPT > /dev/null 2>&1
+    iptables -A POSTROUTING -t nat -o ! $PPP_IFACE -j MASQUERADE > /dev/null 2>&1
+fi
+
+# allow udpxy for l2tp clients
+if [ "$UDPXYMode" != "0" ]; then
+    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $UDPXYPort -j ACCEPT
+fi
+
+# allow SSH for l2tp clients
+if [ "$RemoteSSH" != "0" ]; then
+    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport 22 -j ACCEPT
+fi
+
+# allow FTP for l2tp clients
+if [ "$RemoteFTP" != "0" ]; then
+    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport 21 -j ACCEPT
+fi
+
+$LOG "Add low prio route to client $PPP_REMOTE network metric 100$PPP_NUM."
+ip route replace default dev $PPP_IFACE metric 100$PPP_NUM via $PPP_REMOTE > /dev/null 2>&1
+
+$LOG "Enable forwarding for $PPP_IFACE interface"
+echo 1 > "/proc/sys/net/ipv4/conf/$PPP_IFACE/forwarding"
+if [ "$radvdEnabled" = "1" ] && [ -f "/proc/sys/net/ipv6/conf/$PPP_IFACE/forwarding" ]; then
+    echo 1 > "/proc/sys/net/ipv6/conf/$PPP_IFACE/forwarding"
+fi
+
+if [ "$l2tp_srv_proxyarp" = "1" ] || [ "$parproutedEnabled" = "1" ]; then
+    $LOG "Enable proxyarp for $PPP_IFACE"
+    echo 1 > "/proc/sys/net/ipv4/conf/$PPP_IFACE/proxy_arp"
+fi
+
+export PPP_IFACE PPP_TTY PPP_SPEED PPP_LOCAL PPP_REMOTE PPP_IPPARAM

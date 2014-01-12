@@ -1,0 +1,157 @@
+#!/bin/sh
+
+# if app not exist
+if [ ! -f /bin/radvd ] || [ ! -d /proc/sys/net/ipv6 ]; then
+    exit 0
+fi
+
+#wait to start web and run from goahead code
+. /etc/scripts/web_wait.sh
+web_wait
+
+#get params
+. /etc/scripts/global.sh
+
+if [ "$OperationMode" = "0" ]; then
+    exit 0
+fi
+
+LOG="logger -t ipv6"
+
+calculate_and_set_mtu() {
+    # get mtu from wan
+    wanmtu=`ip link show $real_wan_if | grep mtu | awk {' print $5 '}`
+    # calculate mtu
+    let "sitmtu=$wanmtu - 20"
+    let "ipvmtu=$sitmtu - 40"
+
+    # set mtu for lan
+    sysctl -wq  net.ipv6.conf."$lan_if".mtu="$ipvmtu"
+    if [ "$Lan2Enabled" = "1" ]; then
+	sysctl -wq  net.ipv6.conf."$lan2_if".mtu="$ipvmtu"
+    fi
+}
+
+start() {
+    eval `nvram_buf_get 2860 radvdEnabled`
+    if [ "$radvdEnabled" = "1" ]; then
+	# default subnet
+	ipv6subnet="2000"
+
+	# check wan ip set
+	if [ "$real_wan_ipaddr" = "" ]; then
+	    $LOG "No ipv4 adress on wan, exit..."
+	    exit 1
+	fi
+
+	# rebuild ipv6 rules
+        service iptables restartv6
+
+        # calculate and set mtu
+        calculate_and_set_mtu
+
+        $LOG "Tunel ipv6 in ipv4 configure and up"
+        ipv6prefix=`echo $real_wan_ipaddr | awk -F. '{ printf "2002:%02x%02x:%02x%02x", $1, $2, $3, $4 }'`
+        if [ "$ipv6_mode" = "6RD" ]; then
+	    # this section for 6RD tunnel mode
+	    relay6to4="192.88.99.127"
+	    $LOG "Up tun6to4 interface"
+	    ip tunnel add $tunif mode sit ttl 64 remote any local $real_wan_ipaddr
+	    ip link set dev $tunif up
+	    $LOG "Set mtu $sitmtu to $tunif"
+	    sysctl -wq net.ipv6.conf.$tunif.mtu="$sitmtu"
+	    ip link set mtu $sitmtu dev $tunif
+	    $LOG "Add adress ${ipv6prefix}::1/16 to $tunif"
+	    ip -6 addr add ${ipv6prefix}::1/16 dev $tunif
+	    $LOG "Add route to ${ipv6subnet}::/3 via ::${relay6to4} dev $tunif"
+	    ip -6 route replace ${ipv6subnet}::/3 via ::${relay6to4} dev $tunif metric 1
+        elif [ "$ipv6_mode" = "6TO4" ]; then
+	    # this section for 6to4 tunnel mode
+	    relay6to4="192.88.99.1"
+	    $LOG "Up $tunif interface"
+	    ip -6 link set $tunif up
+	    $LOG "Set mtu $sitmtu to $tunif"
+	    sysctl -wq net.ipv6.conf.$tunif.mtu="$sitmtu"
+	    ip link set mtu $sitmtu dev $tunif
+	    $LOG "Add adress ${ipv6prefix}::1/16 to $tunif"
+	    ip -6 addr add ${ipv6prefix}::1/16 dev $tunif
+	    $LOG "Add route to ${ipv6subnet}::/3 via ::${relay6to4} dev $tunif"
+	    ip -6 route replace ${ipv6subnet}::/3 via ::${relay6to4} dev $tunif metric 1
+        elif [ "$ipv6_mode" = "NATIVE" ]; then
+	    # this section for native/dualstack mode
+	    :
+	fi
+
+	$LOG "Enable ipv6 forward"
+        echo "1" > /proc/sys/net/ipv6/conf/all/forwarding
+
+	$LOG "Set ${ipv6prefix}:${ipv6subnet}::1/64 to $lan_if"
+	ip -6 addr del ${ipv6prefix}:${ipv6subnet}::1/64 dev $lan_if		> /dev/null 2>&1
+	ip -6 addr add ${ipv6prefix}:${ipv6subnet}::1/64 dev $lan_if
+
+	$LOG "Configure radvd"
+        printf "
+        interface $lan_if
+            {
+                AdvSendAdvert on;
+                MinRtrAdvInterval 3;
+                MaxRtrAdvInterval 10;
+                prefix ${ipv6prefix}:${ipv6subnet}::1/64
+                {
+                        AdvOnLink off;
+                        AdvAutonomous on;
+                        AdvRouterAddr on;
+                        AdvPreferredLifetime 20;
+                        AdvValidLifetime 30;
+                };
+                RDNSS ${ipv6prefix}:${ipv6subnet}::1 2001:4860:4860::8888
+                {
+                        AdvRDNSSLifetime 10;
+                };
+            };
+        " > /etc/radvd.conf
+
+	$LOG "Starting radvd"
+	radvd -s -C /etc/radvd.conf --debug=0 --facility=0 --logmethod=syslog &
+    fi
+}
+
+stop() {
+    if [ -f /var/run/radvd.pid ]; then
+	$LOG  "Stop radvd daemon."
+	echo "0" > /proc/sys/net/ipv6/conf/all/forwarding
+
+	# rebuild ipv6 rules
+	service iptables stopv6
+
+	killall -q radvd
+	killall -q -SIGKILL radvd
+
+	ip -6 route flush dev tun6to4	> /dev/null 2>&1
+	ip -6 addr flush dev tun6to4	> /dev/null 2>&1
+	ip -6 route flush dev sit0	> /dev/null 2>&1
+	ip -6 addr flush dev sit0	> /dev/null 2>&1
+	ip link set dev tun6to4 down	> /dev/null 2>&1
+	ip link set dev sit0 down	> /dev/null 2>&1
+	ip tunnel del tun6to4		> /dev/null 2>&1
+    fi
+}
+
+case "$1" in
+	start)
+	    start
+	    ;;
+
+	stop)
+	    stop
+	    ;;
+
+	restart)
+	    stop
+	    start
+	    ;;
+
+	*)
+	    echo $"Usage: $0 {start|stop|restart}"
+	    exit 1
+esac
