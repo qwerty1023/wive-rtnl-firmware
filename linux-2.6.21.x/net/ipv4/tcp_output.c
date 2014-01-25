@@ -405,13 +405,13 @@ static int tcp_transmit_skb(struct sock *sk, struct sk_buff *skb, int clone_it, 
 
 	BUG_ON(!skb || !tcp_skb_pcount(skb));
 
-	/* If congestion control is doing timestamping, we must
-	 * take such a timestamp before we potentially clone/copy.
-	 */
-	if (icsk->icsk_ca_ops->rtt_sample)
-		__net_timestamp(skb);
+	if (clone_it) {
+		/* If congestion control is doing timestamping, we must
+		 * take such a timestamp before we potentially clone/copy.
+		 */
+		if (icsk->icsk_ca_ops->rtt_sample)
+		    __net_timestamp(skb);
 
-	if (likely(clone_it)) {
 		if (unlikely(skb_cloned(skb)))
 			skb = pskb_copy(skb, gfp_mask);
 		else
@@ -579,7 +579,7 @@ static void tcp_queue_skb(struct sock *sk, struct sk_buff *skb)
 
 static void tcp_set_skb_tso_segs(struct sock *sk, struct sk_buff *skb, unsigned int mss_now)
 {
-	if (skb->len <= mss_now || !sk_can_gso(sk)) {
+	if (skb->len <= mss_now || skb->ip_summed == CHECKSUM_NONE) {
 		/* Avoid the costly divide in the normal
 		 * non-TSO case.
 		 */
@@ -1772,23 +1772,6 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	   (tcp_skb_pcount(skb) == 1 && tcp_skb_pcount(skb->next) == 1) &&
 	   (sysctl_tcp_retrans_collapse != 0))
 		tcp_retrans_try_collapse(sk, skb, cur_mss);
-
-	/* Some Solaris stacks overoptimize and ignore the FIN on a
-	 * retransmit when old data is attached.  So strip it off
-	 * since it is cheap to do so and saves bytes on the network.
-	 */
-	if(skb->len > 0 &&
-	   (TCP_SKB_CB(skb)->flags & TCPHDR_FIN) &&
-	   tp->snd_una == (TCP_SKB_CB(skb)->end_seq - 1)) {
-		if (!pskb_trim(skb, 0)) {
-			TCP_SKB_CB(skb)->seq = TCP_SKB_CB(skb)->end_seq - 1;
-			skb_shinfo(skb)->gso_segs = 1;
-			skb_shinfo(skb)->gso_size = 0;
-			skb_shinfo(skb)->gso_type = 0;
-			skb->ip_summed = CHECKSUM_NONE;
-			skb->csum = 0;
-		}
-	}
 
 	/* Make a copy, if the first transmission SKB clone we made
 	 * is still in somebody's hands, else make a clone.
