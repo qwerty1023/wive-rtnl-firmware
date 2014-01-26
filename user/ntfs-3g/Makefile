@@ -1,9 +1,8 @@
-
 CFLAGS += -DHAVE_CONFIG_H
 
 SUBDIRS = libfuse-lite src
 
-all: 
+all:
 	@for dir in ${SUBDIRS}; do \
 		echo "Making all in $$dir"; \
 		(cd $$dir; $(MAKE) all) || exit 1; \

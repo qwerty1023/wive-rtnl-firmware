@@ -484,27 +484,23 @@ static inline void skb_entail(struct sock *sk, struct sk_buff *skb)
 		tp->nonagle &= ~TCP_NAGLE_PUSH;
 }
 
-static inline void tcp_mark_urg(struct tcp_sock *tp, int flags,
-				struct sk_buff *skb)
+static inline void tcp_mark_urg(struct tcp_sock *tp, int flags)
 {
 	if (flags & MSG_OOB) {
 		tp->urg_mode = 1;
 		tp->snd_up = tp->write_seq;
-		TCP_SKB_CB(skb)->sacked |= TCPCB_URG;
 	}
 }
 
 static inline void tcp_push(struct sock *sk, int flags, int mss_now,
 			    int nonagle)
 {
-	struct tcp_sock *tp = tcp_sk(sk);
-
 	if (sk->sk_send_head) {
-		struct sk_buff *skb = sk->sk_write_queue.prev;
+		struct tcp_sock *tp = tcp_sk(sk);
 		if (!(flags & MSG_MORE) || forced_push(tp))
-			tcp_mark_push(tp, skb);
+			tcp_mark_push(tp, sk->sk_write_queue.prev);
 
-		tcp_mark_urg(tp, flags, skb);
+		tcp_mark_urg(tp, flags);
 		__tcp_push_pending_frames(sk, mss_now, (flags & MSG_MORE) ? TCP_NAGLE_CORK : nonagle);
 	}
 }
@@ -557,7 +553,7 @@ static ssize_t do_tcp_sendpages(struct sock *sk, struct page *page, int offset,
 
 	err = -EPIPE;
 	if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
-		goto do_error;
+		goto out_err;
 
 	while (size > 0) {
 		struct sk_buff *skb = sk->sk_write_queue.prev;
@@ -721,7 +717,7 @@ int tcp_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 
 	err = -EPIPE;
 	if (sk->sk_err || (sk->sk_shutdown & SEND_SHUTDOWN))
-		goto do_error;
+		goto out_err;
 
 	sg = !!(sk->sk_route_caps & NETIF_F_SG);
 
@@ -913,8 +909,7 @@ out_err:
  */
 
 static int tcp_recv_urg(struct sock *sk, long timeo,
-			struct msghdr *msg, int len, int flags,
-			int *addr_len)
+			struct msghdr *msg, int len, int flags)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
@@ -1518,7 +1513,7 @@ out:
 	return err;
 
 recv_urg:
-	err = tcp_recv_urg(sk, timeo, msg, len, flags, addr_len);
+	err = tcp_recv_urg(sk, timeo, msg, len, flags);
 	goto out;
 }
 

@@ -609,7 +609,6 @@ int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len, unsigned int mss
 	if (WARN_ON(len > skb->len))
 		return -EINVAL;
 
-	clear_all_retrans_hints(tp);
 	nsize = skb_headlen(skb) - len;
 	if (nsize < 0)
 		nsize = 0;
@@ -643,7 +642,6 @@ int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len, unsigned int mss
 	TCP_SKB_CB(skb)->flags = flags & ~(TCPHDR_FIN|TCPHDR_PSH);
 	TCP_SKB_CB(buff)->flags = flags;
 	TCP_SKB_CB(buff)->sacked = TCP_SKB_CB(skb)->sacked;
-	TCP_SKB_CB(skb)->sacked &= ~TCPCB_AT_TAIL;
 
 	if (!skb_shinfo(skb)->nr_frags && skb->ip_summed != CHECKSUM_PARTIAL) {
 		/* Copy and checksum data tail into the new buffer. */
@@ -702,6 +700,12 @@ int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len, unsigned int mss
 			if ((int)tp->fackets_out < 0)
 				tp->fackets_out = 0;
 		}
+
+		if (tp->lost_skb_hint &&
+		    before(TCP_SKB_CB(skb)->seq,
+			   TCP_SKB_CB(tp->lost_skb_hint)->seq) &&
+		    (tcp_is_fack(tp) || TCP_SKB_CB(skb)->sacked))
+			tp->lost_cnt_hint -= diff;
 	}
 
 	/* Link BUFF into the send queue. */
@@ -1160,6 +1164,7 @@ static int tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb)
 	struct tcp_sock *tp = tcp_sk(sk);
 	const struct inet_connection_sock *icsk = inet_csk(sk);
 	u32 send_win, cong_win, limit, in_flight;
+	int win_divisor;
 
 	if (TCP_SKB_CB(skb)->flags & TCPHDR_FIN)
 		goto send_now;
@@ -1187,13 +1192,14 @@ static int tcp_tso_should_defer(struct sock *sk, struct sk_buff *skb)
 	if (limit >= 65536)
 		goto send_now;
 
-	if (sysctl_tcp_tso_win_divisor) {
+	win_divisor = ACCESS_ONCE(sysctl_tcp_tso_win_divisor);
+	if (win_divisor) {
 		u32 chunk = min(tp->snd_wnd, tp->snd_cwnd * tp->mss_cache);
 
 		/* If at least some fraction of a window is available,
 		 * just use it.
 		 */
-		chunk /= sysctl_tcp_tso_win_divisor;
+		chunk /= win_divisor;
 		if (limit >= chunk)
 			goto send_now;
 	} else {
@@ -1647,7 +1653,7 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		/* All done, get rid of second SKB and account for it so
 		 * packet counting does not break.
 		 */
-		TCP_SKB_CB(skb)->sacked |= TCP_SKB_CB(next_skb)->sacked&(TCPCB_EVER_RETRANS|TCPCB_AT_TAIL);
+		TCP_SKB_CB(skb)->sacked |= TCP_SKB_CB(next_skb)->sacked & TCPCB_EVER_RETRANS;
 		if (TCP_SKB_CB(next_skb)->sacked&TCPCB_SACKED_RETRANS)
 			tp->retrans_out -= tcp_skb_pcount(next_skb);
 		if (TCP_SKB_CB(next_skb)->sacked&TCPCB_LOST)
@@ -1866,10 +1872,8 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 				if (!(sacked&(TCPCB_SACKED_ACKED|TCPCB_SACKED_RETRANS))) {
 					int mib_idx;
 
-					if (tcp_retransmit_skb(sk, skb)) {
-						tp->retransmit_skb_hint = NULL;
+					if (tcp_retransmit_skb(sk, skb))
 						return;
-					}
 					if (icsk->icsk_ca_state != TCP_CA_Loss)
 						mib_idx = LINUX_MIB_TCPFASTRETRANS;
 					else
@@ -2213,7 +2217,7 @@ static void tcp_connect_init(struct sock *sk)
 	sk->sk_err = 0;
 	sock_reset_flag(sk, SOCK_DONE);
 	tp->snd_wnd = 0;
-	tcp_init_wl(tp, tp->write_seq, 0);
+	tcp_init_wl(tp, 0);
 	tp->snd_una = tp->write_seq;
 	tp->snd_sml = tp->write_seq;
 	tp->rcv_nxt = 0;
@@ -2394,7 +2398,7 @@ static int tcp_xmit_probe_skb(struct sock *sk, int urgent)
 	skb_reserve(skb, MAX_TCP_HEADER);
 	skb->csum = 0;
 	TCP_SKB_CB(skb)->flags = TCPHDR_ACK;
-	TCP_SKB_CB(skb)->sacked = urgent;
+	TCP_SKB_CB(skb)->sacked = 0;
 	skb_shinfo(skb)->gso_segs = 1;
 	skb_shinfo(skb)->gso_size = 0;
 	skb_shinfo(skb)->gso_type = 0;
@@ -2447,7 +2451,7 @@ int tcp_write_wakeup(struct sock *sk)
 		} else {
 			if (tp->urg_mode &&
 			    between(tp->snd_up, tp->snd_una+1, tp->snd_una+0xFFFF))
-				tcp_xmit_probe_skb(sk, TCPCB_URG);
+				tcp_xmit_probe_skb(sk, 1);
 			return tcp_xmit_probe_skb(sk, 0);
 		}
 	}

@@ -686,13 +686,10 @@ static inline void tcp_set_rto(struct sock *sk)
 	 *    all the algo is pure shit and should be replaced
 	 *    with correct one. It is exactly, which we pretend to do.
 	 */
-}
 
-/* NOTE: clamping at TCP_RTO_MIN is not required, current algo
- * guarantees that rto is higher.
- */
-static inline void tcp_bound_rto(struct sock *sk)
-{
+	/* NOTE: clamping at TCP_RTO_MIN is not required, current algo
+	 * guarantees that rto is higher.
+	 */
 	if (inet_csk(sk)->icsk_rto > TCP_RTO_MAX)
 		inet_csk(sk)->icsk_rto = TCP_RTO_MAX;
 }
@@ -869,7 +866,6 @@ static void tcp_init_metrics(struct sock *sk)
 		tp->mdev_max = tp->rttvar = max(tp->mdev, tcp_rto_min(sk));
 	}
 	tcp_set_rto(sk);
-	tcp_bound_rto(sk);
 	if (inet_csk(sk)->icsk_rto < TCP_TIMEOUT_INIT && !tp->rx_opt.saw_tstamp)
 		goto reset;
 cwnd:
@@ -2308,6 +2304,13 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 	tcp_xmit_retransmit_queue(sk);
 }
 
+static void tcp_valid_rtt_meas(struct sock *sk, u32 seq_rtt)
+{
+	tcp_rtt_estimator(sk, seq_rtt);
+	tcp_set_rto(sk);
+	inet_csk(sk)->icsk_backoff = 0;
+}
+
 /* Read draft-ietf-tcplw-high-performance before mucking
  * with this code. (Supersedes RFC1323)
  */
@@ -2329,11 +2332,8 @@ static void tcp_ack_saw_tstamp(struct sock *sk, int flag)
 	 * in window is lost... Voila.	 			--ANK (010210)
 	 */
 	struct tcp_sock *tp = tcp_sk(sk);
-	const __u32 seq_rtt = tcp_time_stamp - tp->rx_opt.rcv_tsecr;
-	tcp_rtt_estimator(sk, seq_rtt);
-	tcp_set_rto(sk);
-	inet_csk(sk)->icsk_backoff = 0;
-	tcp_bound_rto(sk);
+
+	tcp_valid_rtt_meas(sk, tcp_time_stamp - tp->rx_opt.rcv_tsecr);
 }
 
 static void tcp_ack_no_tstamp(struct sock *sk, u32 seq_rtt, int flag)
@@ -2350,10 +2350,7 @@ static void tcp_ack_no_tstamp(struct sock *sk, u32 seq_rtt, int flag)
 	if (flag & FLAG_RETRANS_DATA_ACKED)
 		return;
 
-	tcp_rtt_estimator(sk, seq_rtt);
-	tcp_set_rto(sk);
-	inet_csk(sk)->icsk_backoff = 0;
-	tcp_bound_rto(sk);
+	tcp_valid_rtt_meas(sk, seq_rtt);
 }
 
 static inline void tcp_ack_update_rtt(struct sock *sk, const int flag,
@@ -2424,11 +2421,8 @@ static int tcp_tso_acked(struct sock *sk, struct sk_buff *skb,
 				tp->sacked_out -= packets_acked;
 			if (sacked & TCPCB_LOST)
 				tp->lost_out -= packets_acked;
-			if (sacked & TCPCB_URG) {
-				if (tp->urg_mode &&
-				    !before(seq, tp->snd_up))
+			if (tp->urg_mode && !before(seq, tp->snd_up))
 					tp->urg_mode = 0;
-			}
 		} else if (*seq_rtt < 0)
 			*seq_rtt = now - scb->when;
 
@@ -2516,11 +2510,8 @@ static int tcp_clean_rtx_queue(struct sock *sk, __s32 *seq_rtt_p)
 				tp->sacked_out -= tcp_skb_pcount(skb);
 			if (sacked & TCPCB_LOST)
 				tp->lost_out -= tcp_skb_pcount(skb);
-			if (sacked & TCPCB_URG) {
-				if (tp->urg_mode &&
-				    !before(scb->end_seq, tp->snd_up))
-					tp->urg_mode = 0;
-			}
+			if (tp->urg_mode && !before(scb->end_seq, tp->snd_up))
+				tp->urg_mode = 0;
 		} else if (seq_rtt < 0) {
 			seq_rtt = now - scb->when;
 			skb_get_timestamp(skb, &tv);
@@ -2640,7 +2631,7 @@ static int tcp_ack_update_window(struct sock *sk, struct sk_buff *skb, u32 ack,
 
 	if (tcp_may_update_window(tp, ack, ack_seq, nwin)) {
 		flag |= FLAG_WIN_UPDATE;
-		tcp_update_wl(tp, ack, ack_seq);
+		tcp_update_wl(tp, ack_seq);
 
 		if (tp->snd_wnd != nwin) {
 			tp->snd_wnd = nwin;
@@ -2755,7 +2746,7 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 		 * No more checks are required.
 		 * Note, we use the fact that SND.UNA>=SND.WL2.
 		 */
-		tcp_update_wl(tp, ack, ack_seq);
+		tcp_update_wl(tp, ack_seq);
 		tp->snd_una = ack;
 		flag |= FLAG_WIN_UPDATE;
 
@@ -4480,7 +4471,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		 * never scaled.
 		 */
 		tp->snd_wnd = ntohs(th->window);
-		tcp_init_wl(tp, TCP_SKB_CB(skb)->ack_seq, TCP_SKB_CB(skb)->seq);
+		tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
 
 		if (!tp->rx_opt.wscale_ok) {
 			tp->rx_opt.snd_wscale = tp->rx_opt.rcv_wscale = 0;
@@ -4777,8 +4768,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb,
 				tp->snd_una = TCP_SKB_CB(skb)->ack_seq;
 				tp->snd_wnd = ntohs(th->window) <<
 					      tp->rx_opt.snd_wscale;
-				tcp_init_wl(tp, TCP_SKB_CB(skb)->ack_seq,
-					    TCP_SKB_CB(skb)->seq);
+				tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
 
 				/* tcp_ack considers this ACK as duplicate
 				 * and does not calculate rtt.

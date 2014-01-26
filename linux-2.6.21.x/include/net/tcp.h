@@ -566,10 +566,6 @@ struct tcp_skb_cb {
 #define TCPCB_EVER_RETRANS	0x80	/* Ever retransmitted frame	*/
 #define TCPCB_RETRANS		(TCPCB_SACKED_RETRANS|TCPCB_EVER_RETRANS)
 
-#define TCPCB_URG		0x20	/* Urgent pointer advanced here	*/
-
-#define TCPCB_AT_TAIL		(TCPCB_URG)
-
 	__u16		urg_ptr;	/* Valid w/URG flags is set.	*/
 	__u32		ack_seq;	/* Sequence number ACK'd	*/
 };
@@ -859,12 +855,12 @@ static inline void tcp_push_pending_frames(struct sock *sk)
 	__tcp_push_pending_frames(sk, tcp_current_mss(sk, 1), tp->nonagle);
 }
 
-static inline void tcp_init_wl(struct tcp_sock *tp, u32 ack, u32 seq)
+static inline void tcp_init_wl(struct tcp_sock *tp, u32 seq)
 {
 	tp->snd_wl1 = seq;
 }
 
-static inline void tcp_update_wl(struct tcp_sock *tp, u32 ack, u32 seq)
+static inline void tcp_update_wl(struct tcp_sock *tp, u32 seq)
 {
 	tp->snd_wl1 = seq;
 }
