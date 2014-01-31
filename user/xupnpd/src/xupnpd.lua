@@ -113,6 +113,6 @@ cfg.feeds_path='/etc/xupnpd/xupnpd-feeds/'
 cfg.www_root='/usr/share/xupnpd/www/'
 cfg.ui_path='/usr/share/xupnpd/ui/'
 cfg.drive=''                    -- reload playlists only if drive state=active/idle, example: cfg.drive='/dev/sda'
-cfg.profiles='/usr/share/xupnpd/profiles/'      -- device profiles feature
+cfg.profiles='/etc/xupnpd/profiles/'      -- device profiles feature
 
 dofile('xupnpd_main.lua')
