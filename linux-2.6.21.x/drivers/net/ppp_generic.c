@@ -1104,7 +1104,7 @@ pad_compress_skb(struct ppp *ppp, struct sk_buff *skb)
 		skb = new_skb;
 		skb_put(skb, len);
 		skb_pull(skb, 2);	/* pull off A/C bytes */
-	} else if (!len) {
+	} else if (len == 0) {
 		/* didn't compress, or CCP not up yet */
 		kfree_skb(new_skb);
 		new_skb = skb;
@@ -1214,6 +1214,33 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		ppp_ccp_peek(ppp, skb, 0);
 #endif
 
+	if (proto != PPP_LCP && proto != PPP_CCP) {
+#ifdef CONFIG_PPP_PREVENT_DROP_SESSION_ON_FULL_CPU_LOAD
+	    /* this is simple cpu based policer need for prevent drop session at high cpu load */
+	    if (ppp_cpu_load >= 1000) {
+		/* get cpu load */
+		curload = (cpload[0] + cpload[1]) >> 1;
+		curload = (curload + cpload[2]) >> 1;
+		curload = (curload + weighted_cpuload(0)) >> 1;
+		cpload[0] = cpload[1];
+		cpload[1] = cpload[2];
+		cpload[2] = curload;
+
+		/* drop if load high in current interval */
+		if (curload > ppp_cpu_load) {
+			goto drop2;      /* drop packet ... */
+		}
+	    }
+#endif
+#ifdef CONFIG_RALINK_GPIO_LED_VPN
+	    if ((jiffies - led_prev_jiffies) >= (HZ>>2)) {
+		    /* blink led */
+		    ralink_gpio_led_set(ppp_led);
+		    led_prev_jiffies = jiffies;
+	    }
+#endif
+	} /* end !lcp/cpp if */
+
 	/* try to do packet compression */
 	if ((ppp->xstate & SC_COMP_RUN) && ppp->xc_state &&
 	    proto != PPP_LCP && proto != PPP_CCP) {
@@ -1239,42 +1266,9 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 		return;
 	}
 
-	if (proto != PPP_LCP && proto != PPP_CCP) {
-#ifdef CONFIG_PPP_PREVENT_DROP_SESSION_ON_FULL_CPU_LOAD
-	    /* this is simple cpu based policer need for prevent drop session at high cpu load */
-	    if (ppp_cpu_load >= 1000) {
-		/* get cpu load */
-		curload = (cpload[0] + cpload[1]) >> 1;
-		curload = (curload + cpload[2]) >> 1;
-		curload = (curload + weighted_cpuload(0)) >> 1;
-		cpload[0] = cpload[1];
-		cpload[1] = cpload[2];
-		cpload[2] = curload;
-
-		/* drop if load high in current interval */
-		if (curload > ppp_cpu_load) {
-			goto drop2;      /* drop packet ... */
-		}
-	    }
-#endif
-
-	    /*if ((jiffies - prn_prev_jiffies) >= (HZ<<1)) {
-		    // print
-		    printk("PPP: CURLOAD %lu, weighted_cpuload %lu\n", curload, weighted_cpuload(0));
-		    prn_prev_jiffies = jiffies;
-	    }*/
-
-#ifdef CONFIG_RALINK_GPIO_LED_VPN
-	    if ((jiffies - led_prev_jiffies) >= (HZ>>2)) {
-		    /* blink led */
-		    ralink_gpio_led_set(ppp_led);
-		    led_prev_jiffies = jiffies;
-	    }
-#endif
-	} /* end !lcp/cpp if */
-
 	ppp->xmit_pending = skb;
 	ppp_push(ppp);
+
 	return;
 
 drop:
@@ -1805,7 +1799,6 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 			*skb_push(skb, 2) = 0;
 			if (ppp->pass_filter &&
 			    sk_run_filter(skb, ppp->pass_filter) == 0) {
-					     ppp->pass_len) == 0) {
 				if (ppp->debug & 1)
 					printk(KERN_DEBUG "PPP: inbound frame "
 					       "not passed\n");
@@ -1882,8 +1875,10 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 			goto err;
 		}
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-		if(ra_sw_nat_hook_rx!= NULL && IS_SPACE_AVAILABLED(skb))
+#if !defined(HNAT_USE_TAILROOM)
+		if(ra_sw_nat_hook_rx != NULL)
 			memcpy(FOE_INFO_START_ADDR(ns), FOE_INFO_START_ADDR(skb), FOE_INFO_LEN); // copy FoE Info
+#endif
 #endif
 		kfree_skb(skb);
 		skb = ns;
@@ -1984,8 +1979,8 @@ ppp_receive_mp_frame(struct ppp *ppp, struct sk_buff *skb, struct channel *pch)
 	   before the start of the queue. */
 	if (skb_queue_len(&ppp->mrq) >= PPP_MP_MAX_QLEN) {
 		struct sk_buff *mskb = skb_peek(&ppp->mrq);
-		if (seq_before(ppp->minseq, PPP_MP_CB(mskb)->sequence))
-			ppp->minseq = PPP_MP_CB(mskb)->sequence;
+		if (seq_before(ppp->minseq, mskb->sequence))
+			ppp->minseq = mskb->sequence;
 	}
 
 	/* Pull completed packets off the queue and receive them. */
@@ -2065,8 +2060,8 @@ ppp_mp_reconstruct(struct ppp *ppp)
 			/* Fragment `seq' is lost, keep going. */
 			lost = 1;
 			oldseq = seq;
-			seq = seq_before(minseq, PPP_MP_CB(p)->sequence)?
-				minseq + 1: PPP_MP_CB(p)->sequence;
+			seq = seq_before(minseq, p->sequence)?
+				minseq + 1: p->sequence;
 
 			if (ppp->debug & 1)
 				netdev_printk(KERN_DEBUG, ppp->dev,

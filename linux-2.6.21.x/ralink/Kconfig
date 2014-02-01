@@ -24,6 +24,11 @@ endmenu
 # Wireless
 #############
 menu "Platform config for  Ralink RT3xx/RT28xx/RT5xx."
+
+config RALINK_RT3052_25DRIVER
+	bool "Use old 2.5.0.x version AP driver for RT305x/3350"
+        depends on RALINK_RT3052
+
 choice
         prompt "RF Type"
         depends on RALINK_RT5350

@@ -125,6 +125,7 @@
 #include <linux/ipsec.h>
 
 #include <linux/filter.h>
+#include <linux/prefetch.h>
 
 #ifdef CONFIG_INET
 #include <net/tcp.h>
@@ -208,13 +209,14 @@ static int sock_set_timeout(long *timeo_p, char __user *optval, int optlen)
 		return -EDOM;
 
 	if (tv.tv_sec < 0) {
-		static int warned = 0;
+		static int warned __read_mostly;
 		*timeo_p = 0;
-		if (warned < 10 && net_ratelimit())
+		if (warned < 10 && net_ratelimit()) {
 			warned++;
 			printk(KERN_INFO "sock_set_timeout: `%s' (pid %d) "
 			       "tries to set negative timeout\n",
 				current->comm, current->pid);
+		}
 		return 0;
 	}
 	*timeo_p = MAX_SCHEDULE_TIMEOUT;
@@ -477,23 +479,15 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 			break;
 		case SO_SNDBUF:
 			/* Don't error on this BSD doesn't and if you think
-			   about it this is right. Otherwise apps have to
-			   play 'guess the biggest size' games. RCVBUF/SNDBUF
-			   are treated in BSD as hints */
-
-			if (val > sysctl_wmem_max)
-				val = sysctl_wmem_max;
+			* about it this is right. Otherwise apps have to
+			* play 'guess the biggest size' games. RCVBUF/SNDBUF
+			* are treated in BSD as hints
+			*/
+			val = min_t(u32, val, sysctl_wmem_max);
 set_sndbuf:
 			sk->sk_userlocks |= SOCK_SNDBUF_LOCK;
-			if ((val * 2) < SOCK_MIN_SNDBUF)
-				sk->sk_sndbuf = SOCK_MIN_SNDBUF;
-			else
-				sk->sk_sndbuf = val * 2;
-
-			/*
-			 *	Wake up sending tasks if we
-			 *	upped the value.
-			 */
+			sk->sk_sndbuf = max_t(u32, val * 2, SOCK_MIN_SNDBUF);
+			/* Wake up sending tasks if we upped the value. */
 			sk->sk_write_space(sk);
 			break;
 
@@ -506,12 +500,11 @@ set_sndbuf:
 
 		case SO_RCVBUF:
 			/* Don't error on this BSD doesn't and if you think
-			   about it this is right. Otherwise apps have to
-			   play 'guess the biggest size' games. RCVBUF/SNDBUF
-			   are treated in BSD as hints */
-
-			if (val > sysctl_rmem_max)
-				val = sysctl_rmem_max;
+			* about it this is right. Otherwise apps have to
+			* play 'guess the biggest size' games. RCVBUF/SNDBUF
+			* are treated in BSD as hints
+			*/
+			val = min_t(u32, val, sysctl_rmem_max);
 set_rcvbuf:
 			sk->sk_userlocks |= SOCK_RCVBUF_LOCK;
 			/*
@@ -529,10 +522,7 @@ set_rcvbuf:
 			 * returning the value we actually used in getsockopt
 			 * is the most desirable behavior.
 			 */
-			if ((val * 2) < SOCK_MIN_RCVBUF)
-				sk->sk_rcvbuf = SOCK_MIN_RCVBUF;
-			else
-				sk->sk_rcvbuf = val * 2;
+			sk->sk_rcvbuf = max_t(u32, val * 2, SOCK_MIN_RCVBUF);
 			break;
 
 		case SO_RCVBUFFORCE:
@@ -1013,6 +1003,11 @@ struct sock *sk_clone(const struct sock *sk, const gfp_t priority)
 
 		newsk->sk_err	   = 0;
 		newsk->sk_priority = 0;
+		/*
+		 * Before updating sk_refcnt, we must commit prior changes to memory
+		 * (Documentation/RCU/rculist_nulls.txt for details)
+		 */
+		smp_wmb();
 		atomic_set(&newsk->sk_refcnt, 2);
 
 		/*
@@ -1137,7 +1132,7 @@ struct sk_buff *sock_rmalloc(struct sock *sk, unsigned long size, int force,
  */
 void *sock_kmalloc(struct sock *sk, int size, gfp_t priority)
 {
-	if ((unsigned)size <= sysctl_optmem_max &&
+	if ((unsigned int)size <= sysctl_optmem_max &&
 	    atomic_read(&sk->sk_omem_alloc) + size < sysctl_optmem_max) {
 		void *mem;
 		/* First do the add, to avoid the race if kmalloc
@@ -1587,6 +1582,11 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 
 	sk->sk_stamp = ktime_set(-1L, 0);
 
+	/*
+	 * Before updating sk_refcnt, we must commit prior changes to memory
+	 * (Documentation/RCU/rculist_nulls.txt for details)
+	 */
+	smp_wmb();
 	atomic_set(&sk->sk_refcnt, 1);
 	atomic_set(&sk->sk_drops, 0);
 }
@@ -1595,9 +1595,9 @@ void fastcall lock_sock_nested(struct sock *sk, int subclass)
 {
 	might_sleep();
 	spin_lock_bh(&sk->sk_lock.slock);
-	if (sk->sk_lock.owner)
+	if (sk->sk_lock.owned)
 		__lock_sock(sk);
-	sk->sk_lock.owner = (void *)1;
+	sk->sk_lock.owned = 1;
 	spin_unlock(&sk->sk_lock.slock);
 	/*
 	 * The sk_lock has mutex_lock() semantics here:
@@ -1618,7 +1618,7 @@ void fastcall release_sock(struct sock *sk)
 	spin_lock_bh(&sk->sk_lock.slock);
 	if (sk->sk_backlog.tail)
 		__release_sock(sk);
-	sk->sk_lock.owner = NULL;
+	sk->sk_lock.owned = 0;
 	if (waitqueue_active(&sk->sk_lock.wq))
 		wake_up(&sk->sk_lock.wq);
 	spin_unlock_bh(&sk->sk_lock.slock);

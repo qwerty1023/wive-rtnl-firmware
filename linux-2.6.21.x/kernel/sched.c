@@ -52,7 +52,6 @@
 #include <linux/tsacct_kern.h>
 #include <linux/kprobes.h>
 #include <linux/delayacct.h>
-#include <linux/prefetch.h>
 #include <linux/reciprocal_div.h>
 
 #include <asm/tlb.h>

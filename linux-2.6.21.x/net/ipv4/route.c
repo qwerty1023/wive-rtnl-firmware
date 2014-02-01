@@ -95,7 +95,6 @@
 #include <linux/rcupdate.h>
 #include <linux/times.h>
 #include <linux/slab.h>
-#include <linux/prefetch.h>
 #include <net/protocol.h>
 #include <net/ip.h>
 #include <net/route.h>
@@ -178,7 +177,7 @@ static struct dst_ops ipv4_dst_ops = {
 
 const __u8 ip_tos2prio[16] = {
 	TC_PRIO_BESTEFFORT,
-	ECN_OR_COST(FILLER),
+	ECN_OR_COST(BESTEFFORT),
 	TC_PRIO_BESTEFFORT,
 	ECN_OR_COST(BESTEFFORT),
 	TC_PRIO_BULK,
@@ -1067,7 +1066,7 @@ void __ip_select_ident(struct iphdr *iph, struct dst_entry *dst, int more)
 	ip_select_fb_ident(iph);
 }
 
-static void rt_del(unsigned hash, struct rtable *rt)
+static void rt_del(unsigned int hash, struct rtable *rt)
 {
 	struct rtable **rthp;
 
@@ -1697,7 +1696,7 @@ static inline int ip_mkroute_input(struct sk_buff *skb,
 {
 	struct rtable* rth = NULL;
 	int err;
-	unsigned hash;
+	unsigned int hash;
 
 	fib_select_default(fl, res);
 #ifdef CONFIG_IP_ROUTE_MULTIPATH

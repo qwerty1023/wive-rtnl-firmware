@@ -10,7 +10,7 @@ cfg.ssdp_loop=0
 cfg.ssdp_notify_interval=5
 
 -- SSDP announcement age
-cfg.ssdp_max_age=600
+cfg.ssdp_max_age=300
 
 -- HTTP port for incoming connections
 cfg.http_port=4044
@@ -64,13 +64,13 @@ cfg.sort_files=true
 cfg.name='Wive-RTNL'
 
 -- static device UUID, '60bd2fb3-dabe-cb14-c766-0e319b54c29a' for example or nil
-cfg.uuid='60bd2fb3-dabe-cb14-c766-0e114b52c22a'
+cfg.uuid='60bd2fb3-dabe-cb24-c766-0e114b52c22a'
 
 -- max url cache size
 cfg.cache_size=4
 
 -- url cache item ttl (sec)
-cfg.cache_ttl=600
+cfg.cache_ttl=300
 
 -- default mime type (mpeg, mpeg_ts, mpeg1, mpeg2, ts, ...)
 cfg.default_mime_type='mpeg'

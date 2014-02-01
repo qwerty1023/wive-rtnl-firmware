@@ -26,34 +26,19 @@ start() {
 	$LOG "Set default filters"
 	iptables -I INPUT -i lo -j ACCEPT
 	iptables -A INPUT $STATE_EST -j ACCEPT
-###########################################IGMP-RULES#######################################
-	# only WAN interface recived multicast
-	if [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
-	    # INPUT needed by unpxy and igmpproxy
-	    if [ "$igmpEnabled" != "0" ] || [ "$UDPXYMode" != "0" ] || [ "$xupnpd" = "1" ]; then
-		$LOG "Set igmp input rules"
-		iptables -A INPUT -p igmp -i $lan_if -j ACCEPT
-	        iptables -A INPUT -d $mcast_net -i $wan_if -j ACCEPT
-		iptables -A INPUT -s $mcast_net -i $wan_if -j ACCEPT
-	    fi
-	    # FORWARD rules needed only for igmpproxy.
-	    if [ "$igmpEnabled" != "0" ]; then
-		$LOG "Set igmp forward rules"
-		iptables -A FORWARD -d $mcast_net -o $lan_if -j ACCEPT
-		iptables -A FORWARD -s $mcast_net -i $lan_if -j ACCEPT
-		# hack for stupid and greedy ISP
-		if [ "$store_ttl_mcast" = "1" ] && [ "$store_ttl" != "1" ]; then
-		    $LOG "Increase TTL for input multicast packets"
-		    iptables -t mangle -A PREROUTING -i $wan_if -d $mcast_net -p udp -j TTL --ttl-inc 1
-		fi
-	    fi
-	fi
 ###########################################SERVICES#######################################
 	$LOG "Service limit set:"
         # add limit connection rules for local services
 	iptables -N servicelimit > /dev/null 2>&1
         iptables -F servicelimit > /dev/null 2>&1
         iptables -A INPUT -j servicelimit > /dev/null 2>&1
+	# INPUT needed by unpxy and igmpproxy
+	if [ "$igmpEnabled" != "0" ] || [ "$UDPXYMode" != "0" ] || [ "$xupnpd" = "1" ]; then
+	    $LOG "Set igmp input rules"
+	    iptables -A servicelimit -p igmp -i $lan_if -j ACCEPT
+	    iptables -A servicelimit -d $mcast_net -i $wan_if -j ACCEPT
+	    iptables -A servicelimit -s $mcast_net -i $wan_if -j ACCEPT
+	fi
 	if [ "$dhcpEnabled" != "0" ]; then
 	    iptables -A servicelimit -i $lan_if -p udp --dport 67 -j ACCEPT
 	fi
@@ -71,14 +56,14 @@ start() {
 	fi
 	if [ "$RemoteSSH" != "0" ]; then
 	    $LOG "ssh"
-    	    iptables -A servicelimit $STATE_NEW -p tcp --dport 22 $CONNLIMIT 4 -j REJECT
+    	    iptables -A servicelimit $STATE_NEW -p tcp --dport $RemoteSSHPort $CONNLIMIT 4 -j REJECT
 	    if [ "$RemoteSSH" = "1" ]; then
-    		iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp --dport 22 -j ACCEPT
+    		iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp --dport $RemoteSSHPort -j ACCEPT
 	     if [ "$Lan2Enabled" = "1" ]; then
-    		iptables -A servicelimit -i $lan2_if $STATE_NEW -p tcp --dport 22 -j ACCEPT
+    		iptables -A servicelimit -i $lan2_if $STATE_NEW -p tcp --dport $RemoteSSHPort -j ACCEPT
 	     fi
 	    elif [ "$RemoteSSH" = "2" ]; then
-    		iptables -A servicelimit $STATE_NEW -p tcp --dport 22 -j ACCEPT
+    		iptables -A servicelimit $STATE_NEW -p tcp --dport $RemoteSSHPort -j ACCEPT
 	    fi
 	fi
 	if [ "$RemoteTelnet" != "0" ]; then
@@ -226,30 +211,19 @@ start() {
 		echo "reset-on-read=no" > /proc/net/ipt_account/mynetwork
 	    fi
 
-	    # tune mss size for tranzit packets
-	    clamp_mss
-
-	    # hack for stupid and greedy ISP
-	    if [ "$store_ttl" = "1" ]; then
-		$LOG "Increase TTL for input packets"
-		iptables -t mangle -A PREROUTING -i $wan_if -j TTL --ttl-inc 1
+	    if [ "$igmpEnabled" != "0" ]; then
+		$LOG "Set igmp forward rules"
+		iptables -A FORWARD -d $mcast_net -o $lan_if -j ACCEPT
+		iptables -A FORWARD -s $mcast_net -i $lan_if -j ACCEPT
 	    fi
 
 	    if [ -f /etc/macipfilter ] && [ "$IPPortFilterEnable" = "1" ]; then
 		$LOG "Set macipport_filter rules"
 		/etc/macipfilter
-		if [ "$DefaultFirewallPolicy" = "1" ]; then
-		    $LOG "Default policy macipport_filter DROP"
-		    iptables -t filter -p tcp $STATE_NEW -A macipport_filter -j DROP
-		    iptables -t filter -p udp -A macipport_filter -j DROP
-		else
-		    iptables -t filter -p tcp $STATE_NEW -A macipport_filter -j RETURN
-		    iptables -t filter -p udp -A macipport_filter -j RETURN
-		fi
 	    fi
 
 	    if [ -f /etc/websfilter ]; then
-        	$LOG "Add rules for content filters"
+        	$LOG "Add rules for web content filters"
     		/etc/websfilter
 	    fi
 
@@ -270,10 +244,24 @@ start() {
 		# in proxy arp mode need all forward packets to acepted
 		iptables -I FORWARD -j ACCEPT
 	    fi
+
 	    # add forward chain for vpn server
 	    if [ "$l2tp_srv_enabled" = "1" ]; then
 		iptables -N l2tpsrvfwd
 		iptables -A FORWARD -j l2tpsrvfwd
+	    fi
+
+	    # tune mss size for tranzit packets
+	    clamp_mss
+
+	    # hack for stupid and greedy ISP
+	    if [ "$store_ttl" = "1" ]; then
+		$LOG "Increase TTL for input packets"
+		iptables -t mangle -A PREROUTING -i $wan_if -j TTL --ttl-inc 1
+		if [ "$igmpEnabled" != "0" ] && [ "$store_ttl_mcast" = "1" ]; then
+		    $LOG "Increase TTL for input multicast packets"
+		    iptables -t mangle -A PREROUTING -i $wan_if -d $mcast_net -p udp -j TTL --ttl-inc 1
+		fi
 	    fi
 	fi
 ###########################################QOS-SIMPLE######################################
@@ -442,9 +430,8 @@ get_param() {
     # get network, vpn, netfiletrs and others config variables
     eval `nvram_buf_get 2860 lan_ipaddr lan_netmask Lan2Enabled lan2_ipaddr lan2_netmask mss_use_pmtu \
 	    natEnabled use_snat PortForwardEnable DMZEnable DMZIPAddress DMZNATLoopback DefaultFirewallPolicy \
-	    IPPortFilterEnable WANPingFilter RemoteSSH RemoteFTP RemoteTelnet RemoteManagement RemoteManagementPort \
-	    dhcpEnabled ipt_account upnpEnabled igmpEnabled xupnpd SmbEnabled \
-		TransmissionEnabled TransRPCPort TransInPort TransAccess snmpd FtpPort\
+	    IPPortFilterEnable WANPingFilter RemoteSSH RemoteSSHPort RemoteFTP FtpPort RemoteTelnet RemoteManagement RemoteManagementPort \
+	    dhcpEnabled ipt_account upnpEnabled igmpEnabled xupnpd SmbEnabled TransmissionEnabled TransRPCPort TransInPort TransAccess snmpd \
 	    parproutedEnabled PrinterSrvEnabled chilli_net vpnType vpnNAT l2tp_srv_enabled MODEMENABLED store_ttl store_ttl_mcast`
 
     # if ppp enabled and not pure pppoe mode (type6 is lanauth not real ppp)
