@@ -94,7 +94,7 @@ static int getProcessList(int eid, webs_t wp, int argc, char_t **argv)
 
 	cmdline_t *proc_list = procps_list();
 	cmdline_t *curr = proc_list;
-
+	
 	while (curr != NULL)
 	{
 		int i=0;
@@ -108,14 +108,14 @@ static int getProcessList(int eid, webs_t wp, int argc, char_t **argv)
 			}
 			i++;
 		}
-
+		
 		// Move pointer
 		curr = curr->next;
 	}
 
 	// Free structure, NULL is properly handled
 	procps_free(proc_list);
-
+	
 	return 0;
 }
 
@@ -380,7 +380,6 @@ const parameter_fetch_t service_misc_flags[] =
 	{ T("natFastpath"), "natFastpath", 0, T("0") },
 	{ T("hw_nat_wifiPT"), "hw_nat_wifi", 0, T("0") },
 	{ T("natMode"), "nat_mode", 0, T("1") },
-	{ T("bridgeFastpath"), "bridgeFastpath", 0, T("1") },
 	{ T("routeFastpath"), "routeFastpath", 0, T("1") },
 	{ T("CrondEnable"), "CrondEnable", 0, T("0") },
 	{ T("ForceRenewDHCP"), "ForceRenewDHCP", 0, T("1") },
@@ -420,13 +419,13 @@ static void setMiscServices(webs_t wp, char_t *path, char_t *query)
 		nvram_bufset(RT2860_NVRAM, "dhcpPriDns", "");
 		nvram_bufset(RT2860_NVRAM, "dhcpSecDns", "");
 	}
-
+	
 	char_t *http_port = nvram_bufget(RT2860_NVRAM, "RemoteManagementPort");
 
 	nvram_close(RT2860_NVRAM);
 
 	char_t *port_changed = websGetVar(wp, T("rmt_http_port_changed"), T("0"));
-
+	
 	if (CHK_IF_DIGIT(port_changed, 1))
 	{
 		char lan_if_addr[32];
@@ -472,7 +471,7 @@ static void setMiscServices(webs_t wp, char_t *path, char_t *query)
 		}
 		websFooter(wp);
 		websDone(wp, 200);
-
+		
 		doSystem("sleep 3 && reboot");
 	}
 	else

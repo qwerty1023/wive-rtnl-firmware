@@ -173,7 +173,6 @@ function initValue()
 	form.watchdogEnable.value = defaultNumber("<% getCfgGeneral(1, "WatchdogEnabled"); %>", "0");
 	form.dhcpSwReset.value = defaultNumber("<% getCfgGeneral(1, "dhcpSwReset"); %>", "0");
 
-	form.bridgeFastpath.value = defaultNumber("<% getCfgGeneral(1, "bridgeFastpath"); %>", "1");
 	form.routeFastpath.value = defaultNumber("<% getCfgGeneral(1, "routeFastpath"); %>", "1");
 	form.CrondEnable.value = defaultNumber("<% getCfgGeneral(1, "CrondEnable"); %>", "0");
 	form.ForceRenewDHCP.value = defaultNumber("<% getCfgGeneral(1, "ForceRenewDHCP"); %>", "1");
@@ -400,15 +399,6 @@ function displayServiceStatus()
 		<option value="0">Linux</option>
 		<option value="1">Fcone</option>
 		<option value="2">Rcone</option>
-	</select>
-</td>
-</tr>
-<tr>
-<td class="head">Bridge fastpath</td>
-<td colspan="4">
-	<select name="bridgeFastpath" class="half">
-		<option value="0">Disable</option>
-		<option value="1">Enable</option>
 	</select>
 </td>
 </tr>
