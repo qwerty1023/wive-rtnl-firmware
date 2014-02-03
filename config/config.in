@@ -171,7 +171,7 @@ bool 'setpci'			CONFIG_USER_PCIUTIL_SETPCI
 if [ "$CONFIG_USER_PCIUTIL_LSPCI" = "y" -o "$CONFIG_USER_PCIUTIL_SETPCI" = "y" ]; then
     define_bool CONFIG_LIB_ZLIB_FORCE y
 fi
-
+bool 'e2fsprogs'		CONFIG_USER_E2FSPROGS
 endmenu
 
 #############################################################################

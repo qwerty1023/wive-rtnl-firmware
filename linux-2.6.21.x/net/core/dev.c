@@ -1824,7 +1824,7 @@ static int ing_filter(struct sk_buff *skb)
 }
 #endif
 
-int netif_receive_skb(struct sk_buff *skb)
+int FASTPATH netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
 	struct net_device *orig_dev;
@@ -3243,7 +3243,7 @@ static void netdev_wait_allrefs(struct net_device *dev)
 			if (count > 2) {
 			    refcnt = 0;
 			    atomic_set (&dev->refcnt, 0);
-			    printk(KERN_EMERG "unregister_netdevice %s refcnt leak. need fix. Usage count = %d\n", dev->name, refcnt);
+			    //printk(KERN_EMERG "unregister_netdevice %s refcnt leak. need fix. Usage count = %d\n", dev->name, refcnt);
 			    break;
 			}
 
