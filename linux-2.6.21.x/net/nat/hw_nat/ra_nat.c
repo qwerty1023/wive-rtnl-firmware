@@ -2319,24 +2319,29 @@ static void FoeFreeTbl(uint32_t NumOfEntry)
 
 static int32_t PpeEngStart(void)
 {
+	char chip_id[8];
+	uint32_t rev_id;
+
+	*(uint32_t *)&chip_id[0] = RegRead(CHIPID);
+	*(uint32_t *)&chip_id[4] = RegRead(CHIPID + 0x4);
+	chip_id[6] = '\0';
+	rev_id = RegRead(REVID);
+	rev_id &= 0xFFFF;
+
 #if defined (CONFIG_RALINK_RT3052)
 	/* RT3052 with RF_REG0 > 0x53 has no bug UDP w/o checksum */
 	uint32_t phy_val = 0;
 	rw_rf_reg(0, 0, &phy_val);
 	ppe_udp_bug = ((phy_val & 0xFF) > 0x53) ? 0 : 1;
-
-	printk("Ralink PPE HW revision: %i\n", phy_val);
-
+	//printk("Ralink PPE HW revision: %i\n", phy_val);
 #elif defined (CONFIG_RALINK_RT3352)
 	/* RT3352 rev 0105 has no bug UDP w/o checksum */
 	ppe_udp_bug = (rev_id > 0x0104) ? 0 : 1;
 #elif defined (CONFIG_RALINK_RT2880) || defined (CONFIG_RALINK_RT2883) || defined (CONFIG_RALINK_RT3883)
 	/* RT3883/RT3662 at least rev 0105 has bug UDP w/o checksum :-( */
 	ppe_udp_bug = 1;
-#elif defined (CONFIG_RALINK_MT7620)
-	/* MT7620 at least rev 0203 has bug UDP w/o checksum :-( */
-	ppe_udp_bug = 1;
 #endif
+
 	/* Set PPE Flow Set */
 	PpeSetFoeEbl(1);
 
@@ -2370,6 +2375,9 @@ static int32_t PpeEngStart(void)
 #endif
 	/* which protocol type should be handle by HNAT not HNAPT */
 	PpeSetHNATProtoType();
+
+	printk("PPE: CHIPID %s, REVISION %04X\n", chip_id, rev_id);
+
 	return 0;
 }
 

@@ -131,7 +131,7 @@ int main(int argc, char** argv)
 
 	/* Initialize the web server */
 	if (initWebs() < 0) {
-		//Clean-up and exit
+		/* Clean-up and exit */
 #ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
 	    if (pid > 0)
 		kill(pid, SIGTERM);
@@ -145,8 +145,13 @@ int main(int argc, char** argv)
     	    /* Start needed services */
 	    initInternet();
 
+#ifdef CONFIG_USB
+	    /* Rescan usb devices after start */
+	    doSystem("service hotplug rescan");
+#endif
+
 	    /* Backup nvram setting and save rwfs */
-	    system("[ ! -f /etc/backup/nvram_backup.dat ] && (sleep 20 && fs backup_nvram && fs save) &");
+	    doSystem("[ ! -f /etc/backup/nvram_backup.dat ] && (sleep 20 && fs backup_nvram && fs save) &");
 
 
 	    //Work - Green ON

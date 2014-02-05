@@ -5,7 +5,7 @@ if [ -f /tmp/nvram_checked ] || [ -f /var/run/goahead.pid ]; then
     exit 0
 fi
 
-LOG="echo CHECKCONF"
+LOG="logger -t CHECKCONF"
 
 start() {
     # get variables

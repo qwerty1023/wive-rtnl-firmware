@@ -80,7 +80,6 @@ start() {
 	fi
 	if [ "$RemoteFTP" != "0" ]; then
 	    $LOG "ftp"
-    	    iptables -A servicelimit $STATE_NEW -p tcp -m multiport --dport 20,$FtpPort $CONNLIMIT 4 -j REJECT
 	    if [ "$RemoteFTP" = "1" ]; then
     		iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp -m multiport --dport 20,$FtpPort -j ACCEPT
 	        if [ "$Lan2Enabled" = "1" ]; then
@@ -118,7 +117,6 @@ start() {
 	fi
 	if [ "$UDPXYMode" != "0" ]; then
 	    $LOG "udpxy"
-    	    iptables -A servicelimit $STATE_NEW -p tcp --dport $UDPXYPort $CONNLIMIT 8 -j REJECT
 	    if [ "$UDPXYMode" = "1" ]; then
     		iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp --dport $UDPXYPort -j ACCEPT
 	     if [ "$Lan2Enabled" = "1" ]; then

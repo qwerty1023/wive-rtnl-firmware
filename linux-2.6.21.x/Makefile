@@ -73,11 +73,9 @@ MOREOPTIMIZE  = -O2
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
 
-ifdef V
   ifeq ("$(origin V)", "command line")
     KBUILD_VERBOSE = $(V)
   endif
-endif
 ifndef KBUILD_VERBOSE
   KBUILD_VERBOSE = 0
 endif
@@ -92,11 +90,9 @@ endif
 # See the file "Documentation/sparse.txt" for more details, including
 # where to get the "sparse" utility.
 
-ifdef C
   ifeq ("$(origin C)", "command line")
     KBUILD_CHECKSRC = $(C)
   endif
-endif
 ifndef KBUILD_CHECKSRC
   KBUILD_CHECKSRC = 0
 endif
@@ -107,12 +103,10 @@ endif
 ifdef SUBDIRS
   KBUILD_EXTMOD ?= $(SUBDIRS)
 endif
-ifdef M
+
   ifeq ("$(origin M)", "command line")
     KBUILD_EXTMOD := $(M)
   endif
-endif
-
 
 # kbuild supports saving output files in a separate directory.
 # To locate output files in a separate directory two syntaxes are supported.
@@ -136,15 +130,20 @@ ifeq ($(KBUILD_SRC),)
 
 # OK, Make called in directory where kernel src resides
 # Do we want to locate output files in a separate directory?
-ifdef O
   ifeq ("$(origin O)", "command line")
     KBUILD_OUTPUT := $(O)
   endif
+
+ifeq ("$(origin W)", "command line")
+  export KBUILD_ENABLE_EXTRA_GCC_CHECKS := $(W)
 endif
 
 # That's our default target when none is given on the command line
 PHONY := _all
 _all:
+
+# Cancel implicit rules on top Makefile
+$(CURDIR)/Makefile Makefile: ;
 
 ifneq ($(KBUILD_OUTPUT),)
 # Invoke a second make in the output directory, passing relevant variables
@@ -359,15 +358,6 @@ CFLAGS		+= -fno-strict-aliasing -fno-common
 # Read KERNELRELEASE from include/config/kernel.release (if it exists)
 KERNELRELEASE = $(shell cat include/config/kernel.release 2> /dev/null)
 KERNELVERSION = $(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
-
-export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
-export ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC
-export CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE
-export HOSTCXX HOSTCXXFLAGS LDFLAGS_MODULE CHECK CHECKFLAGS
-
-export CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS LDFLAGS
-export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE
-export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
 # When compiling out-of-tree modules, put MODVERDIR in the module
 # tree rather than in the kernel tree. The kernel tree might
@@ -598,6 +588,15 @@ CHECKFLAGS     += $(NOSTDINC_FLAGS)
 ifeq ($(CONFIG_STRIP_ASM_SYMS),y)
 LDFLAGS_vmlinux	+= $(call ld-option, -X,)
 endif
+
+export VERSION PATCHLEVEL SUBLEVEL KERNELRELEASE KERNELVERSION
+export ARCH CONFIG_SHELL HOSTCC HOSTCFLAGS CROSS_COMPILE AS LD CC
+export CPP AR NM STRIP OBJCOPY OBJDUMP MAKE AWK GENKSYMS PERL UTS_MACHINE
+export HOSTCXX HOSTCXXFLAGS LDFLAGS_MODULE CHECK CHECKFLAGS
+
+export CPPFLAGS NOSTDINC_FLAGS LINUXINCLUDE OBJCOPYFLAGS LDFLAGS ARFLAGS EXTRA_ARFLAGS
+export CFLAGS CFLAGS_KERNEL CFLAGS_MODULE
+export AFLAGS AFLAGS_KERNEL AFLAGS_MODULE
 
 # Default kernel image to build when no specific target is given.
 # KBUILD_IMAGE may be overruled on the command line or
@@ -1573,9 +1572,6 @@ endif	# skip-makefile
 
 PHONY += FORCE
 FORCE:
-
-# Cancel implicit rules on top Makefile, `-rR' will apply to sub-makes.
-Makefile: ;
 
 # Declare the contents of the .PHONY variable as phony.  We keep that
 # information in a variable se we can use it in if_changed and friends.
