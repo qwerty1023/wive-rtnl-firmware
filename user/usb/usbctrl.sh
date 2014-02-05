@@ -57,9 +57,19 @@ case $TYPE in
 	    $LOG "${ACTION} ${idVendor}:${idProduct} may be storage"
 	    if [ ! -d /sys/module/usb-storage ]; then
 		$LOG "Load module usb-storage and wait initialization to complete"
+		sync
 		modprobe -q usb-storage
+		sleep 2
+		count=0
 		while [ ! -d /sys/module/usb_storage ]; do
-		    sleep 2
+		    sync
+		    modprobe -q usb-storage
+		    if [ "$count" = "5" ]; then
+			$LOG "modprobe usb-storage failed!!!"
+			exit 1
+		    fi
+		    count="$(($count+1))"
+		    sleep 5
 		done
 		$LOG "usb_storage init complete"
 	    fi

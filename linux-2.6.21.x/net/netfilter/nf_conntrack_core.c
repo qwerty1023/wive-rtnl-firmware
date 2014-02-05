@@ -144,16 +144,14 @@ static DEFINE_MUTEX(nf_ct_cache_mutex);
 static unsigned int nf_conntrack_hash_rnd __read_mostly;
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-static inline unsigned int is_local_svc(struct sk_buff **pskb, u_int8_t protonm)
+static inline unsigned int is_local_svc(u_int8_t protonm)
 {
 	/* Local gre/esp/ah/ip-ip/icmp proto must be skip from hardware offload
 	    and mark as interested by ALG  for correct tracking this */
 	switch (protonm) {
 	    case IPPROTO_IPIP:
 	    case IPPROTO_ICMP:
-#ifndef CONFIG_HNAT_V2
 	    case IPPROTO_GRE:
-#endif
 	    case IPPROTO_ESP:
 	    case IPPROTO_AH:
 		return 1;
@@ -1061,9 +1059,10 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	int set_reply = 0;
 	int ret;
 #ifdef CONFIG_BCM_NAT
-	struct nf_conn_nat *nat = NULL;
+	int pure_route = 0;
 	extern int skb_is_ready(struct sk_buff *skb);
 	extern int is_pure_routing(struct nf_conn *ct);
+	extern int bcm_do_fastroute(struct nf_conn *ct,	struct sk_buff **pskb, unsigned int hooknum, int set_reply);
 	extern int bcm_do_fastnat(struct nf_conn *ct, enum ip_conntrack_info ctinfo, struct sk_buff **pskb,
 				    struct nf_conntrack_l3proto *l3proto, struct nf_conntrack_l4proto *l4proto);
 #endif
@@ -1091,8 +1090,7 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	if ((nf_conntrack_fastnat || nf_conntrack_fastroute) && pf == PF_INET)
 	    /* gather fragments before fastpath/fastnat, ipv4 only. */
 	    if ((*pskb)->nh.iph->frag_off & htons(IP_MF|IP_OFFSET))
-		    if(nf_ct_ipv4_gather_frags(*pskb,
-			hooknum == NF_IP_PRE_ROUTING ? IP_DEFRAG_CONNTRACK_IN : IP_DEFRAG_CONNTRACK_OUT))
+		    if(nf_ct_ipv4_gather_frags(*pskb, hooknum == NF_IP_PRE_ROUTING ? IP_DEFRAG_CONNTRACK_IN : IP_DEFRAG_CONNTRACK_OUT))
 			return NF_STOLEN;
 #endif
 
@@ -1136,52 +1134,50 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	}
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_BCM_NAT)
+	/*
+	 * skip ALG marked packets from all fastpaths
+	 */
 	help = nfct_help(ct);
 	if (help && help->helper)
-	    /* skip marked packets for ALG from all fastpaths */
 	    skip_offload = 1;
 
-	/* full skip not ipv4 and mcast/bcast traffic by software offload and filtering section */
-	if (FASTNAT_SKIP_TYPE(pf))
-	    goto skip;
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	/*
+	 * skip ALG and some proto from hardware offload
+	 */
+	if (hooknum != NF_IP_LOCAL_OUT && FOE_ALG(*pskb) == 0) {
+	    if (skip_offload || (pf == PF_INET && is_local_svc(protonum)))
+		if (IS_SPACE_AVAILABLED(*pskb) && IS_MAGIC_TAG_VALID(*pskb))
+			FOE_ALG(*pskb)=1;
+	}
 #endif
+#endif
+	/*
+	 * full skip not ipv4 and mcast/bcast traffic by software offload and filtering section
+	 * allow only established/reply tpc/udp protocol packets for processing in software offload
+	 */
+	if (FASTNAT_SKIP_PROTO(protonum) || FASTNAT_SKIP_TYPE(*pskb) || (pf != PF_INET))
+	    goto skip;
+
+	/* pure route or nat ? */
+	pure_route = is_pure_routing(ct);
+
 #ifdef CONFIG_BCM_NAT
-	/* software route offload path */
-        if (nf_conntrack_fastroute && !skip_offload && skb_is_ready(*pskb) && is_pure_routing(ct)
-	    && (ctinfo == IP_CT_ESTABLISHED || ctinfo == IP_CT_ESTABLISHED_REPLY)) {
-
-	    /* change status from new to seen_reply. when receive reply packet the status will set to establish */
-	    if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status))
-		nf_conntrack_event_cache(IPCT_STATUS, *pskb);
-
-	    if(hooknum == NF_IP_PRE_ROUTING) {
-	        (*pskb)->cb[NF_FAST_ROUTE]=1;
-		/* this function will handle routing decision. the next hoook will be input or forward chain */
-		if (ip_rcv_finish(*pskb) == NF_FAST_NAT) {
-		    /* Change skb owner to output device */
-		    (*pskb)->dev = (*pskb)->dst->dev;
-		    (*pskb)->protocol = htons(ETH_P_IP);
-		    return NF_FAST_NAT;
-		}
-		/* this tell system no need to handle this packet. we will handle this. */
-		return NF_STOLEN;
-	    } else {
-		if(hooknum == NF_IP_LOCAL_OUT) {
-		    /* Change skb owner to output device */
-		    (*pskb)->dev = (*pskb)->dst->dev;
-		    (*pskb)->protocol = htons(ETH_P_IP);
-		    return NF_FAST_NAT;
-		}
-	    }
+	/*
+	 * software route offload path
+	 * send pkts to fastroute if adress not changed (not nat)
+	 */
+        if (nf_conntrack_fastroute && !skip_offload && skb_is_ready(*pskb) && pure_route && FASTNAT_ESTABLISHED(ctinfo)) {
+    	    int bcmverdict = bcm_do_fastroute(ct, pskb, hooknum, set_reply);
+	    /* if accept - continue process in normal path */
+    	    if (bcmverdict != NF_ACCEPT)
+		return bcmverdict;
 	}
 #endif
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) || defined(CONFIG_BCM_NAT)
-        /* packets for nat ? */
-        nat = nfct_nat(ct);
-
 	/* this code section may be used for skip some types traffic,
 	    only if hardware nat support enabled or software fastnat support enabled */
-	if (nat && !skip_offload && (ra_sw_nat_hook_rx != NULL || nf_conntrack_fastnat)) {
+	if (!pure_route && !skip_offload && (ra_sw_nat_hook_rx != NULL || nf_conntrack_fastnat)) {
 #if defined(CONFIG_NETFILTER_XT_MATCH_WEBSTR) || defined(CONFIG_NETFILTER_XT_MATCH_WEBSTR_MODULE)
 	    /*  1. skip http post/get/head traffic for correct webstr work */
 	    if (web_str_loaded && protonum == IPPROTO_TCP && CTINFO2DIR(ctinfo) == IP_CT_DIR_ORIGINAL) {
@@ -1201,7 +1197,7 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 #endif /* XT_MATCH_WEBSTR */
 #ifdef CONFIG_NF_CONNTRACK_MARK
 	    /* 2. offload only packets with connection mark flag 0 */
-	    if ((protonum == IPPROTO_TCP || protonum == IPPROTO_UDP) && ((ct->mark & 0xFF0000) != 0)) {
+	    if ((ct->mark & 0xFF0000) != 0) {
 		skip_offload = 1;
 		goto pass;
 	    }
@@ -1215,41 +1211,36 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 	    */
 pass:
 	    if(skip_offload) {
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+		/* skip hardware offload flag */
+		if (IS_SPACE_AVAILABLED(*pskb) && IS_MAGIC_TAG_VALID(*pskb))
+		    FOE_ALG(*pskb)=1;
+#endif
 #ifdef CONFIG_BCM_NAT
 		/* skip sofware nat fastpath flag */
-		nat->info.nat_type |= NF_FAST_NAT_DENY;
+		ct->nat_type |= NF_FAST_NAT_DENY;
 #endif
 		goto skip;
 	    }
 	}
 
 #ifdef CONFIG_BCM_NAT
-	/* software nat offload path */
-	if (nf_conntrack_fastnat && nat &&
-	    /* if not deny for this packets */
-	    !skip_offload && !(nat->info.nat_type & NF_FAST_NAT_DENY) &&
-	    /* allow  tcp/udp packet pass fastnat */
-	    hooknum == NF_IP_PRE_ROUTING && (protonum == IPPROTO_UDP || protonum == IPPROTO_TCP) &&
-	    /* allow tcp packet with established/reply state */
-	    (ctinfo == IP_CT_ESTABLISHED || ctinfo == IP_CT_ESTABLISHED_REPLY)) {
-	    /* if not pure routing - try send selected pakets to bcm_nat */
-		if (!is_pure_routing(ct))
-		    ret = bcm_do_fastnat(ct, ctinfo, pskb, l3proto, l4proto);
-	}
+	/*
+	 * software nat offload path
+	 * send pkts to fastroute if adress changed (nat)
+	 */
+	if (nf_conntrack_fastnat && (hooknum == NF_IP_PRE_ROUTING) &&
+	    (FASTNAT_ESTABLISHED(ctinfo) || protonum == IPPROTO_UDP) &&
+	    !(ct->nat_type & NF_FAST_NAT_DENY) && !pure_route)
+		ret = bcm_do_fastnat(ct, ctinfo, pskb, l3proto, l4proto);
 #endif
 skip:
-
-#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if (skip_offload || hooknum == NF_IP_LOCAL_OUT || is_local_svc(pskb, protonum))
-	    if (IS_SPACE_AVAILABLED(*pskb) && IS_MAGIC_TAG_VALID(*pskb))
-		FOE_ALG(*pskb)=1;
-#endif
 #endif /* RA_HW_NAT || BCM_NAT */
 
 	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
 #ifdef CONFIG_BCM_NAT
-	    if (nf_conntrack_fastnat && pf == PF_INET && nat && hooknum == NF_IP_LOCAL_OUT)
-		nat->info.nat_type |= NF_FAST_NAT_DENY;
+	    if (nf_conntrack_fastnat && pf == PF_INET && hooknum == NF_IP_LOCAL_OUT)
+		ct->nat_type |= NF_FAST_NAT_DENY;
 #endif
 	    nf_conntrack_event_cache(IPCT_STATUS, *pskb);
 	}
