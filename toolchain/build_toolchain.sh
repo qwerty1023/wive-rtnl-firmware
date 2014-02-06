@@ -1,11 +1,11 @@
 #!/bin/sh
 
-DIR=`pwd`
+CURDIR=`pwd`
 
 KERNELHDRS=kernel-headers
-BINUTILVER=binutils-2.21
+BINUTILVER=binutils-2.24
 UCLIBCVER=uClibc-0.9.28
-GCCVER=gcc-4.8.1
+GCCVER=gcc-4.8.2
 
 INSTALL_DEP=NO
 UNPACK=YES
@@ -34,47 +34,91 @@ export LC_NUMERIC=
 export LC_CTYPE=
 export LC_TIME=
 
-export WDIR=$DIR/tmp
+export WCURDIR=$CURDIR/tmp
 export TARGET=mipsel-linux-uclibc
-export PREFIX=$DIR
-export ROOTDIR=$DIR
+export PREFIX=$CURDIR
+export ROOTCURDIR=$CURDIR
 
-export TARGET_DIR=$WDIR/$TARGET-toolchain
-export KERNEL_HEADERS=$TARGET_DIR/include
+export TARGET_CURDIR=$WCURDIR/$TARGET-toolchain
+export KERNEL_HEADERS=$TARGET_CURDIR/include
 export REALKRNINC=${PREFIX}/../linux-2.6.21.x/include
 export REALLIBINC=${PREFIX}/../lib/include
 export PATH="${PATH}":${PREFIX}/bin:${PREFIX}/lib:${KERNEL_HEADERS}:${REALLIBINC}:${REALKRNINC}
 export CC=gcc
 
-#install need lib`s
-if [ -f /etc/mandriva-release ] && [ "$INSTALL_DEP" = "YES" ]; then
-    urpmi --auto -a glibc-
-    urpmi --auto  -a libgmpxx-devel --download-all --allow-force
-    urpmi --auto  -a libmpc- --download-all --allow-force
-    urpmi --auto  -a mpfr- --download-all --allow-force
-    urpmi --auto  -a gcc-gfortran --download-all --allow-force
-    urpmi --auto  -a texinfo- --download-all --allow-force
+#install need lib`s and headers
+if [ -e /etc/release ] && [ "$INSTALL_DEP" = "YES" ]; then
+    ISOPENMANDRIVA=`grep OpenMandriva -i -c < /etc/release`
+    ISROSA=`grep ROSA -i -c < /etc/release`
+    ISMAGEIA=`grep Mageia -i -c < /etc/release`
+    if [ "$ISOPENMANDRIVA" = "1" ] || [ "$ISROSA" = "1" ]; then
+	urpmi --auto -a flex --download-all --allow-force
+	urpmi --auto -a make --download-all --allow-force
+	urpmi --auto -ay gcc --download-all --allow-force
+	urpmi --auto -ay glibc --download-all --allow-force
+	urpmi --auto -ay bison --download-all --allow-force
+	urpmi --auto -ay libtool --download-all --allow-force
+	urpmi --auto -ay libgmpxx-devel --download-all --allow-force
+	urpmi --auto -ay libmpc --download-all --allow-force
+	urpmi --auto -ay mpfr --download-all --allow-force
+	urpmi --auto -ay gcc-gfortran --download-all --allow-force
+	urpmi --auto -ay texinfo --download-all --allow-force
+	urpmi --auto -ay intltool --download-all --allow-force
+    elif [ "$ISMAGEIA" = "1" ]; then
+	urpmi --auto bc --download-all
+	urpmi --auto flex --download-all
+	urpmi --auto make --download-all
+	urpmi --auto gcc --download-all
+	urpmi --auto glibc-devel --download-all
+	urpmi --auto binutils-devel --download-all
+	urpmi --auto bison --download-all
+	urpmi --auto libtool-devel --download-all
+	urpmi --auto autoconf --download-all
+	urpmi --auto automake --download-all
+	urpmi --auto libgmpxx-devel --download-all
+	urpmi --auto libmpc-devel --download-all
+	urpmi --auto gcc-cpp --download-all
+	urpmi --auto gcc-c++ --download-all
+	urpmi --auto gcc-gfortran --download-all
+	urpmi --auto gcc-plugins --download-all
+	urpmi --auto colorgcc --download-all
+	urpmi --auto texinfo --download-all
+	urpmi --auto gettext --download-all
+	urpmi --auto intltool --download-all
+    else
+	urpmi --auto -a flex --download-all --allow-force
+	urpmi --auto -a make --download-all --allow-force
+	urpmi --auto -a gcc- --download-all --allow-force
+	urpmi --auto -a glibc- --download-all --allow-force
+	urpmi --auto -a bison- --download-all --allow-force
+	urpmi --auto -a libtool- --download-all --allow-force
+	urpmi --auto -a libgmpxx-devel --download-all --allow-force
+	urpmi --auto -a libmpc- --download-all --allow-force
+	urpmi --auto -a mpfr- --download-all --allow-force
+	urpmi --auto -a gcc-gfortran --download-all --allow-force
+	urpmi --auto -a texinfo- --download-all --allow-force
+	urpmi --auto -a intltool- --download-all --allow-force
+    fi
 fi
 
-mkdir -p $WDIR
+mkdir -p $WCURDIR
 
-cd $WDIR
+cd $WCURDIR
 mkdir -p ${TARGET}-toolchain  && cd ${TARGET}-toolchain
 
 ##################################TUNE FOR CURRENT VERSION GCC BUILD####################################
 HOSTGCCVER=`gcc -dumpversion | cut -f -2 -d .`
 if [ "$HOSTGCCVER" = "4.5" ] || [ "$HOSTGCCVER" = "4.6" ] || [ "$HOSTGCCVER" = "4.7" ] || [ "$HOSTGCCVER" = "4.8" ]; then
-    WARN_OPTS="-Wno-pointer-sign -Wno-unused-but-set-variable -Wno-trigraphs -Wno-format-security -Wno-long-long"
-    export CFLAGS="-O2 $WARN_OPTS"
-else
-    export CFLAGS="-O2 $WARN_OPTS"
+    WARN_OPTS="-Wno-pointer-sign -Wno-unused-but-set-variable -Wno-trigraphs -Wno-format-security -Wno-long-long -Wno-sizeof-pointer-memaccess"
 fi
 
+export CFLAGS="-O2 $WARN_OPTS"
+
 EXT_OPT="$EXT_OPT --disable-lto --enable-ld=yes --enable-gold=no --disable-sanity-checks --disable-werror"
-if [ "$GCCVER" = "gcc-4.6.3" ] || [ "$GCCVER" = "gcc-4.7.3" ] || [ "$GCCVER" = "gcc-4.8.1" ]; then
+if [ "$GCCVER" = "gcc-4.6.4" ] || [ "$GCCVER" = "gcc-4.7.4" ] || [ "$GCCVER" = "gcc-4.8.2" ]; then
     EXT_OPT="$EXT_OPT --disable-biendian --disable-softfloat --disable-libquadmath --disable-libquadmath-support"
 fi
-if [ "$GCCVER" = "gcc-4.8.1" ]; then
+if [ "$GCCVER" = "gcc-4.8.2" ]; then
     EXT_OPT="$EXT_OPT --disable-libatomic --with-pic"
 fi
 #########################################################################################################
@@ -82,6 +126,13 @@ fi
 if [ "$UNPACK" = "YES" ]; then
     echo "=================REMOVE-OLD-BUILD-TREE=================="
     rm -rf build-*
+    rm -rf $CURDIR/bin
+    rm -rf $CURDIR/lib
+    rm -rf $CURDIR/usr
+    rm -rf $CURDIR/share
+    rm -rf $CURDIR/libexec
+    rm -rf $CURDIR/include
+    rm -rf $CURDIR/mipsel-linux-uclibc
 fi
 
 if [ "$UNPACK" = "YES" ]; then
@@ -97,17 +148,18 @@ fi
 
 if [ "$HEADERS" = "YES" ]; then
     echo "=====================INSTALL-C-HEADERS===================="
-    mkdir -p $DIR/usr
-    rm -rf $DIR/usr/include
-    cp -rf $KERNEL_HEADERS $DIR/usr
-    ln -sf $DIR/usr/include $DIR/include
+    mkdir -p $CURDIR/usr
+    rm -rf $CURDIR/usr/include
+    cp -rf $KERNEL_HEADERS $CURDIR/usr
+    ln -sf $CURDIR/usr/include $CURDIR/include
 fi
 
 if [ "$BINUTILS" = "YES" ]; then
     echo "=====================BUILD-BINUTILS====================="
     mkdir -p build-binutils && cd build-binutils
     (../$BINUTILVER/configure --target=$TARGET --prefix=$PREFIX --includedir=$KERNEL_HEADERS \
-	--with-sysroot=$PREFIX --with-build-sysroot=$PREFIX && \
+	--with-sysroot=$PREFIX --with-build-sysroot=$PREFIX \
+	--disable-gold --disable-libquadmath --disable-libquadmath-support --disable-lto --disable-werror && \
     make -j4 KERNEL_HEADERS=$KERNEL_HEADERS && \
     make install) || exit 1
     cd ..
@@ -131,11 +183,11 @@ if [ "$GCC" = "YES" ]; then
 fi
 
 if [ "$UCLIB" = "YES" ]; then
-    echo "=====================BUILD-C-HEADERS===================="
+    echo "=====================BUILD-C-UCLIBC===================="
     cp -fv uclibc-config $UCLIBCVER/.config
     cd $UCLIBCVER
-    (make oldconfig && \
-    make -j4 && \
+    (make oldconfig ROOTDIR="$CURDIR" && \
+    make -j4 ROOTDIR="$CURDIR" && \
     make install) || exit 1
     cd ..
 fi

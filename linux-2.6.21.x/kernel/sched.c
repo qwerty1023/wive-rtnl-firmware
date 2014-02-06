@@ -4230,7 +4230,7 @@ EXPORT_SYMBOL_GPL(task_nice);
  * idle_cpu - is a given cpu idle currently?
  * @cpu: the processor in question.
  */
-int FASTPATH idle_cpu(int cpu)
+int idle_cpu(int cpu)
 {
 	return cpu_curr(cpu) == cpu_rq(cpu)->idle;
 }
