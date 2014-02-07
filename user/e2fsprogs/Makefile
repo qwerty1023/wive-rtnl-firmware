@@ -43,9 +43,15 @@ romfs:
 	$(ROMFSINST) -S $(SRC_NAME)/lib/e2p/libe2p.so.2.3 /lib/libe2p.so.2.3
 	$(ROMFSINST) -S $(SRC_NAME)/lib/et/libcom_err.so.2.1 /lib/libcom_err.so.2.1
 	$(ROMFSINST) -S $(SRC_NAME)/lib/ext2fs/libext2fs.so.2.4 /lib/libext2fs.so.2.4
+	$(ROMFSINST) -S $(SRC_NAME)/lib/blkid/libblkid.so.1.0 /lib/libblkid.so.1.0
+	$(ROMFSINST) -S $(SRC_NAME)/lib/uuid/libuuid.so.1.2 /lib/libuuid.so.1.2
 	$(ROMFSINST) -s libe2p.so.2.3 /lib/libe2p.so.2
 	$(ROMFSINST) -s libcom_err.so.2.1 /lib/libcom_err.so.2
 	$(ROMFSINST) -s libext2fs.so.2.4 /lib/libext2fs.so.2
+	$(ROMFSINST) -s libblkid.so.1.0 /lib/libblkid.so
+	$(ROMFSINST) -s libblkid.so.1.0 /lib/libblkid.so.1
+	$(ROMFSINST) -s libuuid.so.1.2 /lib/libuuid.so
+	$(ROMFSINST) -s libuuid.so.1.2 /lib/libuuid.so.1
 	$(ROMFSINST) -S /etc/e2fsck.conf
 	$(ROMFSINST) -s mke2fs /bin/mkfs.ext2
 	$(ROMFSINST) -s e2fsck /bin/fsck.ext2
