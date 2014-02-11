@@ -140,16 +140,25 @@ if [ "$ACTION" = "add" ]; then
 elif [ "$ACTION" = "mount" ]; then
   $LOG "device $MDEV_PATH mount OK"
   exit 0
+
+elif [ "$ACTION" = "umount" ]; then
+  if [ -d "/media/$MDEV" ]; then
+  rmdir "/media/$MDEV"
+  fi
+  exit 0
+
 else
   $LOG "remove $MDEV_PATH"
   try_umount
   swap_off
 fi
 
-fs drop_caches
-
 if [ "$MDEV_LABEL" != "optware" ] && [ "$MDEV_TYPE" != "swap" ]; then
+    # restart only if not cold boot
+    . /etc/scripts/web_wait.sh
+    web_wait
     # restart HDD depended services
+    sync
     service xupnpd restart
     service samba restart
     service transmission restart
