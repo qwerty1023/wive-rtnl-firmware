@@ -7,24 +7,17 @@ LOG="logger -t storage_helper"
 
 case $1 in
 	"remove")
-		$LOG "Unmount all discs and swap."
-		service samba stop
-		DiskApps="transmission-daemon ftpd wget minidlna mt-daapd xupnpd"
+		$LOG "Umount all disks and swap."
+		DiskApps="transmission samba xupnpd"
 		for app in $DiskApps; do
-			if [ `pidof -s $app` ]; then
-			killall -q $app
-			killall -q -SIGKILL $app
-        		fi
+		    service "$app" stop
 		done
-		for mpoint in $(mount | grep "/dev/sd" | awk '{print $3}'); do
-			fuser -mks -TERM $mpoint
-			sync && umount $mpoint && sync
-			rmdir $mpoint
+		umount_all.sh
+		$LOG "Umount complite. services restart (exclude transmission)."
+		DiskApps="samba xupnpd"
+		for app in $DiskApps; do
+		    service "$app" restart
 		done
-		swp=`cat /proc/swaps | grep "/dev/sd" | awk '{print $1}'`
-		swapoff $swp
-		service samba start
-		$LOG "Unmount complite. Samba restart."
 		;;
 	"adddir")
 		if [ -n "$2" ]; then
@@ -106,4 +99,3 @@ case $1 in
 esac
 
 exit 0
-

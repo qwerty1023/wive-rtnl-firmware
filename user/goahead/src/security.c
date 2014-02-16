@@ -157,7 +157,7 @@ int websSecurityHandler(webs_t wp, char_t *urlPrefix, char_t *webDir, int arg,
 			a_assert(wp->digest);
 			a_assert(wp->nonce);
 			a_assert(wp->password);
-							 
+
 			digestCalc = websCalcDigest(wp);
 			a_assert(digestCalc);
 

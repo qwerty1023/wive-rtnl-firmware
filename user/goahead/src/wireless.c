@@ -973,7 +973,6 @@ static void wirelessAdvanced(webs_t wp, char_t *path, char_t *query)
 
 	//fetch from web input
 	bg_protection = websGetVar(wp, T("bg_protection"), T("0"));
-	//basic_rate = websGetVar(wp, T("basic_rate"), T("15"));
 	beacon = websGetVar(wp, T("beacon"), T("100"));
 	dtim = websGetVar(wp, T("dtim"), T("1"));
 	fragment = websGetVar(wp, T("fragment"), T("2346"));
@@ -1272,7 +1271,6 @@ void getSecurity(int nvram, webs_t wp, char_t *path, char_t *query)
 
 	if (RT2860_NVRAM == nvram) {
 		for(i=0; i<num_ssid; i++) {
-			//LFF(result, nvram, SSID, i);
 			gstrncat(result, nvram_get(nvram, racat("SSID", i+1)), 4096);
 			gstrncat(result, "\r", 4096);
 			LFF(result, nvram, PreAuth, i);
@@ -1280,22 +1278,17 @@ void getSecurity(int nvram, webs_t wp, char_t *path, char_t *query)
 			LFF(result, nvram, EncrypType, i);
 			LFF(result, nvram, DefaultKeyID, i);
 			LFF(result, nvram, Key1Type, i);
-			//LFF(result, nvram, Key1Str, i);
 			gstrncat(result, nvram_get(nvram, racat("Key1Str", i+1)), 4096);
 			gstrncat(result, "\r", 4096);
 			LFF(result, nvram, Key2Type, i);
-			//LFF(result, nvram, Key2Str, i);
 			gstrncat(result, nvram_get(nvram, racat("Key2Str", i+1)), 4096);
 			gstrncat(result, "\r", 4096);
 			LFF(result, nvram, Key3Type, i);
-			//LFF(result, nvram, Key3Str, i);
 			gstrncat(result, nvram_get(nvram, racat("Key3Str", i+1)), 4096);
 			gstrncat(result, "\r", 4096);
 			LFF(result, nvram, Key4Type, i);
-			//LFF(result, nvram, Key4Str, i);
 			gstrncat(result, nvram_get(nvram, racat("Key4Str", i+1)), 4096);
 			gstrncat(result, "\r", 4096);
-			//LFF(result, nvram, WPAPSK, i);
 			gstrncat(result, nvram_get(nvram, racat("WPAPSK", i+1)), 4096);
 			gstrncat(result, "\r", 4096);
 
@@ -1388,9 +1381,8 @@ int AccessPolicyHandle(int nvram, webs_t wp, int mbssid)
 	char str[32];
 	char ap_list[2048];
 
-	if(mbssid > 8 || mbssid < 0) {
+	if(mbssid > 8 || mbssid < 0)
 		return -1;
-	}
 
 	sprintf(str, "apselect_%d", mbssid);	// UI on web page
 	apselect = websGetVar(wp, str, T(""));
@@ -1404,11 +1396,13 @@ int AccessPolicyHandle(int nvram, webs_t wp, int mbssid)
 
 	sprintf(str, "newap_text_%d", mbssid);
 	newap_list = websGetVar(wp, str, T(""));
-	if(!newap_list) {
+
+	if(!newap_list)
 		return -1;
-	}
+
 	if(!gstrlen(newap_list))
 		return 0;
+
 	sprintf(str, "AccessControlList%d", mbssid);
 	sprintf(ap_list, "%s", nvram_get(nvram, str));
 	if(strlen(ap_list))
@@ -1420,7 +1414,7 @@ int AccessPolicyHandle(int nvram, webs_t wp, int mbssid)
 	return 0;
 }
 
-#ifdef CONFIG_USER_802_1X 
+#ifdef CONFIG_USER_802_1X
 void conf8021x(int nvram, webs_t wp, int mbssid)
 {
 	char_t *RadiusServerIP, *RadiusServerPort, *RadiusServerSecret, *RadiusServerSessionTimeout;//, *RadiusServerIdleTimeout;
@@ -1517,9 +1511,10 @@ void clearRadiusSetting(int nvram, int mbssid)
 	nvram_bufset(nvram, "RADIUS_Server", setNthValue(mbssid, RADIUS_Server, "0"));
 	nvram_bufset(nvram, "RADIUS_Port", setNthValue(mbssid, RADIUS_Port, "1812"));
 	nvram_bufset(nvram, "RADIUS_Key", setNthValue(mbssid, RADIUS_Key, "ralink"));
+
 	nvram_commit(RT2860_NVRAM);
 	nvram_close(RT2860_NVRAM);
-    return;
+	return;
 }
 
 
