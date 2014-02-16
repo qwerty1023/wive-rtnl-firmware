@@ -147,7 +147,7 @@ int main(int argc, char** argv)
 
 #ifdef CONFIG_USB
 	    /* Rescan usb devices after start */
-	    doSystem("service hotplug rescan");
+	    //doSystem("service hotplug rescan");
 #endif
 
 	    /* Backup nvram setting and save rwfs */
