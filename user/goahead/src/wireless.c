@@ -957,7 +957,7 @@ static int getVideoTurbineBuilt(int eid, webs_t wp, int argc, char_t **argv)
 /* goform/wirelessAdvanced */
 static void wirelessAdvanced(webs_t wp, char_t *path, char_t *query)
 {
-	char_t	*bg_protection, /**basic_rate,*/ *beacon, *dtim, *fragment, *rts,
+	char_t	*bg_protection, *beacon, *dtim, *fragment, *rts,
 			*tx_power, *short_preamble, *short_slot, *tx_burst, *pkt_aggregate,
 			*countrycode, *country_region;
 	char_t	*rd_region, *lna_gain, *ht_noise_thresh, *ap2040_rescan, *ht_bss_coex;
@@ -1035,6 +1035,7 @@ static void wirelessAdvanced(webs_t wp, char_t *path, char_t *query)
 #endif
 #ifdef CONFIG_RT2860V2_AP_IGMP_SNOOP
 	nvram_bufset(RT2860_NVRAM, "M2UEnabled", m2u_enable);
+	nvram_bufset(RT2860_NVRAM, "IgmpSnEnable", m2u_enable);
 	nvram_bufset(RT2860_NVRAM, "McastMcs", mcast_mcs);
 #if defined(CONFIG_RT2860V2_AP_VIDEO_TURBINE) || defined(CONFIG_RT2860V2_STA_VIDEO_TURBINE)
 	nvram_bufset(RT2860_NVRAM, "VideoTurbine", video_turbine);
@@ -1104,8 +1105,7 @@ static void wirelessAdvanced(webs_t wp, char_t *path, char_t *query)
 /* goform/wirelessWds */
 static void wirelessWds(webs_t wp, char_t *path, char_t *query)
 {
-	char_t	*wds_mode, *wds_phy_mode, *wds_encryp_type, *wds_encryp_key0,
-			*wds_encryp_key1,*wds_encryp_key2, *wds_encryp_key3, *wds_list;
+	char_t	*wds_mode, *wds_phy_mode, *wds_encryp_type, *wds_encryp_key0, *wds_encryp_key1,*wds_encryp_key2, *wds_encryp_key3, *wds_list;
 	char *submitUrl;
 
 	wds_mode = websGetVar(wp, T("wds_mode"), T("0"));
@@ -1669,15 +1669,14 @@ void DeleteAccessPolicyList(int nvram, webs_t wp, char_t *path, char_t *query)
 {
 	int mbssid, aplist_num;
 	char str[32], apl[64*20], *tmp;
-	sscanf(query, "%d,%d", &mbssid, &aplist_num);
 
+	sscanf(query, "%d,%d", &mbssid, &aplist_num);
 	sprintf(str, "AccessControlList%d", mbssid);
 	if(!(tmp = nvram_get(nvram, str)))
 		return;
+
 	strcpy(apl, tmp);
-
 	deleteNthValueMulti(&aplist_num, 1, apl, ';');
-
 	nvram_set(nvram, str, apl);
 
 	default_shown_mbssid[nvram] = mbssid;
@@ -1710,16 +1709,14 @@ static void wirelessMesh(webs_t wp, char_t *path, char_t *query)
 	autolink = websGetVar(wp, T("AutoLinkEnable"), T(""));
 	mode = websGetVar(wp, T("security_mode"), T(""));
 	strcpy(defaultkey, "");
-	if (0 == strcmp(mode, "OPEN"))
-	{
+
+	if (0 == strcmp(mode, "OPEN")) {
 		encrypt_type = websGetVar(wp, T("open_encrypt_type"), T(""));
 		if (0 == strcmp(encrypt_type, "WEP"))
 			strcpy(defaultkey, "1");
-	}
-	else if (0 == strcmp(mode, "WPANONE"))
-	{
+	} else if (0 == strcmp(mode, "WPANONE"))
 		encrypt_type = websGetVar(wp, T("wpa_cipher"), T(""));
-	}
+
 	wepkey = websGetVar(wp, T("wep_key"), T(""));
 	wep_select = websGetVar(wp, T("wep_select"), T(""));
 	wpakey = websGetVar(wp, T("passphrase"), T(""));
@@ -1777,7 +1774,7 @@ static void meshManualLink(webs_t wp, char_t *path, char_t *query)
 }
 
 typedef struct _MESH_NEIGHBOR_ENTRY_INFO {
-	char			Rssi;
+	char		Rssi;
 	unsigned char	HostName[64 + 1];
 	unsigned char	MacAddr[6];
 	unsigned char	MeshId[32 + 1];
@@ -1873,7 +1870,7 @@ static int is3t3r(int eid, webs_t wp, int argc, char_t **argv)
 
 static int is5gh_only(int eid, webs_t wp, int argc, char_t **argv)
 {
-#if defined(CONFIG_RALINK_RT3662_2T2R)
+#if defined(CONFIG_RALINK_RT3662_2T2R) || defined(CONFIG_RALINK_RT3883_3T3R)
 	websWrite(wp, T("1"));
 #else
 	websWrite(wp, T("0"));
@@ -1884,9 +1881,9 @@ static int is5gh_only(int eid, webs_t wp, int argc, char_t **argv)
 static int isWPSConfiguredASP(int eid, webs_t wp, int argc, char_t **argv)
 {
 #ifdef CONFIG_USER_WSC
-	if(g_wsc_configured){
+	if(g_wsc_configured)
 		websWrite(wp, T("1"));
-	}else
+	else
 #endif
 		websWrite(wp, T("0"));
 	return 0;
@@ -1897,7 +1894,7 @@ void AntennaDiversityInit(void)
 {
 	char *mode = nvram_get(RT2860_NVRAM, "AntennaDiversity");
 
-	if(!gstrcmp(mode, "Disable")){						// Disable
+	if(!gstrcmp(mode, "Disable")){				// Disable
 		doSystem("echo 0 > /proc/AntDiv/AD_RUN");
 	}else if(!gstrcmp(mode, "Enable_Algorithm1")){
 		doSystem("echo 1 > /proc/AntDiv/AD_ALGORITHM"); // Algorithm1
@@ -1911,10 +1908,8 @@ void AntennaDiversityInit(void)
 	}else if(!gstrcmp(mode, "Antenna2")){				// fix Ant2
 		doSystem("echo 0 > /proc/AntDiv/AD_RUN");
 		doSystem("echo 2 > /proc/AntDiv/AD_FORCE_ANTENNA");
-	}else{
+	}else
 		doSystem("echo 0 > /proc/AntDiv/AD_RUN");
-	return;
-}
 	return;
 }
 
