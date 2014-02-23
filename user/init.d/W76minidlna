@@ -1,0 +1,134 @@
+#!/bin/sh
+
+# if app not exist
+if [ ! -f /bin/minidlna ] || [ ! -d /proc/bus/usb ]; then
+    exit 0
+fi
+
+# wait to start web and run from goahead code
+. /etc/scripts/web_wait.sh
+web_wait
+
+#include global config
+. /etc/scripts/global.sh
+
+LOG="logger -t minidlna"
+
+start() {
+    get_param
+    if [ "$DlnaEnabled" = "1" ]; then
+	# if need kill minidlna
+	pid=`pidof minidlna`
+	if [ "$pid" != "" ]; then
+	    $LOG "Stop minidlna."
+	    killall -q minidlna
+	    sleep 2
+	    #kill if not stopped
+	    killall -q -SIGKILL minidlna
+	    sleep 1
+        fi
+
+	gen_config
+
+	$LOG "Start minidlna."
+	/bin/minidlna
+    fi
+}
+
+rescan() {
+    get_param
+    if [ "$DlnaEnabled" = "1" ]; then
+	# if need kill minidlna
+	pid=`pidof minidlna`
+	if [ "$pid" != "" ]; then
+	    $LOG "Stop minidlna."
+	    killall -q minidlna
+	    sleep 2
+	    #kill if not stopped
+	    killall -q -SIGKILL minidlna
+	    sleep 1
+        fi
+
+	gen_config
+
+	$LOG "Start minidlna - rescan mode."
+	/bin/minidlna -R
+    fi
+}
+
+stop() {
+	# if need kill minidlna
+	pid=`pidof minidlna`
+	if [ "$pid" != "" ]; then
+	    $LOG "Stop minidlna."
+	    killall -q minidlna
+	    sleep 2
+	    #kill if not stopped
+	    killall -q -SIGKILL minidlna
+        fi
+}
+
+get_param() {
+    eval `nvram_buf_get 2860 DlnaEnabled dlnaPort dlnaDBPath dlnaAPath dlnaVPath dlnaPPath`
+
+    #include profile variables
+    . /etc/profile
+}
+
+gen_config() {
+    fname="/etc/minidlna.conf"
+
+    # drop current
+    rm -f $fname
+    touch $fname
+
+    # port for HTTP (descriptions, SOAP, media transfer) traffic
+    echo "port=$dlnaPort" >> $fname
+
+    # network interfaces to serve, comma delimited
+    echo "network_interface=$lan_if" >> $fname
+
+    #  scan fie path
+    echo "media_dir=A,$dlnaAPath" >> $fname
+    echo "media_dir=V,$dlnaVPath" >> $fname
+    echo "media_dir=P,$dlnaPPath" >> $fname
+
+    # set this if you would like to specify the directory where you want MiniDLNA to store its database and album art cache
+    echo "db_dir=$dlnaDBPath" >> $fname
+
+    # set this if you want to customize the name that shows up on your clients
+    echo "friendly_name=miniDLNA Server" >> $fname
+
+    echo "album_art_names=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg" >> $fname
+    echo "inotify=yes" >> $fname
+    echo "enable_tivo=no" >> $fname
+    echo "strict_dlna=no" >> $fname
+    echo "notify_interval=10" >> $fname
+    echo "serial=12345678" >> $fname
+    echo "model_number=1" >> $fname
+    echo "root_container=." >> $fname
+}
+
+case "$1" in
+        start)
+            start
+            ;;
+
+	stop)
+            stop
+            ;;
+
+	restart)
+            stop
+            start
+            ;;
+
+	rescan)
+            stop
+            rescan
+            ;;
+
+        *)
+            echo $"Usage: $0 {start|stop|restart|rescan}"
+            exit 1
+esac

@@ -64,6 +64,9 @@ void formDefineUSB(void) {
 #ifdef CONFIG_USER_TRANSMISSION
 websFormDefine(T("formTrans"), transmission);
 #endif
+#ifdef CONFIG_USER_MINIDLNA
+websFormDefine(T("formDlna"), dlna);
+#endif
 }
 
 static int dir_count;
@@ -401,6 +404,62 @@ static void transmission(webs_t wp, char_t *path, char_t *query)
 	else if (0 == strcmp(submit, "reload"))
 		{
 			doSystem("service transmission reload");
+		}
+
+	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+	if (submitUrl != NULL)
+		websRedirect(wp, submitUrl);
+	else
+		websDone(wp, 200);
+}
+#endif
+
+#ifdef CONFIG_USER_MINIDLNA
+
+const parameter_fetch_t dlna_args[] =
+{
+	{ T("dlnaPort"), "dlnaPort", 0, T("") },
+	{ T("dlnaDBPath"), "dlnaDBPath", 0, T("") },
+	{ T("dlnaAPath"), "dlnaAPath", 0, T("") },
+	{ T("dlnaVPath"), "dlnaVPath", 0, T("") },
+	{ T("dlnaPPath"), "dlnaPPath", 0, T("") },
+	{ NULL, NULL, 0, NULL } // Terminator
+};
+
+static void dlna(webs_t wp, char_t *path, char_t *query)
+{
+	char *submitUrl;
+	char_t *submit;
+
+	submit = websGetVar(wp, T("hiddenButton"), T(""));
+
+	if (0 == strcmp(submit, "apply"))
+		{
+			char_t *dlna_enabled = websGetVar(wp, T("DlnaEnabled"), T("0"));
+			if (dlna_enabled == NULL)
+			dlna_enabled = "0";
+
+			nvram_init(RT2860_NVRAM);
+			nvram_bufset(RT2860_NVRAM, "DlnaEnabled", dlna_enabled);
+
+			if (CHK_IF_DIGIT(dlna_enabled, 1))
+			setupParameters(wp, dlna_args, 0);
+
+			nvram_close(RT2860_NVRAM);
+			doSystem("service iptables restart");
+			doSystem("service minidlna restart");
+		}
+	else if (0 == strcmp(submit, "start"))
+		{
+			doSystem("service minidlna start");
+		}
+	else if (0 == strcmp(submit, "stop"))
+		{
+			doSystem("service minidlna stop");
+		}
+	else if (0 == strcmp(submit, "rescan"))
+		{
+			doSystem("service minidlna rescan");
 		}
 
 	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page

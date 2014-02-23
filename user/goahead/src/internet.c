@@ -44,6 +44,7 @@ static int getFtpBuilt(int eid, webs_t wp, int argc, char_t **argv);
 static int getPrinterSrvBuilt(int eid, webs_t wp, int argc, char_t **argv);
 static int getUSBModemBuilt(int eid, webs_t wp, int argc, char_t **argv);
 static int getTransmissionBuilt(int eid, webs_t wp, int argc, char_t **argv);
+static int getDlnaBuilt(int eid, webs_t wp, int argc, char_t **argv);
 static int getIgmpProxyBuilt(int eid, webs_t wp, int argc, char_t **argv);
 static int getVPNBuilt(int eid, webs_t wp, int argc, char_t **argv);
 static int getDnsmasqBuilt(int eid, webs_t wp, int argc, char_t **argv);
@@ -134,6 +135,7 @@ void formDefineInternet(void) {
 	websFormDefine(T("getMyMAC"), getMyMAC);
 	websFormDefine(T("editRouting"), editRouting);
 	websAspDefine(T("getTransmissionBuilt"), getTransmissionBuilt);
+	websAspDefine(T("getDlnaBuilt"), getDlnaBuilt);
 
 #ifdef CONFIG_USER_ZEBRA
 	websFormDefine(T("dynamicRouting"), dynamicRouting);
@@ -941,6 +943,15 @@ static int getUSBModemBuilt(int eid, webs_t wp, int argc, char_t **argv)
 static int getTransmissionBuilt(int eid, webs_t wp, int argc, char_t **argv)
 {
 #ifdef CONFIG_USER_TRANSMISSION
+	return websWrite(wp, T("1"));
+#else
+	return websWrite(wp, T("0"));
+#endif
+}
+
+static int getDlnaBuilt(int eid, webs_t wp, int argc, char_t **argv)
+{
+#ifdef CONFIG_USER_MINIDLNA
 	return websWrite(wp, T("1"));
 #else
 	return websWrite(wp, T("0"));

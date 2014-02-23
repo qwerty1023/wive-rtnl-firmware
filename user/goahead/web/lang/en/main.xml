@@ -71,6 +71,7 @@
   <message msgid="treeapp printersrv" msgstr="Printer Server" />
   <message msgid="treeapp usbmodem" msgstr="USB Modem" />
   <message msgid="treeapp transmission" msgstr="BitTorrent daemon" />
+  <message msgid="treeapp minidlna" msgstr="DLNA Server" />
 
   <message msgid="opmode title" msgstr="Operation Mode Configuration" />
   <message msgid="opmode introduction" msgstr="You can configure the operation mode suitable for your environment." />

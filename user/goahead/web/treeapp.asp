@@ -82,6 +82,7 @@ var syslogb = '<% getSysLogBuilt(); %>';
 var swqos = '<% getSWQoSBuilt(); %>';
 var ad = '<% isAntennaDiversityBuilt(); %>';
 var transb = '<% getTransmissionBuilt(); %>';
+var dlnab = '<% getDlnaBuilt(); %>';
 
 a = new dTree('a');
 a.config.useStatusText=true;
@@ -173,6 +174,8 @@ if (usbb == "1")
 			a.add(852, 850, _("treeapp ftpsrv"),	"javascript:go('usb/STORAGEftpsrv.asp');");
 		if (transb == "1")
 			a.add(853, 850, _("treeapp transmission"),	"javascript:go('usb/Transmission.asp');");
+		if (dlnab == "1")
+			a.add(854, 850, _("treeapp minidlna"),	"javascript:go('usb/minidlna.asp');");
 	}
 }
 
