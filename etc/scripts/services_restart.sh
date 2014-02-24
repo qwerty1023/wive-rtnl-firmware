@@ -82,6 +82,9 @@ if [ "$MODE" != "pppd" ] && [ "$MODE" != "dhcp" ]; then
     if [ -e /etc/init.d/transmission ]; then
 	service transmission restart
     fi
+    if [ -e /etc/init.d/minidlna ]; then
+	service minidlna restart
+    fi
 fi
 
 # restart this if wan ip adress change
