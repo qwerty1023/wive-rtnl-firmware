@@ -8,12 +8,12 @@ LOG="logger -t storage_helper"
 case $1 in
 	"remove")
 		$LOG "Umount all disks and swap."
-		DiskApps="transmission samba xupnpd"
+		DiskApps="transmission samba xupnpd minidlna"
 		for app in $DiskApps; do
 		    service "$app" stop
 		done
 		umount_all.sh
-		$LOG "Umount complite. services restart (exclude transmission)."
+		$LOG "Umount complite. services restart."
 		DiskApps="samba xupnpd"
 		for app in $DiskApps; do
 		    service "$app" restart

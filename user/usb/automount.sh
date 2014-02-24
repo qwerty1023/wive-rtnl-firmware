@@ -162,6 +162,7 @@ if [ "$MDEV_LABEL" != "optware" ] && [ "$MDEV_TYPE" != "swap" ]; then
     service xupnpd restart
     service samba restart
     service transmission restart
+    service minidlna restart
 fi
 
 exit 0

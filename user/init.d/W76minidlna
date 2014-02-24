@@ -31,12 +31,19 @@ start() {
 	gen_config
 
 	$LOG "Start minidlna."
+
+	if [ "$public" = "" ]; then
+	    $LOG "Disc not mounted... minidlna cant start."
+	    exit 0
+	fi
+
 	/bin/minidlna
     fi
 }
 
 rescan() {
     get_param
+
     if [ "$DlnaEnabled" = "1" ]; then
 	# if need kill minidlna
 	pid=`pidof minidlna`
@@ -52,7 +59,13 @@ rescan() {
 	gen_config
 
 	$LOG "Start minidlna - rescan mode."
-	/bin/minidlna -R
+
+	if [ "$public" = "" ]; then
+	    $LOG "Disc not mounted... minidlna cant start."
+	    exit 0
+	fi
+
+	/bin/minidlna -r
     fi
 }
 

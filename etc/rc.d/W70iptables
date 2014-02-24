@@ -115,6 +115,17 @@ start() {
 		iptables -A servicelimit -i $lan2_if -p udp --dport 1900 -j ACCEPT
 	    fi
 	fi
+	if [ "$DlnaEnabled" = "1" ]; then
+	    $LOG "minidlna"
+	    iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp --dport $dlnaPort -j ACCEPT
+	    # not safe fix me later
+	    iptables -A servicelimit -i $lan_if -p udp --dport 1900 -j ACCEPT
+	    if [ "$Lan2Enabled" = "1" ]; then
+    		iptables -A servicelimit -i $lan2_if $STATE_NEW -p tcp --dport $dlnaPort -j ACCEPT
+		# not safe fix me later
+		iptables -A servicelimit -i $lan2_if -p udp --dport 1900 -j ACCEPT
+	    fi
+	fi
 	if [ "$UDPXYMode" != "0" ]; then
 	    $LOG "udpxy"
 	    if [ "$UDPXYMode" = "1" ]; then
