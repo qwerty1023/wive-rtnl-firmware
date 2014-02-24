@@ -80,7 +80,9 @@ minidlna:	$(BASEOBJS) $(LNXOBJS)
 
 romfs:	all
 	$(ROMFSINST) -S minidlna	/bin/minidlna
-	$(ROMFSINST) -S minidlna.conf	/etc/minidlna.conf
+	$(ROMFSINST) -S init.d/W76minidlna /etc/rc.d/W76minidlna
+	$(ROMFSINST) -s /etc/rc.d/W76minidlna /etc/init.d/minidlna
+
 testupnpdescgen:	$(TESTUPNPDESCGENOBJS)
 	@echo Linking $@
 	@$(CC) $(CFLAGS) -o $@ $(TESTUPNPDESCGENOBJS)

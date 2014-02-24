@@ -19,8 +19,6 @@
 function initValue(form)
 {
 	form.DlnaEnabled.value = defaultNumber("<% getCfgZero(1, "DlnaEnabled"); %>", '0');
-	form.transAccess.value = '<% getCfgGeneral(1, "TransAccess"); %>'
-	form.transAuthor.value = '<% getCfgGeneral(1, "TransAuthor"); %>'
 	DlnaEnabledSwitch(form);
 }
 
@@ -34,23 +32,22 @@ function CheckValue(form)
 {
 	if ((document.formDlna.DlnaEnabled.value == '1'))
 	{
-		if (document.formDlna.transRPCPort.value == "")
+		if (document.formDlna.dlnaPort.value == "")
 		{
 			alert('Please specify DLNA port');
 			document.formDlna.dlnaPort.focus();
 			document.formDlna.dlnaPort.select();
 			return false;
 		}
-		else if (isNaN(document.formDlna.transRPCPort.value) ||
-			 parseInt(document.formDlna.transRPCPort.value,10) > 65535 ||
-			 parseInt(document.formDlna.transRPCPort.value,10) < 1024)
-
-		{
-			alert('Please specify valid DLNA port number');
-			document.formDlna.transRPCPort.focus();
-			document.formDlna.transRPCPort.select();
-			return false;
-		}
+		else if (isNaN(document.formDlna.dlnaPort.value) ||
+			 parseInt(document.formDlna.dlnaPort.value,10) > 65535 ||
+			 parseInt(document.formDlna.dlnaPort.value,10) < 1024)
+			{
+				alert('Please specify valid DLNA port number');
+				document.formDlna.dlnaPort.focus();
+				document.formDlna.dlnaPort.select();
+				return false;
+			}
 		
 		if (document.formDlna.dlnaDBPath.value == "")
 		{
@@ -99,8 +96,8 @@ function submit_apply(parm)
 			<option value="0">Disable</option>
 			<option value="1">Enable</option>
 			</select>&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; 
-		<input type="button" style="{width:80px;}" value="Start" name="transstart" onClick="submit_apply('start')">&nbsp;
-		<input type="button" style="{width:80px;}" value="Stop" name="transstop" onClick="submit_apply('stop')">&nbsp;
+		<input type="button" style="{width:80px;}" value="Start" name="dlnastart" onClick="submit_apply('start')">&nbsp;
+		<input type="button" style="{width:80px;}" value="Stop" name="dlnastop" onClick="submit_apply('stop')">&nbsp;
 		<input type="button" style="{width:80px;}" value="ReScan" name="dlnarescan" onClick="submit_apply('rescan')"></td>
 	</td>
 </tr>
@@ -110,19 +107,19 @@ function submit_apply(parm)
 </tr>
 <tr>
 	<td class="head">DLNA DB path</td>
-	<td><input type=text name="dlnaDBPath" size=32 maxlength=256 value="<% getCfgGeneral(1, "dlnaDBPath"); %>" ></td>
+	<td><input type=text name="dlnaDBPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaDBPath"); %>" ></td>
 </tr>
 <tr>
 	<td class="head">Audo file</td>
-	<td><input type=text name="dlnaAPath" size=32 maxlength=256 value="<% getCfgGeneral(1, "dlnaAPath"); %>" ></td>
+	<td><input type=text name="dlnaAPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaAPath"); %>" ></td>
 </tr>
 <tr>
 	<td class="head">Video file</td>
-	<td><input type=text name="dlnaVPath" size=32 maxlength=256 value="<% getCfgGeneral(1, "dlnaVPath"); %>" ></td>
+	<td><input type=text name="dlnaVPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaVPath"); %>" ></td>
 </tr>
 <tr>
 	<td class="head">Pics file</td>
-	<td><input type=text name="dlnaPPath" size=32 maxlength=256 value="<% getCfgGeneral(1, "dlnaPPath"); %>" ></td>
+	<td><input type=text name="dlnaPPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaPPath"); %>" ></td>
 </tr>
 </table>
 

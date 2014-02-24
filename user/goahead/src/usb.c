@@ -34,7 +34,9 @@ static int modemShowStatus(int eid, webs_t wp, int argc, char_t **argv);
 #ifdef CONFIG_USER_TRANSMISSION
 static void transmission(webs_t wp, char_t *path, char_t *query);
 #endif
-
+#ifdef CONFIG_USER_MINIDLNA
+static void dlna(webs_t wp, char_t *path, char_t *query);
+#endif
 
 #define	LSDIR_INFO		"/tmp/lsdir"
 #define	MOUNT_INFO		"/proc/mounts"
