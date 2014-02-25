@@ -21,7 +21,11 @@
 
 #include <stdio.h>
 #include <string.h>
+#ifdef HAVE_MACHINE_ENDIAN_H
+#include <machine/endian.h>
+#else
 #include <endian.h>
+#endif
 
 #include "misc.h"
 
@@ -77,7 +81,8 @@ fget_byte(FILE *fp)
 {
 	__u8 d;
 
-	(void)fread(&d, sizeof(d), 1, fp);
+	if (!fread(&d, sizeof(d), 1, fp))
+		return 0;
 	return d;
 }
 
@@ -86,7 +91,8 @@ fget_le16(FILE *fp)
 {
 	__u16 d;
 
-	(void)fread(&d, sizeof(d), 1, fp);
+	if (!fread(&d, sizeof(d), 1, fp))
+		return 0;
 	d = le16_to_cpu(d);
 	return d;
 }
@@ -96,7 +102,8 @@ fget_le32(FILE *fp)
 {
 	__u32 d;
 
-	(void)fread(&d, sizeof(d), 1, fp);
+	if (!fread(&d, sizeof(d), 1, fp))
+		return 0;
 	d = le32_to_cpu(d);
 	return d;
 }

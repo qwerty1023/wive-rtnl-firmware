@@ -26,8 +26,6 @@ CFLAGS = -D_GNU_SOURCE -D_FILE_OFFSET_BITS=64 \
 RM = rm -f
 INSTALL = install
 
-CFLAGS += -ffunction-sections -fdata-sections
-LDFLAGS += -Wl,--gc-sections
 LDFLAGS += -L$(STAGEDIR)/lib
 
 INSTALLPREFIX ?= $(DESTDIR)
@@ -36,20 +34,18 @@ ETCINSTALLDIR = $(DESTDIR)/etc
 
 BASEOBJS = minidlna.o upnphttp.o upnpdescgen.o upnpsoap.o \
            upnpreplyparse.o minixml.o \
-           getifaddr.o daemonize.o upnpglobalvars.o \
+           getifaddr.o upnpglobalvars.o \
            options.o minissdp.o uuid.o upnpevents.o \
            sql.o utils.o metadata.o scanner.o inotify.o \
            tivo_utils.o tivo_beacon.o tivo_commands.o \
            tagutils/textutils.o tagutils/misc.o tagutils/tagutils.o \
-           playlist.o image_utils.o albumart.o log.o
+           playlist.o image_utils.o albumart.o log.o clients.o process.o
 
 ALLOBJS = $(BASEOBJS) $(LNXOBJS)
 
 LIBS += -ldl -lm -lpthread -lexif -ljpeg -lsqlite3 -lid3tag -lFLAC -lvorbis -logg -lavformat -lavcodec -lavutil -lz -liconv
 
-TESTUPNPDESCGENOBJS = testupnpdescgen.o upnpdescgen.o
-
-EXECUTABLES = minidlna testupnpdescgen
+EXECUTABLES = minidlna
 
 .PHONY:	all clean distclean install depend
 
@@ -83,10 +79,6 @@ romfs:	all
 	$(ROMFSINST) -S init.d/W76minidlna /etc/rc.d/W76minidlna
 	$(ROMFSINST) -s /etc/rc.d/W76minidlna /etc/init.d/minidlna
 
-testupnpdescgen:	$(TESTUPNPDESCGENOBJS)
-	@echo Linking $@
-	@$(CC) $(CFLAGS) -o $@ $(TESTUPNPDESCGENOBJS)
-
 config.h:	genconfig.sh
 	./genconfig.sh
 
@@ -98,29 +90,28 @@ depend:	config.h
 
 minidlna.o: config.h upnpglobalvars.h minidlnatypes.h
 minidlna.o: upnphttp.h upnpdescgen.h minidlnapath.h getifaddr.h upnpsoap.h
-minidlna.o: options.h minissdp.h daemonize.h upnpevents.h log.h
+minidlna.o: options.h minissdp.h upnpevents.h log.h
 upnphttp.o: config.h upnphttp.h upnpdescgen.h minidlnapath.h upnpsoap.h
 upnphttp.o: upnpevents.h image_utils.h sql.h log.h icons.c
 upnpdescgen.o: config.h upnpdescgen.h minidlnapath.h upnpglobalvars.h
-upnpdescgen.o: minidlnatypes.h upnpdescstrings.h log.h
+upnpdescgen.o: minidlnatypes.h log.h
 upnpsoap.o: config.h upnpglobalvars.h minidlnatypes.h log.h utils.h sql.h
 upnpsoap.o: upnphttp.h upnpsoap.h upnpreplyparse.h getifaddr.h log.h
 upnpreplyparse.o: upnpreplyparse.h minixml.h log.h
 minixml.o: minixml.h
 getifaddr.o: getifaddr.h log.h
-daemonize.o: daemonize.h config.h log.h
 upnpglobalvars.o: config.h upnpglobalvars.h
 upnpglobalvars.o: minidlnatypes.h
 options.o: options.h config.h upnpglobalvars.h
 options.o: minidlnatypes.h
-minissdp.o: config.h upnpdescstrings.h minidlnapath.h upnphttp.h
+minissdp.o: config.h minidlnapath.h upnphttp.h
 minissdp.o: upnpglobalvars.h minidlnatypes.h minissdp.h log.h
 upnpevents.o: config.h upnpevents.h minidlnapath.h upnpglobalvars.h
 upnpevents.o: minidlnatypes.h upnpdescgen.h log.h uuid.h
 uuid.o: uuid.h
 testupnpdescgen.o: config.h upnpdescgen.h
 upnpdescgen.o: config.h upnpdescgen.h minidlnapath.h upnpglobalvars.h
-upnpdescgen.o: minidlnatypes.h upnpdescstrings.h
+upnpdescgen.o: minidlnatypes.h
 scanner.o: upnpglobalvars.h metadata.h utils.h sql.h scanner.h log.h playlist.h
 metadata.o: upnpglobalvars.h metadata.h albumart.h utils.h sql.h log.h
 albumart.o: upnpglobalvars.h albumart.h utils.h image_utils.h sql.h log.h
