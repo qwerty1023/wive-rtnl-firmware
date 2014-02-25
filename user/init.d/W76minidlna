@@ -14,6 +14,8 @@ web_wait
 
 LOG="logger -t minidlna"
 
+SCAN_OPT=""
+
 start() {
     get_param
     if [ "$DlnaEnabled" = "1" ]; then
@@ -37,36 +39,10 @@ start() {
 	    exit 0
 	fi
 
-	/bin/minidlna
+	/bin/minidlna $SCAN_OPT
     fi
 }
 
-rescan() {
-    get_param
-
-    if [ "$DlnaEnabled" = "1" ]; then
-	# if need kill minidlna
-	pid=`pidof minidlna`
-	if [ "$pid" != "" ]; then
-	    $LOG "Stop minidlna."
-	    killall -q minidlna
-	    sleep 2
-	    #kill if not stopped
-	    killall -q -SIGKILL minidlna
-	    sleep 1
-        fi
-
-	gen_config
-
-	$LOG "Start minidlna - rescan mode."
-
-	if [ "$public" = "" ]; then
-	    $LOG "Disc not mounted... minidlna cant start."
-	    exit 0
-	fi
-
-	/bin/minidlna -r
-    fi
 }
 
 stop() {
@@ -97,21 +73,17 @@ gen_config() {
 
     # port for HTTP (descriptions, SOAP, media transfer) traffic
     echo "port=$dlnaPort" >> $fname
-
     # network interfaces to serve, comma delimited
     echo "network_interface=$lan_if" >> $fname
-
     #  scan fie path
     echo "media_dir=A,$dlnaAPath" >> $fname
     echo "media_dir=V,$dlnaVPath" >> $fname
     echo "media_dir=P,$dlnaPPath" >> $fname
-
     # set this if you would like to specify the directory where you want MiniDLNA to store its database and album art cache
     echo "db_dir=$dlnaDBPath" >> $fname
-
     # set this if you want to customize the name that shows up on your clients
     echo "friendly_name=miniDLNA Server" >> $fname
-
+    # other
     echo "album_art_names=Cover.jpg/cover.jpg/AlbumArtSmall.jpg/albumartsmall.jpg/AlbumArt.jpg/albumart.jpg/Album.jpg/album.jpg/Folder.jpg/folder.jpg/Thumb.jpg/thumb.jpg" >> $fname
     echo "inotify=yes" >> $fname
     echo "enable_tivo=no" >> $fname
@@ -119,7 +91,6 @@ gen_config() {
     echo "notify_interval=10" >> $fname
     echo "serial=12345678" >> $fname
     echo "model_number=1" >> $fname
-    echo "root_container=." >> $fname
 }
 
 case "$1" in
@@ -137,8 +108,9 @@ case "$1" in
             ;;
 
 	rescan)
+            SCAN_OPT="-r"
             stop
-            rescan
+            start
             ;;
 
         *)
