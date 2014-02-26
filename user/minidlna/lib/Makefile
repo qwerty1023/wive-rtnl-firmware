@@ -24,13 +24,13 @@ dir_$(CONFIG_USER_MINIDLNA)		+= libogg
 dir_$(CONFIG_USER_MINIDLNA)		+= libvorbis
 dir_$(CONFIG_USER_MINIDLNA)		+= libflac
 dir_$(CONFIG_USER_MINIDLNA)		+= libav
-dir_$(CONFIG_USER_MINIDLNA)		+= libid3tag
 dir_$(CONFIG_USER_MINIDLNA)		+= libsqlite
+dir_$(CONFIG_USER_MINIDLNA)		+= libid3tag
 
 all: 
 	for i in $(dir_y) ; do \
 		[ -d $$i ] && \
-		$(MAKE) -C $$i || \
+		$(MAKE) -j$(HOST_NCPU) -C $$i || \
 		exit $$? ; \
 		if [ ! -f $(DESTDIR)/.installed_$$i ] ; then \
 			$(MAKE) -C $$i install && \

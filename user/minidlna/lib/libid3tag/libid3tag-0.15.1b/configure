@@ -11474,20 +11474,6 @@ fi
 done
 
 
-ac_fn_c_check_header_mongrel "$LINENO" "zlib.h" "ac_cv_header_zlib_h" "$ac_includes_default"
-if test "x$ac_cv_header_zlib_h" = xyes; then :
-
-else
-
-	as_fn_error $? "zlib.h was not found
-*** You must first install zlib (libz) before you can build this package.
-*** If zlib is already installed, you may need to use the CPPFLAGS
-*** environment variable to specify its installed location, e.g. -I<dir>." "$LINENO" 5
-
-fi
-
-
-
 
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for an ANSI C-conforming const" >&5
 $as_echo_n "checking for an ANSI C-conforming const... " >&6; }

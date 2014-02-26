@@ -27,7 +27,3 @@ clean:
 install:
 	$(MAKE) -C $(SRC_NAME) install
 
-romfs:
-	if [ $(CONFIG_LIB_BUILD_SHARED) = "y" ] ; then \
-		cp -fP $(DESTDIR)/lib/libid3tag.so* $(ROMFSDIR)/lib ; \
-	fi
