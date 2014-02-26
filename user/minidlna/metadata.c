@@ -31,7 +31,7 @@
 #include <libexif/exif-loader.h>
 #include <jpeglib.h>
 #include <setjmp.h>
-//#include "libav.h"
+
 #include <avutil.h>
 #include <avcodec.h>
 #include <avformat.h>

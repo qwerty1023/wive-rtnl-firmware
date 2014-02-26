@@ -19,7 +19,7 @@ configure:
 	( cd $(SRC_NAME) ; \
 	./configure \
 		--prefix=/ \
-		--cross-prefix=/opt/Wive-RTNL/toolchain/bin/mipsel-linux-uclibc- \
+		--cross-prefix=/home/sandra/source/wive-rtnl-firmware/toolchain/bin/mipsel-linux-uclibc- \
 		--enable-cross-compile \
 		--arch=mips \
 		--target-os=linux \

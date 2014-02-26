@@ -11,7 +11,7 @@ config_test:
 	fi ) 
 
 configure:
-	( cd $(SRC_NAME) && CFLAGS="-Wall -Wstrict-prototypes -Wno-trigraphs  -mips32r2 -march=mips32r2 -fno-stack-protector -fno-builtin -nostdinc -D_LIBC -I./include -I.  -Os -funit-at-a-time -fforce-addr -fno-stack-protector -isystem /opt/Wive-RTNL/toolchain/lib/gcc/mipsel-linux-uclibc/4.4.7/include -DNDEBUG -fPIC -Os -I/opt/Wive-RTNL/linux/include -I/opt/Wive-RTNL/lib/include" \
+	( cd $(SRC_NAME) && CFLAGS="-Wall -Wstrict-prototypes -Wno-trigraphs  -mips32r2 -march=mips32r2 -fno-stack-protector -fno-builtin -nostdinc -D_LIBC -I./include -I.  -Os -funit-at-a-time -fforce-addr -fno-stack-protector -isystem /home/sandra/source/wive-rtnl-firmware/toolchain/lib/gcc/mipsel-linux-uclibc/4.8.2/include -DNDEBUG -fPIC -Os -I/home/sandra/source/wive-rtnl-firmware/linux/include -I/home/sandra/source/wive-rtnl-firmware/lib/include" \
 	./configure \
 		--prefix=/ \
 		--disable-readline \
@@ -28,8 +28,4 @@ clean:
 install:
 	$(MAKE) -C $(SRC_NAME) install
 
-romfs:
-	if [ $(CONFIG_LIB_BUILD_SHARED) = "y" ] ; then \
-		cp -fP $(DESTDIR)/lib/libsqlite3.so* $(ROMFSDIR)/lib ; \
-	fi
 
