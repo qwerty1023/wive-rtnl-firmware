@@ -60,7 +60,6 @@ clean:
 	$(RM) testupnpdescgen.o
 
 distclean: clean
-	$(RM) config.h
 
 install:	minidlna
 	$(INSTALL) -d $(SBININSTALLDIR)
@@ -78,9 +77,6 @@ romfs:	all
 	$(ROMFSINST) -S minidlna	/bin/minidlna
 	$(ROMFSINST) -S init.d/W76minidlna /etc/rc.d/W76minidlna
 	$(ROMFSINST) -s /etc/rc.d/W76minidlna /etc/init.d/minidlna
-
-config.h:	genconfig.sh
-	./genconfig.sh
 
 depend:	config.h
 	makedepend -f$(MAKEFILE_LIST) -Y \
