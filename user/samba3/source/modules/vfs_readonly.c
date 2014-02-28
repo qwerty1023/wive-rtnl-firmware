@@ -6,7 +6,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 
    This work was sponsored by Optifacio Software Services, Inc.
 */
@@ -64,25 +65,12 @@ static int readonly_connect(vfs_handle_struct *handle,
 					     "period", period_def); 
 
   if (period && period[0] && period[1]) {
-    int i;
     time_t current_time = time(NULL);
     time_t begin_period = get_date(period[0], &current_time);
     time_t end_period   = get_date(period[1], &current_time);
 
     if ((current_time >= begin_period) && (current_time <= end_period)) {
-      connection_struct *conn = handle->conn;
-
       handle->conn->read_only = True;
-
-      /* Wipe out the VUID cache. */
-      for (i=0; i< VUID_CACHE_SIZE; i++) {
-        struct vuid_cache_entry *ent = ent = &conn->vuid_cache.array[i];
-        ent->vuid = UID_FIELD_INVALID;
-        TALLOC_FREE(ent->server_info);
-        ent->read_only = false;
-        ent->admin_user = false;
-      }
-      conn->vuid_cache.next_entry = 0;
     }
 
     return SMB_VFS_NEXT_CONNECT(handle, service, user);

@@ -6,17 +6,19 @@
    Copyright (C) Tim Potter 2000
    
    This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
+   modify it under the terms of the GNU Library General Public
    License as published by the Free Software Foundation; either
-   version 3 of the License, or (at your option) any later version.
+   version 2 of the License, or (at your option) any later version.
    
    This library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
    Library General Public License for more details.
    
-   You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   You should have received a copy of the GNU Library General Public
+   License along with this library; if not, write to the
+   Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+   Boston, MA  02111-1307, USA.   
 */
 
 #ifndef _WINBIND_NSS_SOLARIS_H
@@ -81,8 +83,5 @@ NSS_STATUS _nss_winbind_getgrnam_r(const char *name,
 NSS_STATUS _nss_winbind_getgrgid_r(gid_t gid,
 				   struct group *result, char *buffer,
 				   size_t buflen, int *errnop);
-NSS_STATUS _nss_winbind_initgroups_dyn(char *user, gid_t group, long int *start,
-				       long int *size, gid_t **groups,
-				       long int limit, int *errnop);
 
 #endif /* _WINBIND_NSS_SOLARIS_H */

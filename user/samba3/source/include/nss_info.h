@@ -5,17 +5,19 @@
    Copyright (C) Gerald Carter             2006
 
    This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
+   modify it under the terms of the GNU Library General Public
    License as published by the Free Software Foundation; either
-   version 3 of the License, or (at your option) any later version.
+   version 2 of the License, or (at your option) any later version.
    
    This library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
    Library General Public License for more details.
    
-   You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   You should have received a copy of the GNU Library General Public
+   License along with this library; if not, write to the
+   Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+   Boston, MA  02111-1307, USA.   
 */
 
 #ifndef _IDMAP_NSS_H
@@ -66,12 +68,6 @@ struct nss_info_methods {
 				  TALLOC_CTX *ctx, 
 				  ADS_STRUCT *ads, LDAPMessage *msg,
 				  char **homedir, char **shell, char **gecos, gid_t *p_gid);
-	NTSTATUS (*map_to_alias)(TALLOC_CTX *mem_ctx,
-				 struct nss_domain_entry *e,
-				 const char *name, char **alias);
-	NTSTATUS (*map_from_alias)(TALLOC_CTX *mem_ctx,
-				   struct nss_domain_entry *e,
-				   const char *alias, char **name);
 	NTSTATUS (*close_fn)( void );
 };
 
@@ -89,12 +85,6 @@ NTSTATUS nss_get_info( const char *domain, const DOM_SID *user_sid,
 		       ADS_STRUCT *ads, LDAPMessage *msg,
                        char **homedir, char **shell, char **gecos,
                        gid_t *p_gid);
-
-NTSTATUS nss_map_to_alias( TALLOC_CTX *mem_ctx, const char *domain,
-			   const char *name, char **alias );
-
-NTSTATUS nss_map_from_alias( TALLOC_CTX *mem_ctx, const char *domain,
-			     const char *alias, char **name );
 
 NTSTATUS nss_close( const char *parameters );
 

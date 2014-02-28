@@ -1,12 +1,12 @@
 .\"     Title: smbcacls
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
-.\"      Date: 02/22/2010
+.\"      Date: 09/30/2009
 .\"    Manual: User Commands
-.\"    Source: Samba 3.3
+.\"    Source: Samba 3.0
 .\"  Language: English
 .\"
-.TH "SMBCACLS" "1" "02/22/2010" "Samba 3\&.3" "User Commands"
+.TH "SMBCACLS" "1" "09/30/2009" "Samba 3\&.0" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * (re)Define some macros
 .\" -----------------------------------------------------------------
@@ -258,18 +258,18 @@ The higher this value, the more detail will be logged to the log files about the
 Levels above 1 will generate considerable amounts of log data, and should only be used when investigating a problem\&. Levels above 3 are designed for use only by developers and generate HUGE amounts of log data, most of which is extremely cryptic\&.
 .sp
 Note that specifying this parameter here will override the
-\m[blue]\fB\%smb.conf.5.html#\fR\m[]
+\m[blue]\fBlog level\fR\m[]
 parameter in the
 \FCsmb\&.conf\F[]
 file\&.
 .RE
 .PP
-\-V|\-\-version
+\-V
 .RS 4
 Prints the program version number\&.
 .RE
 .PP
-\-s|\-\-configfile <configuration file>
+\-s <configuration file>
 .RS 4
 The file specified contains the configuration details required by the server\&. The information in this file includes server\-specific information such as what printcap file to use, as well as descriptions of all the services that the server is to provide\&. See
 \FCsmb\&.conf\F[]
@@ -312,7 +312,7 @@ The owner and group specify the owner and group sids for the object\&. If a SID 
 .PP
 ACLs specify permissions granted to the SID\&. This SID again can be specified in S\-1\-x\-y\-z format or as a name in which case it is resolved against the server on which the file or directory resides\&. The type, flags and mask values determine the type of access granted to the SID\&.
 .PP
-The type can be either ALLOWED or DENIED to allow/deny access to the SID\&. The flags values are generally zero for file ACLs and either 9 or 2 for directory ACLs\&. Some common flags are:
+The type can be either 0 or 1 corresponding to ALLOWED or DENIED access to the SID\&. The flags values are generally zero for file ACLs and either 9 or 2 for directory ACLs\&. Some common flags are:
 .sp
 .RS 4
 .ie n \{\
@@ -483,7 +483,7 @@ If the operation succeeded, smbcacls returns and exit status of 0\&. If
 couldn\'t connect to the specified server, or there was an error getting or setting the ACLs, an exit status of 1 is returned\&. If there was an error parsing any command line arguments, an exit status of 2 is returned\&.
 .SH "VERSION"
 .PP
-This man page is correct for version 3 of the Samba suite\&.
+This man page is correct for version 3\&.0 of the Samba suite\&.
 .SH "AUTHOR"
 .PP
 The original Samba software and related utilities were created by Andrew Tridgell\&. Samba is now developed by the Samba Team as an Open Source project similar to the way the Linux kernel is developed\&.

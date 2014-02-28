@@ -5,7 +5,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,7 +14,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 /*
@@ -24,10 +25,6 @@
 #include "includes.h"
 
 #ifdef HAVE_INOTIFY
-
-#if HAVE_SYS_INOTIFY_H
-#include <sys/inotify.h>
-#else
 
 #ifdef HAVE_ASM_TYPES_H
 #include <asm/types.h>
@@ -61,7 +58,7 @@ static int inotify_rm_watch(int fd, int wd)
 #include <sys/inotify.h>
 
 #endif
-#endif
+
 
 /* older glibc headers don't have these defines either */
 #ifndef IN_ONLYDIR
@@ -105,7 +102,7 @@ static int inotify_destructor(struct inotify_private *in)
   see if a particular event from inotify really does match a requested
   notify event in SMB
 */
-static bool filter_match(struct inotify_watch_context *w,
+static BOOL filter_match(struct inotify_watch_context *w,
 			 struct inotify_event *e)
 {
 	DEBUG(10, ("filter_match: e->mask=%x, w->mask=%x, w->filter=%x\n",
@@ -232,7 +229,6 @@ static void inotify_handler(struct event_context *ev, struct fd_event *fde,
 	int bufsize = 0;
 	struct inotify_event *e0, *e;
 	uint32_t prev_cookie=0;
-	NTSTATUS status;
 
 	/*
 	  we must use FIONREAD as we cannot predict the length of the
@@ -248,19 +244,14 @@ static void inotify_handler(struct event_context *ev, struct fd_event *fde,
 	e0 = e = (struct inotify_event *)TALLOC_SIZE(in, bufsize);
 	if (e == NULL) return;
 
-	status = read_data(in->fd, (char *)e0, bufsize);
-	if (!NT_STATUS_IS_OK(status)) {
-		DEBUG(0,("Failed to read all inotify data - %s\n",
-			nt_errstr(status)));
+	if (read(in->fd, e0, bufsize) != bufsize) {
+		DEBUG(0,("Failed to read all inotify data\n"));
 		talloc_free(e0);
-		/* the inotify fd will now be out of sync,
-		 * can't keep reading data off it */
-		TALLOC_FREE(fde);
 		return;
 	}
 
 	/* we can get more than one event in the buffer */
-	while (e && (bufsize >= sizeof(*e))) {
+	while (bufsize >= sizeof(*e)) {
 		struct inotify_event *e2 = NULL;
 		bufsize -= e->len + sizeof(*e);
 		if (bufsize >= sizeof(*e)) {

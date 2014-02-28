@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -120,7 +121,7 @@ NTSTATUS smb_register_charset(struct charset_functions *funcs)
 
 static void lazy_initialize_iconv(void)
 {
-	static bool initialized;
+	static BOOL initialized;
 	int i;
 
 	if (!initialized) {
@@ -140,7 +141,7 @@ static size_t sys_iconv(void *cd,
 			char **outbuf, size_t *outbytesleft)
 {
 	size_t ret = iconv((iconv_t)cd, 
-			   (void *)inbuf, inbytesleft,
+			   (char **)inbuf, inbytesleft, 
 			   outbuf, outbytesleft);
 	if (ret == (size_t)-1) {
 		int saved_errno = errno;
@@ -193,7 +194,7 @@ size_t smb_iconv(smb_iconv_t cd,
 }
 
 
-static bool is_utf16(const char *name)
+static BOOL is_utf16(const char *name)
 {
 	return strcasecmp(name, "UCS-2LE") == 0 ||
 		strcasecmp(name, "UTF-16LE") == 0;
@@ -388,7 +389,10 @@ static size_t latin1_push(void *cd, const char **inbuf, size_t *inbytesleft,
 
 	while (*inbytesleft >= 2 && *outbytesleft >= 1) {
 		(*outbuf)[0] = (*inbuf)[0];
-		if ((*inbuf)[1]) ir_count++;
+		if ((*inbuf)[1]) {
+			ir_count++;
+			(*outbuf)[0] = '_'; // AVM
+		}
 		(*inbytesleft)  -= 2;
 		(*outbytesleft) -= 1;
 		(*inbuf)  += 2;

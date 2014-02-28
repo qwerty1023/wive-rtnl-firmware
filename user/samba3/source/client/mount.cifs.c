@@ -1036,14 +1036,6 @@ uppercase_string(char *string)
 	return 1;
 }
 
-static void print_cifs_mount_version(void)
-{
-	printf("mount.cifs version: %s.%s%s\n",
-		MOUNT_CIFS_VERSION_MAJOR,
-		MOUNT_CIFS_VERSION_MINOR,
-		MOUNT_CIFS_VENDOR_SUFFIX);
-}
-
 int main(int argc, char ** argv)
 {
 	int c;
@@ -1105,25 +1097,15 @@ int main(int argc, char ** argv)
 			exit(EX_SYSERR);
 		}
 		mountpoint = argv[2];
-	} else if (argc == 2) {
-		if ((strcmp(argv[1], "-V") == 0) ||
-		    (strcmp(argv[1], "--version") == 0))
-		{
-			print_cifs_mount_version();
-			exit(0);
-		}
-
-		if ((strcmp(argv[1], "-h") == 0) ||
-		    (strcmp(argv[1], "-?") == 0) ||
-		    (strcmp(argv[1], "--help") == 0))
-		{
-			mount_cifs_usage();
-			exit(0);
-		}
-
-		mount_cifs_usage();
-		exit(EX_USAGE);
 	} else {
+		if ((strcmp (argv[1], "--version") == 0) ||
+		    ((strcmp (argv[1], "-V") == 0))) {
+			printf ("mount.cifs version: %s.%s%s\n",
+			MOUNT_CIFS_VERSION_MAJOR,
+			MOUNT_CIFS_VERSION_MINOR,
+			MOUNT_CIFS_VENDOR_SUFFIX);
+			exit (0);
+		}
 		mount_cifs_usage();
 		exit(EX_USAGE);
 	}
@@ -1179,8 +1161,11 @@ int main(int argc, char ** argv)
 		case 'v':
 			++verboseflag;
 			break;
-		case 'V':
-			print_cifs_mount_version();
+		case 'V':	   
+			printf ("mount.cifs version: %s.%s%s\n",
+			MOUNT_CIFS_VERSION_MAJOR,
+			MOUNT_CIFS_VERSION_MINOR,
+			MOUNT_CIFS_VENDOR_SUFFIX);
 			exit (0);
 		case 'w':
 			flags &= ~MS_RDONLY;
@@ -1489,8 +1474,7 @@ mount_retry:
 			}
 		}
 		printf("mount error(%d): %s\n", errno, strerror(errno));
-		printf("Refer to the mount.cifs(8) manual page (e.g. man "
-		       "mount.cifs)\n");
+		printf("Refer to the mount.cifs(8) manual page (e.g.man mount.cifs)\n");
 		rc = EX_FAIL;
 		goto mount_exit;
 	}

@@ -6,7 +6,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -27,7 +28,7 @@ struct timed_event {
 	const char *event_name;
 	void (*handler)(struct event_context *event_ctx,
 			struct timed_event *te,
-			struct timeval now,
+			const struct timeval *now,
 			void *private_data);
 	void *private_data;
 };
@@ -44,6 +45,16 @@ struct fd_event {
 	void *private_data;
 };
 
+#define EVENT_FD_WRITEABLE(fde) \
+	event_set_fd_flags(fde, event_get_fd_flags(fde) | EVENT_FD_WRITE)
+#define EVENT_FD_READABLE(fde) \
+	event_set_fd_flags(fde, event_get_fd_flags(fde) | EVENT_FD_READ)
+
+#define EVENT_FD_NOT_WRITEABLE(fde) \
+	event_set_fd_flags(fde, event_get_fd_flags(fde) & ~EVENT_FD_WRITE)
+#define EVENT_FD_NOT_READABLE(fde) \
+	event_set_fd_flags(fde, event_get_fd_flags(fde) & ~EVENT_FD_READ)
+
 struct event_context {
 	struct timed_event *timed_events;
 	struct fd_event *fd_events;
@@ -53,7 +64,7 @@ static int timed_event_destructor(struct timed_event *te)
 {
 	DEBUG(10, ("Destroying timed event %lx \"%s\"\n", (unsigned long)te,
 		te->event_name));
-	if (te->event_ctx != NULL) {
+	if (te->event_ctx) {
 		DLIST_REMOVE(te->event_ctx->timed_events, te);
 	}
 	return 0;
@@ -88,13 +99,13 @@ static void add_event_by_time(struct timed_event *te)
  handed to it.
 ****************************************************************************/
 
-struct timed_event *_event_add_timed(struct event_context *event_ctx,
+struct timed_event *event_add_timed(struct event_context *event_ctx,
 				TALLOC_CTX *mem_ctx,
 				struct timeval when,
 				const char *event_name,
 				void (*handler)(struct event_context *event_ctx,
 						struct timed_event *te,
-						struct timeval now,
+						const struct timeval *now,
 						void *private_data),
 				void *private_data)
 {
@@ -123,8 +134,10 @@ struct timed_event *_event_add_timed(struct event_context *event_ctx,
 
 static int fd_event_destructor(struct fd_event *fde)
 {
-	if (fde->event_ctx != NULL) {
-		DLIST_REMOVE(fde->event_ctx->fd_events, fde);
+	struct event_context *event_ctx = fde->event_ctx;
+
+	if (event_ctx) {
+		DLIST_REMOVE(event_ctx->fd_events, fde);
 	}
 	return 0;
 }
@@ -139,11 +152,6 @@ struct fd_event *event_add_fd(struct event_context *event_ctx,
 			      void *private_data)
 {
 	struct fd_event *fde;
-
-	if (fd < 0 || fd >= FD_SETSIZE) {
-		errno = EBADF;
-		return NULL;
-	}
 
 	if (!(fde = TALLOC_P(mem_ctx, struct fd_event))) {
 		return NULL;
@@ -181,35 +189,20 @@ void event_fd_set_not_readable(struct fd_event *fde)
 	fde->flags &= ~EVENT_FD_READ;
 }
 
-/*
- * Return if there's something in the queue
- */
-
-bool event_add_to_select_args(struct event_context *event_ctx,
+void event_add_to_select_args(struct event_context *event_ctx,
 			      const struct timeval *now,
 			      fd_set *read_fds, fd_set *write_fds,
 			      struct timeval *timeout, int *maxfd)
 {
 	struct fd_event *fde;
 	struct timeval diff;
-	bool ret = False;
 
 	for (fde = event_ctx->fd_events; fde; fde = fde->next) {
-		if (fde->fd < 0 || fde->fd >= FD_SETSIZE) {
-			/* We ignore here, as it shouldn't be
-			   possible to add an invalid fde->fd
-			   but we don't want FD_SET to see an
-			   invalid fd. */
-			continue;
-		}
-
 		if (fde->flags & EVENT_FD_READ) {
 			FD_SET(fde->fd, read_fds);
-			ret = True;
 		}
 		if (fde->flags & EVENT_FD_WRITE) {
 			FD_SET(fde->fd, write_fds);
-			ret = True;
 		}
 
 		if ((fde->flags & (EVENT_FD_READ|EVENT_FD_WRITE))
@@ -219,25 +212,32 @@ bool event_add_to_select_args(struct event_context *event_ctx,
 	}
 
 	if (event_ctx->timed_events == NULL) {
-		return ret;
+		return;
 	}
 
 	diff = timeval_until(now, &event_ctx->timed_events->when);
 	*timeout = timeval_min(timeout, &diff);
-
-	return True;
 }
 
-bool run_events(struct event_context *event_ctx,
+BOOL run_events(struct event_context *event_ctx,
 		int selrtn, fd_set *read_fds, fd_set *write_fds)
 {
-	struct fd_event *fde;
-	struct timeval now;
+	BOOL fired = False;
+	struct fd_event *fde, *next;
 
-	GetTimeOfDay(&now);
+	/* Run all events that are pending, not just one (as we
+	   did previously. */
 
-	if ((event_ctx->timed_events != NULL)
-	    && (timeval_compare(&now, &event_ctx->timed_events->when) >= 0)) {
+	while (event_ctx->timed_events) {
+		struct timeval now;
+		GetTimeOfDay(&now);
+
+		if (timeval_compare(
+			    &now, &event_ctx->timed_events->when) < 0) {
+			/* Nothing to do yet */
+			DEBUG(11, ("run_events: Nothing to do\n"));
+			break;
+		}
 
 		DEBUG(10, ("Running event \"%s\" %lx\n",
 			   event_ctx->timed_events->event_name,
@@ -245,32 +245,41 @@ bool run_events(struct event_context *event_ctx,
 
 		event_ctx->timed_events->handler(
 			event_ctx,
-			event_ctx->timed_events, now,
+			event_ctx->timed_events, &now,
 			event_ctx->timed_events->private_data);
 
-		return true;
+		fired = True;
+	}
+
+	if (fired) {
+		/*
+		 * We might have changed the socket status during the timed
+		 * events, return to run select again.
+		 */
+		return True;
 	}
 
 	if (selrtn == 0) {
 		/*
 		 * No fd ready
 		 */
-		return false;
+		return fired;
 	}
 
-	for (fde = event_ctx->fd_events; fde; fde = fde->next) {
+	for (fde = event_ctx->fd_events; fde; fde = next) {
 		uint16 flags = 0;
 
+		next = fde->next;
 		if (FD_ISSET(fde->fd, read_fds)) flags |= EVENT_FD_READ;
 		if (FD_ISSET(fde->fd, write_fds)) flags |= EVENT_FD_WRITE;
 
-		if (flags & fde->flags) {
+		if (flags) {
 			fde->handler(event_ctx, fde, flags, fde->private_data);
-			return true;
+			fired = True;
 		}
 	}
 
-	return false;
+	return fired;
 }
 
 
@@ -290,40 +299,6 @@ struct timeval *get_timed_events_timeout(struct event_context *event_ctx,
 		(int)to_ret->tv_usec));
 
 	return to_ret;
-}
-
-int event_loop_once(struct event_context *ev)
-{
-	struct timeval now, to;
-	fd_set r_fds, w_fds;
-	int maxfd = 0;
-	int ret;
-
-	FD_ZERO(&r_fds);
-	FD_ZERO(&w_fds);
-
-	to.tv_sec = 9999;	/* Max timeout */
-	to.tv_usec = 0;
-
-	GetTimeOfDay(&now);
-
-	if (!event_add_to_select_args(ev, &now, &r_fds, &w_fds, &to, &maxfd)) {
-		return -1;
-	}
-
-	if (timeval_is_zero(&to)) {
-		run_events(ev, 0, NULL, NULL);
-		return 0;
-	}
-
-	ret = sys_select(maxfd+1, &r_fds, &w_fds, NULL, &to);
-
-	if (ret == -1 && errno != EINTR) {
-		return -1;
-	}
-
-	run_events(ev, ret, &r_fds, &w_fds);
-	return 0;
 }
 
 static int event_context_destructor(struct event_context *ev)
@@ -356,38 +331,4 @@ struct event_context *event_context_init(TALLOC_CTX *mem_ctx)
 
 	talloc_set_destructor(result, event_context_destructor);
 	return result;
-}
-
-void dump_event_list(struct event_context *event_ctx)
-{
-	struct timed_event *te;
-	struct fd_event *fe;
-	struct timeval evt, now;
-
-	if (!event_ctx) {
-		return;
-	}
-
-	now = timeval_current();
-
-	DEBUG(10,("dump_event_list:\n"));
-
-	for (te = event_ctx->timed_events; te; te = te->next) {
-
-		evt = timeval_until(&now, &te->when);
-
-		DEBUGADD(10,("Timed Event \"%s\" %lx handled in %d seconds (at %s)\n",
-			   te->event_name,
-			   (unsigned long)te,
-			   (int)evt.tv_sec,
-			   http_timestring(te->when.tv_sec)));
-	}
-
-	for (fe = event_ctx->fd_events; fe; fe = fe->next) {
-
-		DEBUGADD(10,("FD Event %d %lx, flags: 0x%04x\n",
-			   fe->fd,
-			   (unsigned long)fe,
-			   fe->flags));
-	}
 }

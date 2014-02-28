@@ -7,7 +7,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -16,7 +16,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -26,7 +27,6 @@ DOM_SID domain_sid;
 
 static enum pipe_auth_type pipe_default_auth_type = PIPE_AUTH_TYPE_NONE;
 static enum pipe_auth_level pipe_default_auth_level = PIPE_AUTH_LEVEL_NONE;
-static unsigned int timeout = 0;
 
 /* List to hold groups of commands.
  *
@@ -133,10 +133,12 @@ static void fetch_machine_sid(struct cli_state *cli)
 {
 	POLICY_HND pol;
 	NTSTATUS result = NT_STATUS_OK;
-	static bool got_domain_sid;
+	uint32 info_class = 5;
+	char *domain_name = NULL;
+	static BOOL got_domain_sid;
 	TALLOC_CTX *mem_ctx;
+	DOM_SID *dom_sid = NULL;
 	struct rpc_pipe_client *lsapipe = NULL;
-	union lsa_PolicyInformation *info = NULL;
 
 	if (got_domain_sid) return;
 
@@ -145,9 +147,7 @@ static void fetch_machine_sid(struct cli_state *cli)
 		goto error;
 	}
 
-	result = cli_rpc_pipe_open_noauth(cli, &ndr_table_lsarpc.syntax_id,
-					  &lsapipe);
-	if (!NT_STATUS_IS_OK(result)) {
+	if ((lsapipe = cli_rpc_pipe_open_noauth(cli, PI_LSARPC, &result)) == NULL) {
 		fprintf(stderr, "could not initialise lsa pipe. Error was %s\n", nt_errstr(result) );
 		goto error;
 	}
@@ -159,19 +159,17 @@ static void fetch_machine_sid(struct cli_state *cli)
 		goto error;
 	}
 
-	result = rpccli_lsa_QueryInfoPolicy(lsapipe, mem_ctx,
-					    &pol,
-					    LSA_POLICY_INFO_ACCOUNT_DOMAIN,
-					    &info);
+	result = rpccli_lsa_query_info_policy(lsapipe, mem_ctx, &pol, info_class, 
+					   &domain_name, &dom_sid);
 	if (!NT_STATUS_IS_OK(result)) {
 		goto error;
 	}
 
 	got_domain_sid = True;
-	sid_copy(&domain_sid, info->account_domain.sid);
+	sid_copy( &domain_sid, dom_sid );
 
-	rpccli_lsa_Close(lsapipe, mem_ctx, &pol);
-	TALLOC_FREE(lsapipe);
+	rpccli_lsa_close(lsapipe, mem_ctx, &pol);
+	cli_rpc_pipe_close(lsapipe);
 	talloc_destroy(mem_ctx);
 
 	return;
@@ -179,7 +177,7 @@ static void fetch_machine_sid(struct cli_state *cli)
  error:
 
 	if (lsapipe) {
-		TALLOC_FREE(lsapipe);
+		cli_rpc_pipe_close(lsapipe);
 	}
 
 	fprintf(stderr, "could not obtain sid for domain %s\n", cli->domain);
@@ -336,11 +334,9 @@ static NTSTATUS cmd_set_ss_level(void)
 				continue;
 			}
 
-			if ((tmp_set->rpc_pipe->auth->auth_type
-			     != pipe_default_auth_type)
-			    || (tmp_set->rpc_pipe->auth->auth_level
-				!= pipe_default_auth_level)) {
-				TALLOC_FREE(tmp_set->rpc_pipe);
+			if (tmp_set->rpc_pipe->auth.auth_type != pipe_default_auth_type ||
+					tmp_set->rpc_pipe->auth.auth_level != pipe_default_auth_level) {
+				cli_rpc_pipe_close(tmp_set->rpc_pipe);
 				tmp_set->rpc_pipe = NULL;
 			}
 		}
@@ -351,8 +347,6 @@ static NTSTATUS cmd_set_ss_level(void)
 static NTSTATUS cmd_sign(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
                          int argc, const char **argv)
 {
-	const char *type = "NTLMSSP";
-
 	pipe_default_auth_level = PIPE_AUTH_LEVEL_INTEGRITY;
 	pipe_default_auth_type = PIPE_AUTH_TYPE_NTLMSSP;
 
@@ -362,29 +356,25 @@ static NTSTATUS cmd_sign(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
 	}
 
 	if (argc == 2) {
-		type = argv[1];
-		if (strequal(type, "NTLMSSP")) {
+		if (strequal(argv[1], "NTLMSSP")) {
 			pipe_default_auth_type = PIPE_AUTH_TYPE_NTLMSSP;
-		} else if (strequal(type, "NTLMSSP_SPNEGO")) {
+		} else if (strequal(argv[1], "NTLMSSP_SPNEGO")) {
 			pipe_default_auth_type = PIPE_AUTH_TYPE_SPNEGO_NTLMSSP;
-		} else if (strequal(type, "SCHANNEL")) {
+		} else if (strequal(argv[1], "SCHANNEL")) {
 			pipe_default_auth_type = PIPE_AUTH_TYPE_SCHANNEL;
 		} else {
-			printf("unknown type %s\n", type);
+			printf("unknown type %s\n", argv[1]);
 			return NT_STATUS_INVALID_LEVEL;
 		}
 	}
 
-	d_printf("Setting %s - sign\n", type);
-
+	printf("debuglevel is %d\n", DEBUGLEVEL);
 	return cmd_set_ss_level();
 }
 
 static NTSTATUS cmd_seal(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
                          int argc, const char **argv)
 {
-	const char *type = "NTLMSSP";
-
 	pipe_default_auth_level = PIPE_AUTH_LEVEL_PRIVACY;
 	pipe_default_auth_type = PIPE_AUTH_TYPE_NTLMSSP;
 
@@ -394,56 +384,19 @@ static NTSTATUS cmd_seal(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
 	}
 
 	if (argc == 2) {
-		type = argv[1];
-		if (strequal(type, "NTLMSSP")) {
+		if (strequal(argv[1], "NTLMSSP")) {
 			pipe_default_auth_type = PIPE_AUTH_TYPE_NTLMSSP;
-		} else if (strequal(type, "NTLMSSP_SPNEGO")) {
+		} else if (strequal(argv[1], "NTLMSSP_SPNEGO")) {
 			pipe_default_auth_type = PIPE_AUTH_TYPE_SPNEGO_NTLMSSP;
-		} else if (strequal(type, "SCHANNEL")) {
+		} else if (strequal(argv[1], "SCHANNEL")) {
 			pipe_default_auth_type = PIPE_AUTH_TYPE_SCHANNEL;
 		} else {
-			printf("unknown type %s\n", type);
+			printf("unknown type %s\n", argv[1]);
 			return NT_STATUS_INVALID_LEVEL;
 		}
 	}
-
-	d_printf("Setting %s - sign and seal\n", type);
-
 	return cmd_set_ss_level();
 }
-
-static NTSTATUS cmd_timeout(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
-			    int argc, const char **argv)
-{
-	struct cmd_list *tmp;
-
-	if (argc > 2) {
-		printf("Usage: %s timeout\n", argv[0]);
-		return NT_STATUS_OK;
-	}
-
-	if (argc == 2) {
-		timeout = atoi(argv[1]);
-
-		for (tmp = cmd_list; tmp; tmp = tmp->next) {
-			
-			struct cmd_set *tmp_set;
-
-			for (tmp_set = tmp->cmd_set; tmp_set->name; tmp_set++) {
-				if (tmp_set->rpc_pipe == NULL) {
-					continue;
-				}
-
-				rpccli_set_timeout(tmp_set->rpc_pipe, timeout);
-			}
-		}
-	}
-
-	printf("timeout is %d\n", timeout);
-
-	return NT_STATUS_OK;
-}
-
 
 static NTSTATUS cmd_none(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
                          int argc, const char **argv)
@@ -481,25 +434,23 @@ static struct cmd_set rpcclient_commands[] = {
 
 	{ "GENERAL OPTIONS" },
 
-	{ "help", RPC_RTYPE_NTSTATUS, cmd_help, NULL, 	  NULL, NULL,	"Get help on commands", "[command]" },
-	{ "?", 	RPC_RTYPE_NTSTATUS, cmd_help, NULL,	  NULL, NULL,	"Get help on commands", "[command]" },
-	{ "debuglevel", RPC_RTYPE_NTSTATUS, cmd_debuglevel, NULL,   NULL,	NULL, "Set debug level", "level" },
-	{ "debug", RPC_RTYPE_NTSTATUS, cmd_debuglevel, NULL,   NULL,	NULL, "Set debug level", "level" },
-	{ "list",	RPC_RTYPE_NTSTATUS, cmd_listcommands, NULL, NULL,	NULL, "List available commands on <pipe>", "pipe" },
-	{ "exit", RPC_RTYPE_NTSTATUS, cmd_quit, NULL,   NULL,	NULL,	"Exit program", "" },
-	{ "quit", RPC_RTYPE_NTSTATUS, cmd_quit, NULL,	  NULL,	NULL, "Exit program", "" },
-	{ "sign", RPC_RTYPE_NTSTATUS, cmd_sign, NULL,	  NULL,	NULL, "Force RPC pipe connections to be signed", "" },
-	{ "seal", RPC_RTYPE_NTSTATUS, cmd_seal, NULL,	  NULL,	NULL, "Force RPC pipe connections to be sealed", "" },
-	{ "schannel", RPC_RTYPE_NTSTATUS, cmd_schannel, NULL,	  NULL, NULL,	"Force RPC pipe connections to be sealed with 'schannel'.  Assumes valid machine account to this domain controller.", "" },
-	{ "schannelsign", RPC_RTYPE_NTSTATUS, cmd_schannel_sign, NULL,	  NULL, NULL, "Force RPC pipe connections to be signed (not sealed) with 'schannel'.  Assumes valid machine account to this domain controller.", "" },
-	{ "timeout", RPC_RTYPE_NTSTATUS, cmd_timeout, NULL,	  NULL, NULL, "Set timeout (in milliseonds) for RPC operations", "" },
-	{ "none", RPC_RTYPE_NTSTATUS, cmd_none, NULL,	  NULL, NULL, "Force RPC pipe connections to have no special properties", "" },
+	{ "help", RPC_RTYPE_NTSTATUS, cmd_help, NULL, 	  -1, NULL,	"Get help on commands", "[command]" },
+	{ "?", 	RPC_RTYPE_NTSTATUS, cmd_help, NULL,	  -1, NULL,	"Get help on commands", "[command]" },
+	{ "debuglevel", RPC_RTYPE_NTSTATUS, cmd_debuglevel, NULL,   -1,	NULL, "Set debug level", "level" },
+	{ "list",	RPC_RTYPE_NTSTATUS, cmd_listcommands, NULL, -1,	NULL, "List available commands on <pipe>", "pipe" },
+	{ "exit", RPC_RTYPE_NTSTATUS, cmd_quit, NULL,   -1,	NULL,	"Exit program", "" },
+	{ "quit", RPC_RTYPE_NTSTATUS, cmd_quit, NULL,	  -1,	NULL, "Exit program", "" },
+	{ "sign", RPC_RTYPE_NTSTATUS, cmd_sign, NULL,	  -1,	NULL, "Force RPC pipe connections to be signed", "" },
+	{ "seal", RPC_RTYPE_NTSTATUS, cmd_seal, NULL,	  -1,	NULL, "Force RPC pipe connections to be sealed", "" },
+	{ "schannel", RPC_RTYPE_NTSTATUS, cmd_schannel, NULL,	  -1, NULL,	"Force RPC pipe connections to be sealed with 'schannel'.  Assumes valid machine account to this domain controller.", "" },
+	{ "schannelsign", RPC_RTYPE_NTSTATUS, cmd_schannel_sign, NULL,	  -1, NULL, "Force RPC pipe connections to be signed (not sealed) with 'schannel'.  Assumes valid machine account to this domain controller.", "" },
+	{ "none", RPC_RTYPE_NTSTATUS, cmd_none, NULL,	  -1, NULL, "Force RPC pipe connections to have no special properties", "" },
 
 	{ NULL }
 };
 
 static struct cmd_set separator_command[] = {
-	{ "---------------", MAX_RPC_RETURN_TYPE, NULL, NULL,	NULL, NULL, "----------------------" },
+	{ "---------------", MAX_RPC_RETURN_TYPE, NULL, NULL,	-1, NULL, "----------------------" },
 	{ NULL }
 };
 
@@ -516,9 +467,6 @@ extern struct cmd_set ds_commands[];
 extern struct cmd_set echo_commands[];
 extern struct cmd_set shutdown_commands[];
 extern struct cmd_set test_commands[];
-extern struct cmd_set wkssvc_commands[];
-extern struct cmd_set ntsvcs_commands[];
-extern struct cmd_set drsuapi_commands[];
 
 static struct cmd_set *rpcclient_command_list[] = {
 	rpcclient_commands,
@@ -532,9 +480,6 @@ static struct cmd_set *rpcclient_command_list[] = {
 	echo_commands,
 	shutdown_commands,
  	test_commands,
-	wkssvc_commands,
-	ntsvcs_commands,
-	drsuapi_commands,
 	NULL
 };
 
@@ -577,61 +522,52 @@ static NTSTATUS do_cmd(struct cli_state *cli,
 
 	/* Open pipe */
 
-	if ((cmd_entry->interface != NULL) && (cmd_entry->rpc_pipe == NULL)) {
+	if (cmd_entry->pipe_idx != -1 && cmd_entry->rpc_pipe == NULL) {
 		switch (pipe_default_auth_type) {
 			case PIPE_AUTH_TYPE_NONE:
-				ntresult = cli_rpc_pipe_open_noauth(
-					cli, cmd_entry->interface,
-					&cmd_entry->rpc_pipe);
+				cmd_entry->rpc_pipe = cli_rpc_pipe_open_noauth(cli,
+								cmd_entry->pipe_idx,
+								&ntresult);
 				break;
 			case PIPE_AUTH_TYPE_SPNEGO_NTLMSSP:
-				ntresult = cli_rpc_pipe_open_spnego_ntlmssp(
-					cli, cmd_entry->interface,
-					NCACN_NP,
-					pipe_default_auth_level,
-					lp_workgroup(),
-					get_cmdline_auth_info_username(),
-					get_cmdline_auth_info_password(),
-					&cmd_entry->rpc_pipe);
+				cmd_entry->rpc_pipe = cli_rpc_pipe_open_spnego_ntlmssp(cli,
+								cmd_entry->pipe_idx,
+								pipe_default_auth_level,
+								lp_workgroup(),
+								cmdline_auth_info.username,
+								cmdline_auth_info.password,
+								&ntresult);
 				break;
 			case PIPE_AUTH_TYPE_NTLMSSP:
-				ntresult = cli_rpc_pipe_open_ntlmssp(
-					cli, cmd_entry->interface,
-					NCACN_NP,
-					pipe_default_auth_level,
-					lp_workgroup(),
-					get_cmdline_auth_info_username(),
-					get_cmdline_auth_info_password(),
-					&cmd_entry->rpc_pipe);
+				cmd_entry->rpc_pipe = cli_rpc_pipe_open_ntlmssp(cli,
+								cmd_entry->pipe_idx,
+								pipe_default_auth_level,
+								lp_workgroup(),
+								cmdline_auth_info.username,
+								cmdline_auth_info.password,
+								&ntresult);
 				break;
 			case PIPE_AUTH_TYPE_SCHANNEL:
-				ntresult = cli_rpc_pipe_open_schannel(
-					cli, cmd_entry->interface,
-					NCACN_NP,
-					pipe_default_auth_level,
-					lp_workgroup(),
-					&cmd_entry->rpc_pipe);
+				cmd_entry->rpc_pipe = cli_rpc_pipe_open_schannel(cli,
+								cmd_entry->pipe_idx,
+								pipe_default_auth_level,
+								lp_workgroup(),
+								&ntresult);
 				break;
 			default:
-				DEBUG(0, ("Could not initialise %s. Invalid "
-					  "auth type %u\n",
-					  cli_get_pipe_name_from_iface(
-						  debug_ctx(), cli,
-						  cmd_entry->interface),
-					  pipe_default_auth_type ));
+				DEBUG(0, ("Could not initialise %s. Invalid auth type %u\n",
+					cli_get_pipe_name(cmd_entry->pipe_idx),
+					pipe_default_auth_type ));
 				return NT_STATUS_UNSUCCESSFUL;
 		}
-		if (!NT_STATUS_IS_OK(ntresult)) {
+		if (!cmd_entry->rpc_pipe) {
 			DEBUG(0, ("Could not initialise %s. Error was %s\n",
-				  cli_get_pipe_name_from_iface(
-					  debug_ctx(), cli,
-					  cmd_entry->interface),
-				  nt_errstr(ntresult) ));
+				cli_get_pipe_name(cmd_entry->pipe_idx),
+				nt_errstr(ntresult) ));
 			return ntresult;
 		}
 
-		if (ndr_syntax_id_equal(cmd_entry->interface,
-					&ndr_table_netlogon.syntax_id)) {
+		if (cmd_entry->pipe_idx == PI_NETLOGON) {
 			uint32_t neg_flags = NETLOGON_NEG_AUTH2_ADS_FLAGS;
 			uint32 sec_channel_type;
 			uchar trust_password[16];
@@ -653,9 +589,7 @@ static NTSTATUS do_cmd(struct cli_state *cli,
 
 			if (!NT_STATUS_IS_OK(ntresult)) {
 				DEBUG(0, ("Could not initialise credentials for %s.\n",
-					  cli_get_pipe_name_from_iface(
-						  debug_ctx(), cli,
-						  cmd_entry->interface)));
+					cli_get_pipe_name(cmd_entry->pipe_idx)));
 				return ntresult;
 			}
 		}
@@ -740,7 +674,7 @@ out_free:
 	 * enough to release it -- we don't free the
 	 * individual strings.  rtfm. */
 	free(argv);
-
+	
 	return result;
 }
 
@@ -752,16 +686,13 @@ out_free:
 	int 			opt;
 	static char		*cmdstr = NULL;
 	const char *server;
-	struct cli_state	*cli = NULL;
+	struct cli_state	*cli;
 	static char 		*opt_ipaddr=NULL;
 	struct cmd_set 		**cmd_set;
-	struct sockaddr_storage server_ss;
+	struct in_addr 		server_ip;
 	NTSTATUS 		nt_status;
 	static int		opt_port = 0;
 	fstring new_workgroup;
-	int result = 0;
-	TALLOC_CTX *frame = talloc_stackframe();
-	uint32_t flags = 0;
 
 	/* make sure the vars that get altered (4th field) are in
 	   a fixed location or certain compilers complain */
@@ -779,14 +710,14 @@ out_free:
 
 	load_case_tables();
 
-	zero_sockaddr(&server_ss);
+	ZERO_STRUCT(server_ip);
 
 	setlinebuf(stdout);
 
 	/* the following functions are part of the Samba debugging
 	   facilities.  See lib/debug.c */
 	setup_logging("rpcclient", True);
-
+	
 	/* Parse options */
 
 	pc = poptGetContext("rpcclient", argc, (const char **) argv,
@@ -794,20 +725,17 @@ out_free:
 
 	if (argc == 1) {
 		poptPrintHelp(pc, stderr, 0);
-		goto done;
+		return 0;
 	}
-
+	
 	while((opt = poptGetNextOpt(pc)) != -1) {
 		switch (opt) {
 
 		case 'I':
-			if (!interpret_string_addr(&server_ss,
-						opt_ipaddr,
-						AI_NUMERICHOST)) {
+		        if ( (server_ip.s_addr=inet_addr(opt_ipaddr)) == INADDR_NONE ) {
 				fprintf(stderr, "%s not a valid IP address\n",
 					opt_ipaddr);
-				result = 1;
-				goto done;
+				return 1;
 			}
 		}
 	}
@@ -816,34 +744,31 @@ out_free:
 	   than one unparsed argument is present. */
 
 	server = poptGetArg(pc);
-
+	
 	if (!server || poptGetArg(pc)) {
 		poptPrintHelp(pc, stderr, 0);
-		result = 1;
-		goto done;
+		return 1;
 	}
 
 	poptFreeContext(pc);
 
 	load_interfaces();
 
-	if (!init_names()) {
-		result = 1;
-		goto done;
-	}
+	if (!init_names())
+		return 1;
 
 	/* save the workgroup...
-
-	   FIXME!! do we need to do this for other options as well
-	   (or maybe a generic way to keep lp_load() from overwriting
+	
+	   FIXME!! do we need to do this for other options as well 
+	   (or maybe a generic way to keep lp_load() from overwriting 
 	   everything)?  */
-
+	
 	fstrcpy( new_workgroup, lp_workgroup() );
 
 	/* Load smb.conf file */
 
-	if (!lp_load(get_dyn_CONFIGFILE(),True,False,False,True))
-		fprintf(stderr, "Can't load %s\n", get_dyn_CONFIGFILE());
+	if (!lp_load(dyn_CONFIGFILE,True,False,False,True))
+		fprintf(stderr, "Can't load %s\n", dyn_CONFIGFILE);
 
 	if ( strlen(new_workgroup) != 0 )
 		set_global_myworkgroup( new_workgroup );
@@ -853,55 +778,30 @@ out_free:
 	 * from stdin if necessary
 	 */
 
-	if (get_cmdline_auth_info_use_machine_account() &&
-	    !set_cmdline_auth_info_machine_account_creds()) {
-		result = 1;
-		goto done;
-	}
-
-	if (!get_cmdline_auth_info_got_pass()) {
+	if (!cmdline_auth_info.got_pass) {
 		char *pass = getpass("Password:");
 		if (pass) {
-			set_cmdline_auth_info_password(pass);
+			pstrcpy(cmdline_auth_info.password, pass);
 		}
 	}
-
+	
 	if ((server[0] == '/' && server[1] == '/') ||
 			(server[0] == '\\' && server[1] ==  '\\')) {
 		server += 2;
 	}
 
-	if (get_cmdline_auth_info_use_kerberos()) {
-		flags |= CLI_FULL_CONNECTION_USE_KERBEROS |
-			 CLI_FULL_CONNECTION_FALLBACK_AFTER_KERBEROS;
-	}
-
-
-	nt_status = cli_full_connection(&cli, global_myname(), server,
-					opt_ipaddr ? &server_ss : NULL, opt_port,
-					"IPC$", "IPC",
-					get_cmdline_auth_info_username(),
+	nt_status = cli_full_connection(&cli, global_myname(), server, 
+					opt_ipaddr ? &server_ip : NULL, opt_port,
+					"IPC$", "IPC",  
+					cmdline_auth_info.username, 
 					lp_workgroup(),
-					get_cmdline_auth_info_password(),
-					flags,
-					get_cmdline_auth_info_signing_state(),NULL);
-
+					cmdline_auth_info.password, 
+					cmdline_auth_info.use_kerberos ? CLI_FULL_CONNECTION_USE_KERBEROS : 0,
+					cmdline_auth_info.signing_state,NULL);
+	
 	if (!NT_STATUS_IS_OK(nt_status)) {
 		DEBUG(0,("Cannot connect to server.  Error was %s\n", nt_errstr(nt_status)));
-		result = 1;
-		goto done;
-	}
-
-	if (get_cmdline_auth_info_smb_encrypt()) {
-		nt_status = cli_cm_force_encryption(cli,
-					get_cmdline_auth_info_username(),
-					get_cmdline_auth_info_password(),
-					lp_workgroup(),
-					"IPC$");
-		if (!NT_STATUS_IS_OK(nt_status)) {
-			result = 1;
-			goto done;
-		}
+		return 1;
 	}
 
 #if 0	/* COMMENT OUT FOR TESTING */
@@ -909,8 +809,6 @@ out_free:
 #endif
 
 	/* Load command lists */
-
-	timeout = cli_set_timeout(cli, 10000);
 
 	cmd_set = rpcclient_command_list;
 
@@ -921,42 +819,40 @@ out_free:
 	}
 
 	fetch_machine_sid(cli);
-
+ 
        /* Do anything specified with -c */
         if (cmdstr && cmdstr[0]) {
                 char    *cmd;
                 char    *p = cmdstr;
-
-		result = 0;
-
+		int result = 0;
+ 
                 while((cmd=next_command(&p)) != NULL) {
                         NTSTATUS cmd_result = process_cmd(cli, cmd);
 			SAFE_FREE(cmd);
 			result = NT_STATUS_IS_ERR(cmd_result);
                 }
-
-		goto done;
+		
+		cli_shutdown(cli);
+                return result;
         }
 
 	/* Loop around accepting commands */
 
 	while(1) {
-		char *line = NULL;
+		pstring prompt;
+		char *line;
 
-		line = smb_readline("rpcclient $> ", NULL, completion_fn);
+		slprintf(prompt, sizeof(prompt) - 1, "rpcclient $> ");
+
+		line = smb_readline(prompt, NULL, completion_fn);
 
 		if (line == NULL)
 			break;
 
 		if (line[0] != '\n')
 			process_cmd(cli, line);
-		SAFE_FREE(line);
 	}
-
-done:
-	if (cli != NULL) {
-		cli_shutdown(cli);
-	}
-	TALLOC_FREE(frame);
-	return result;
+	
+	cli_shutdown(cli);
+	return 0;
 }

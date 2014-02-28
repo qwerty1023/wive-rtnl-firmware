@@ -5,7 +5,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,7 +14,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #include "includes.h"
 #include "libsmbclient.h"
@@ -27,14 +28,14 @@
 #define OFF_T_FORMAT_CAST long
 #endif
 
-static int columns = 0;
+int columns = 0;
 
-static int debuglevel, update;
+static int _resume, _recursive, debuglevel;
 static char *outputfile;
 
 
-static time_t total_start_time = 0;
-static off_t total_bytes = 0;
+time_t total_start_time = 0;
+off_t total_bytes = 0;
 
 #define SMB_MAXPATHLEN MAXPATHLEN
 
@@ -45,9 +46,9 @@ static off_t total_bytes = 0;
 /* Number of bytes to read at once */
 #define SMB_DEFAULT_BLOCKSIZE 					64000
 
-static const char *username = NULL, *password = NULL, *workgroup = NULL;
-static int nonprompt = 0, quiet = 0, dots = 0, keep_permissions = 0, verbose = 0, send_stdout = 0;
-static int blocksize = SMB_DEFAULT_BLOCKSIZE;
+const char *username = NULL, *password = NULL, *workgroup = NULL;
+int nonprompt = 0, quiet = 0, dots = 0, keep_permissions = 0, verbose = 0, send_stdout = 0;
+int blocksize = SMB_DEFAULT_BLOCKSIZE;
 
 static int smb_download_file(const char *base, const char *name, int recursive, int resume, char *outfile);
 
@@ -91,18 +92,14 @@ static void get_auth_data(const char *srv, const char *shr, char *wg, int wglen,
 
 	if(!nonprompt && !username) {
 		printf("Username for %s at %s [guest] ", shr, srv);
-		if (fgets(tmp, sizeof(tmp), stdin) == NULL) {
-			return;
-		}
+		fgets(tmp, sizeof(tmp), stdin);
 		if(tmp[strlen(tmp)-1] == '\n')tmp[strlen(tmp)-1] = '\0';
 		strncpy(un, tmp, unlen-1);
 	} else if(username) strncpy(un, username, unlen-1);
 
 	if(!nonprompt && !password) {
 		char *prompt, *pass;
-		if (asprintf(&prompt, "Password for %s at %s: ", shr, srv) == -1) {
-			return;
-		}
+		asprintf(&prompt, "Password for %s at %s: ", shr, srv);
 		pass = getpass(prompt);
 		free(prompt);
 		strncpy(pw, pass, pwlen-1);
@@ -142,9 +139,7 @@ static int smb_download_dir(const char *base, const char *name, int resume)
 	while((dirent = smbc_readdir(dirhandle))) {
 		char *newname;
 		if(!strcmp(dirent->name, ".") || !strcmp(dirent->name, ".."))continue;
-		if (asprintf(&newname, "%s/%s", tmpname, dirent->name) == -1) {
-			return 0;
-		}
+		asprintf(&newname, "%s/%s", tmpname, dirent->name);
 		switch(dirent->smbc_type) {
 		case SMBC_DIR:
 			smb_download_dir(base, newname, resume);
@@ -194,8 +189,7 @@ static int smb_download_dir(const char *base, const char *name, int resume)
 		}
 		
 		if(chmod(relname, remotestat.st_mode) < 0) {
-			fprintf(stderr, "Unable to change mode of local dir %s to %o\n", relname,
-				(unsigned int)remotestat.st_mode);
+			fprintf(stderr, "Unable to change mode of local dir %s to %o\n", relname, remotestat.st_mode);
 			smbc_closedir(dirhandle);
 			return 0;
 		}
@@ -238,19 +232,11 @@ static void print_progress(const char *name, time_t start, time_t now, off_t sta
 	human_readable(avg, havg, sizeof(havg));
 
 	len = asprintf(&status, "%s of %s (%.2f%%) at %s/s ETA: %s", hpos, htotal, prcnt, havg, print_time(eta));
-	if (len == -1) {
-		return;
-	}
 	
 	if(columns) {
 		int required = strlen(name), available = columns - len - strlen("[] ");
-		if(required > available) {
-			if (asprintf(&filename, "...%s", name + required - available + 3) == -1) {
-				return;
-			}
-		} else {
-			filename = SMB_STRNDUP(name, available);
-		}
+		if(required > available) asprintf(&filename, "...%s", name + required - available + 3);
+		else filename = SMB_STRNDUP(name, available);
 	} else filename = SMB_STRDUP(name);
 
 	fprintf(stderr, "\r[%s] %s", filename, status);
@@ -318,26 +304,8 @@ static int smb_download_file(const char *base, const char *name, int recursive, 
 
 	if(newpath[0] == '/')newpath++;
 	
-	/* Open local file according to the mode */
-	if(update) {
-		/* if it is up-to-date, skip */
-		if(stat(newpath, &localstat) == 0 &&
-				localstat.st_mtime >= remotestat.st_mtime) {
-			if(verbose)
-				printf("%s is up-to-date, skipping\n", newpath);
-			smbc_close(remotehandle);
-			return 0;
-		}
-		/* else open it for writing and truncate if it exists */
-		localhandle = open(newpath, O_CREAT | O_NONBLOCK | O_RDWR | O_TRUNC, 0775);
-		if(localhandle < 0) {
-			fprintf(stderr, "Can't open %s : %s\n", newpath,
-					strerror(errno));
-			smbc_close(remotehandle);
-			return 0;
-		}
-		/* no offset */
-	} else if(!send_stdout) {
+	/* Open local file and, if necessary, resume */
+	if(!send_stdout) {
 		localhandle = open(newpath, O_CREAT | O_NONBLOCK | O_RDWR | (!resume?O_EXCL:0), 0755);
 		if(localhandle < 0) {
 			fprintf(stderr, "Can't open %s: %s\n", newpath, strerror(errno));
@@ -345,12 +313,7 @@ static int smb_download_file(const char *base, const char *name, int recursive, 
 			return 0;
 		}
 	
-		if (fstat(localhandle, &localstat) != 0) {
-			fprintf(stderr, "Can't fstat %s: %s\n", newpath, strerror(errno));
-			smbc_close(remotehandle);
-			close(localhandle);
-			return 0;
-		}
+		fstat(localhandle, &localstat);
 
 		start_offset = localstat.st_size;
 
@@ -472,8 +435,7 @@ static int smb_download_file(const char *base, const char *name, int recursive, 
 
 	if(keep_permissions && !send_stdout) {
 		if(fchmod(localhandle, remotestat.st_mode) < 0) {
-			fprintf(stderr, "Unable to change mode of local file %s to %o\n", path,
-				(unsigned int)remotestat.st_mode);
+			fprintf(stderr, "Unable to change mode of local file %s to %o\n", path, remotestat.st_mode);
 			smbc_close(remotehandle);
 			close(localhandle);
 			return 0;
@@ -489,8 +451,7 @@ static void clean_exit(void)
 {
 	char bs[100];
 	human_readable(total_bytes, bs, sizeof(bs));
-	if(!quiet)fprintf(stderr, "Downloaded %s in %lu seconds\n", bs,
-		(unsigned long)(time(NULL) - total_start_time));
+	if(!quiet)fprintf(stderr, "Downloaded %s in %lu seconds\n", bs, time(NULL) - total_start_time);
 	exit(0);
 }
 
@@ -561,15 +522,10 @@ int main(int argc, const char **argv)
 	int c = 0;
 	const char *file = NULL;
 	char *rcfile = NULL;
-	bool smb_encrypt = false;
-	int resume = 0, recursive = 0;
-	TALLOC_CTX *frame = talloc_stackframe();
 	struct poptOption long_options[] = {
 		{"guest", 'a', POPT_ARG_NONE, NULL, 'a', "Work as user guest" },	
-		{"encrypt", 'e', POPT_ARG_NONE, NULL, 'e', "Encrypt SMB transport (UNIX extended servers only)" },	
-		{"resume", 'r', POPT_ARG_NONE, &resume, 0, "Automatically resume aborted files" },
-		{"update", 'U',  POPT_ARG_NONE, &update, 0, "Download only when remote file is newer than local file or local file is missing"},
-		{"recursive", 'R',  POPT_ARG_NONE, &recursive, 0, "Recursively download files" },
+		{"resume", 'r', POPT_ARG_NONE, &_resume, 0, "Automatically resume aborted files" },
+		{"recursive", 'R',  POPT_ARG_NONE, &_recursive, 0, "Recursively download files" },
 		{"username", 'u', POPT_ARG_STRING, &username, 'u', "Username to use" },
 		{"password", 'p', POPT_ARG_STRING, &password, 'p', "Password to use" },
 		{"workgroup", 'w', POPT_ARG_STRING, &workgroup, 'w', "Workgroup to use (optional)" },
@@ -582,7 +538,7 @@ int main(int argc, const char **argv)
 		{"verbose", 'v', POPT_ARG_NONE, &verbose, 'v', "Be verbose" },
 		{"keep-permissions", 'P', POPT_ARG_NONE, &keep_permissions, 'P', "Keep permissions" },
 		{"blocksize", 'b', POPT_ARG_INT, &blocksize, 'b', "Change number of bytes in a block"},
-		{"rcfile", 'f', POPT_ARG_STRING, NULL, 'f', "Use specified rc file"},
+		{"rcfile", 'f', POPT_ARG_STRING, NULL, 0, "Use specified rc file"},
 		POPT_AUTOHELP
 		POPT_TABLEEND
 	};
@@ -591,9 +547,7 @@ int main(int argc, const char **argv)
 	load_case_tables();
 
 	/* only read rcfile if it exists */
-	if (asprintf(&rcfile, "%s/.smbgetrc", getenv("HOME")) == -1) {
-		return 1;
-	}
+	asprintf(&rcfile, "%s/.smbgetrc", getenv("HOME"));
 	if(access(rcfile, F_OK) == 0) 
 		readrcfile(rcfile, long_options);
 	free(rcfile);
@@ -614,17 +568,10 @@ int main(int argc, const char **argv)
 		case 'a':
 			username = ""; password = "";
 			break;
-		case 'e':
-			smb_encrypt = true;
-			break;
 		}
 	}
 
-	if((send_stdout || resume || outputfile) && update) {
-		fprintf(stderr, "The -o, -R or -O and -U options can not be used together.\n");
-		return 1;
-	}
-	if((send_stdout || outputfile) && recursive) {
+	if((send_stdout || outputfile) && _recursive) {
 		fprintf(stderr, "The -o or -O and -R options can not be used together.\n");
 		return 1;
 	}
@@ -639,25 +586,18 @@ int main(int argc, const char **argv)
 		return 1;
 	}
 
-	if (smb_encrypt) {
-		SMBCCTX *smb_ctx = smbc_set_context(NULL);
-		smbc_option_set(smb_ctx,
-			CONST_DISCARD(char *, "smb_encrypt_level"),
-			"require");
-	}
-	
 	columns = get_num_cols();
 
 	total_start_time = time(NULL);
 
 	while ( (file = poptGetArg(pc)) ) {
-		if (!recursive) 
-			return smb_download_file(file, "", recursive, resume, outputfile);
+		if (!_recursive) 
+			return smb_download_file(file, "", _recursive, _resume, outputfile);
 		else 
-			return smb_download_dir(file, "", resume);
+			return smb_download_dir(file, "", _resume);
 	}
 
 	clean_exit();
-	TALLOC_FREE(frame);
+
 	return 0;
 }

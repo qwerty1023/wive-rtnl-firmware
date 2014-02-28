@@ -9,17 +9,19 @@
    Copyright (C) Simo Sorce 2003
    
    This library is free software; you can redistribute it and/or
-   modify it under the terms of the GNU Lesser General Public
+   modify it under the terms of the GNU Library General Public
    License as published by the Free Software Foundation; either
-   version 3 of the License, or (at your option) any later version.
+   version 2 of the License, or (at your option) any later version.
    
    This library is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
    Library General Public License for more details.
    
-   You should have received a copy of the GNU Lesser General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   You should have received a copy of the GNU Library General Public
+   License along with this library; if not, write to the
+   Free Software Foundation, Inc., 59 Temple Place - Suite 330,
+   Boston, MA  02111-1307, USA.   
 */
 
 /* idmap version determines auto-conversion - this is the database
@@ -31,21 +33,24 @@
    Updated to 3 for enum types by JRA. */
 
 /* Updated to 4, completely new interface, SSS */
-/* Updated to 5, simplified interface by Volker */
 
-#define SMB_IDMAP_INTERFACE_VERSION 5
+#define SMB_IDMAP_INTERFACE_VERSION 4
 
 struct idmap_domain {
 	const char *name;
-	struct idmap_methods *methods;
+	BOOL default_domain;
+	BOOL readonly;
 	void *private_data;
+	struct idmap_methods *methods;
+	BOOL initialized;
+	const char *params;
 };
 
 /* Filled out by IDMAP backends */
 struct idmap_methods {
 
 	/* Called when backend is first loaded */
-	NTSTATUS (*init)(struct idmap_domain *dom, const char *params);
+	NTSTATUS (*init)(struct idmap_domain *dom);
 
 	/* Map an array of uids/gids to SIDs.  The caller specifies
 	   the uid/gid and type. Gets back the SID. */

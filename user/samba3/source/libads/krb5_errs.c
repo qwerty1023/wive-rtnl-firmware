@@ -5,7 +5,7 @@
  *  
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 3 of the License, or
+ *  the Free Software Foundation; either version 2 of the License, or
  *  (at your option) any later version.
  *  
  *  This program is distributed in the hope that it will be useful,
@@ -14,11 +14,11 @@
  *  GNU General Public License for more details.
  *  
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include "includes.h"
-#include "smb_krb5.h"
 
 #ifdef HAVE_KRB5
 
@@ -31,10 +31,12 @@ static const struct {
 	{KRB5KDC_ERR_CLIENT_REVOKED, NT_STATUS_ACCESS_DENIED},
 	{KRB5KDC_ERR_C_PRINCIPAL_UNKNOWN, NT_STATUS_INVALID_ACCOUNT_NAME},
 	{KRB5KDC_ERR_ETYPE_NOSUPP, NT_STATUS_LOGON_FAILURE},
-#if defined(KRB5KDC_ERR_KEY_EXP) /* MIT */
-	{KRB5KDC_ERR_KEY_EXP, NT_STATUS_PASSWORD_EXPIRED},
-#else /* old Heimdal releases have it with different name only in an enum: */
+#if defined(KRB5KDC_ERR_KEY_EXPIRED) /* Heimdal */
 	{KRB5KDC_ERR_KEY_EXPIRED, NT_STATUS_PASSWORD_EXPIRED},
+#elif defined(KRB5KDC_ERR_KEY_EXP) /* MIT */
+	{KRB5KDC_ERR_KEY_EXP, NT_STATUS_PASSWORD_EXPIRED},
+#else 
+#error Neither KRB5KDC_ERR_KEY_EXPIRED nor KRB5KDC_ERR_KEY_EXP available
 #endif
 	{25, NT_STATUS_PASSWORD_EXPIRED}, /* FIXME: bug in heimdal 0.7 krb5_get_init_creds_password (Inappropriate ioctl for device (25)) */
 	{KRB5KDC_ERR_NULL_KEY, NT_STATUS_LOGON_FAILURE},
@@ -56,12 +58,10 @@ static const struct {
 #endif
 	{KRB5_CC_NOTFOUND, NT_STATUS_NO_SUCH_FILE},
 	{KRB5_FCC_NOFILE, NT_STATUS_NO_SUCH_FILE},
+	{KRB5KDC_ERR_NONE, NT_STATUS_OK},
 	{KRB5_RC_MALLOC, NT_STATUS_NO_MEMORY},
 	{ENOMEM, NT_STATUS_NO_MEMORY},
-	{KRB5_REALM_CANT_RESOLVE, NT_STATUS_DOMAIN_CONTROLLER_NOT_FOUND},
-
-	/* Must be last entry */
-	{KRB5KDC_ERR_NONE, NT_STATUS_OK}
+	{0, NT_STATUS_OK}
 };
 
 static const struct {

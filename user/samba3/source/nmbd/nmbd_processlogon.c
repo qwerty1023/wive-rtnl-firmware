@@ -8,7 +8,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -17,7 +17,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
    
    Revision History:
 
@@ -31,38 +32,30 @@ struct sam_database_info {
         uint32 date_lo, date_hi;
 };
 
-/**
- * check whether the client belongs to the hosts
- * for which initial logon should be delayed...
- */
-static bool delay_logon(const char *peer_name, const char *peer_addr)
+/****************************************************************************
+Send a message to smbd to do a sam delta sync
+**************************************************************************/
+
+static void send_repl_message(uint32 low_serial)
 {
-	const char **delay_list = lp_init_logon_delayed_hosts();
-	const char *peer[2];
+        TDB_CONTEXT *tdb;
 
-	if (delay_list == NULL) {
-		return False;
-	}
+        tdb = tdb_open_log(lock_path("connections.tdb"), 0,
+                           TDB_DEFAULT, O_RDONLY, 0);
 
-	peer[0] = peer_name;
-	peer[1] = peer_addr;
+        if (!tdb) {
+                DEBUG(3, ("send_repl_message(): failed to open connections "
+                          "database\n"));
+                return;
+        }
 
-	return list_match(delay_list, (const char *)peer, client_match);
-}
+        DEBUG(3, ("sending replication message, serial = 0x%04x\n", 
+                  low_serial));
+        
+        message_send_all(tdb, MSG_SMB_SAM_REPL, &low_serial,
+                         sizeof(low_serial), False, NULL);
 
-static void delayed_init_logon_handler(struct event_context *event_ctx,
-				       struct timed_event *te,
-				       struct timeval now,
-				       void *private_data)
-{
-	struct packet_struct *p = (struct packet_struct *)private_data;
-
-	DEBUG(10, ("delayed_init_logon_handler (%lx): re-queuing packet.\n",
-		   (unsigned long)te));
-
-	queue_packet(p);
-
-	TALLOC_FREE(te);
+        tdb_close(tdb);
 }
 
 /****************************************************************************
@@ -73,34 +66,20 @@ void process_logon_packet(struct packet_struct *p, char *buf,int len,
                           const char *mailslot)
 {
 	struct dgram_packet *dgram = &p->packet.dgram;
-	fstring my_name;
+	pstring my_name;
 	fstring reply_name;
-	char outbuf[1024];
+	pstring outbuf;
 	int code;
 	uint16 token = 0;
 	uint32 ntversion = 0;
 	uint16 lmnttoken = 0;
 	uint16 lm20token = 0;
 	uint32 domainsidsize;
-	bool short_request = False;
+	BOOL short_request = False;
 	char *getdc;
 	char *uniuser; /* Unicode user name. */
-	fstring ascuser;
+	pstring ascuser;
 	char *unicomp; /* Unicode computer name. */
-	size_t size;
-	struct sockaddr_storage ss;
-	const struct sockaddr_storage *pss;
-	struct in_addr ip;
-
-	in_addr_to_sockaddr_storage(&ss, p->ip);
-	pss = iface_ip(&ss);
-	if (!pss) {
-		DEBUG(5,("process_logon_packet:can't find outgoing interface "
-			"for packet from IP %s\n",
-			inet_ntoa(p->ip) ));
-		return;
-	}
-	ip = ((struct sockaddr_in *)pss)->sin_addr;
 
 	memset(outbuf, 0, sizeof(outbuf));
 
@@ -110,13 +89,13 @@ logons are not enabled.\n", inet_ntoa(p->ip) ));
 		return;
 	}
 
-	fstrcpy(my_name, global_myname());
+	pstrcpy(my_name, global_myname());
 
 	code = get_safe_SVAL(buf,len,buf,0,-1);
 	DEBUG(4,("process_logon_packet: Logon from %s: code = 0x%x\n", inet_ntoa(p->ip), code));
 
 	switch (code) {
-		case 0:
+		case 0:    
 			{
 				fstring mach_str, user_str, getdc_str;
 				char *q = buf + 2;
@@ -141,7 +120,7 @@ logons are not enabled.\n", inet_ntoa(p->ip) ));
 				}
 				token = SVAL(q,3);
 
-				fstrcpy(reply_name,my_name);
+				fstrcpy(reply_name,my_name); 
 
 				pull_ascii_fstring(mach_str, machine);
 				pull_ascii_fstring(user_str, user);
@@ -156,36 +135,33 @@ logons are not enabled.\n", inet_ntoa(p->ip) ));
 
 				fstrcpy(reply_name, "\\\\");
 				fstrcat(reply_name, my_name);
-				size = push_ascii(q,reply_name,
+				push_ascii(q,reply_name,
 						sizeof(outbuf)-PTR_DIFF(q, outbuf),
 						STR_TERMINATE);
-				if (size == (size_t)-1) {
-					return;
-				}
 				q = skip_string(outbuf,sizeof(outbuf),q); /* PDC name */
 
 				SSVAL(q, 0, token);
 				q += 2;
 
-				dump_data(4, (uint8 *)outbuf, PTR_DIFF(q, outbuf));
+				dump_data(4, outbuf, PTR_DIFF(q, outbuf));
 
-				send_mailslot(True, getdc_str,
+				send_mailslot(True, getdc_str, 
 						outbuf,PTR_DIFF(q,outbuf),
 						global_myname(), 0x0,
 						mach_str,
 						dgram->source_name.name_type,
-						p->ip, ip, p->port);
+						p->ip, *iface_ip(p->ip), p->port);  
 				break;
 			}
 
-		case LOGON_PRIMARY_QUERY:
+		case QUERYFORPDC:
 			{
 				fstring mach_str, getdc_str;
 				fstring source_name;
 				char *q = buf + 2;
 				char *machine = q;
 
-				if (!lp_domain_master()) {
+				if (!lp_domain_master()) {  
 					/* We're not Primary Domain Controller -- ignore this */
 					return;
 				}
@@ -253,16 +229,13 @@ logons are not enabled.\n", inet_ntoa(p->ip) ));
 
 				/* Construct reply. */
 				q = outbuf;
-				SSVAL(q, 0, NETLOGON_RESPONSE_FROM_PDC);
+				SSVAL(q, 0, QUERYFORPDC_R);
 				q += 2;
 
 				fstrcpy(reply_name,my_name);
-				size = push_ascii(q, reply_name,
+				push_ascii(q, reply_name,
 						sizeof(outbuf)-PTR_DIFF(q, outbuf),
 						STR_TERMINATE);
-				if (size == (size_t)-1) {
-					return;
-				}
 				q = skip_string(outbuf,sizeof(outbuf),q); /* PDC name */
 
 				/* PDC and domain name */
@@ -292,10 +265,10 @@ logons are not enabled.\n", inet_ntoa(p->ip) ));
 				DEBUG(5,("process_logon_packet: GETDC request from %s at IP %s, \
 reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					mach_str,inet_ntoa(p->ip), reply_name, lp_workgroup(),
-					NETLOGON_RESPONSE_FROM_PDC, (uint32)ntversion, (uint32)lmnttoken,
+					QUERYFORPDC_R, (uint32)ntversion, (uint32)lmnttoken,
 					(uint32)lm20token ));
 
-				dump_data(4, (uint8 *)outbuf, PTR_DIFF(q, outbuf));
+				dump_data(4, outbuf, PTR_DIFF(q, outbuf));
 
 				pull_ascii_fstring(getdc_str, getdc);
 				pull_ascii_nstring(source_name, sizeof(source_name), dgram->source_name.name);
@@ -305,16 +278,15 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					global_myname(), 0x0,
 					source_name,
 					dgram->source_name.name_type,
-					p->ip, ip, p->port);
+					p->ip, *iface_ip(p->ip), p->port);  
 				return;
 			}
 
-		case LOGON_SAM_LOGON_REQUEST:
+		case SAMLOGON:
 
 			{
 				fstring getdc_str;
 				fstring source_name;
-				char *source_addr;
 				char *q = buf + 2;
 				fstring asccomp;
 
@@ -351,7 +323,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 				domainsidsize = IVAL(q, 0);
 				q += 4;
 
-				DEBUG(5,("process_logon_packet: LOGON_SAM_LOGON_REQUEST sidsize %d, len = %d\n", domainsidsize, len));
+				DEBUG(5,("process_logon_packet: SAMLOGON sidsize %d, len = %d\n", domainsidsize, len));
 
 				if (domainsidsize < (len - PTR_DIFF(q, buf)) && (domainsidsize != 0)) {
 					q += domainsidsize;
@@ -383,23 +355,23 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 				lm20token = SVAL(q, 6);
 				q += 8;
 
-				DEBUG(3,("process_logon_packet: LOGON_SAM_LOGON_REQUEST sidsize %d ntv %d\n", domainsidsize, ntversion));
+				DEBUG(3,("process_logon_packet: SAMLOGON sidsize %d ntv %d\n", domainsidsize, ntversion));
 
 				/*
 				 * we respond regadless of whether the machine is in our password 
 				 * database. If it isn't then we let smbd send an appropriate error.
 				 * Let's ignore the SID.
 				 */
-				pull_ucs2_fstring(ascuser, uniuser);
+				pull_ucs2_pstring(ascuser, uniuser);
 				pull_ucs2_fstring(asccomp, unicomp);
-				DEBUG(5,("process_logon_packet: LOGON_SAM_LOGON_REQUEST user %s\n", ascuser));
+				DEBUG(5,("process_logon_packet: SAMLOGON user %s\n", ascuser));
 
 				fstrcpy(reply_name, "\\\\"); /* Here it wants \\LOGONSERVER. */
 				fstrcat(reply_name, my_name);
 
-				DEBUG(5,("process_logon_packet: LOGON_SAM_LOGON_REQUEST request from %s(%s) for %s, returning logon svr %s domain %s code %x token=%x\n",
+				DEBUG(5,("process_logon_packet: SAMLOGON request from %s(%s) for %s, returning logon svr %s domain %s code %x token=%x\n",
 					asccomp,inet_ntoa(p->ip), ascuser, reply_name, lp_workgroup(),
-				LOGON_SAM_LOGON_RESPONSE ,lmnttoken));
+				SAMLOGON_R ,lmnttoken));
 
 				/* Construct reply. */
 
@@ -408,9 +380,9 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 				/* never, at least for now */
 				if ((ntversion < 11) || (SEC_ADS != lp_security()) || (ROLE_DOMAIN_PDC != lp_server_role())) {
 					if (SVAL(uniuser, 0) == 0) {
-						SSVAL(q, 0, LOGON_SAM_LOGON_USER_UNKNOWN);	/* user unknown */
+						SSVAL(q, 0, SAMLOGON_UNK_R);	/* user unknown */
 					} else {
-						SSVAL(q, 0, LOGON_SAM_LOGON_RESPONSE);
+						SSVAL(q, 0, SAMLOGON_R);
 					}
 
 					q += 2;
@@ -429,38 +401,28 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 				else {
 					struct GUID domain_guid;
 					UUID_FLAT flat_guid;
-					char *domain;
-					char *hostname;
+					pstring domain;
+					pstring hostname;
 					char *component, *dc, *q1;
+					uint8 size;
 					char *q_orig = q;
 					int str_offset;
-					char *saveptr = NULL;
 
-					domain = get_mydnsdomname(talloc_tos());
-					if (!domain) {
-						DEBUG(2,
-						("get_mydnsdomname failed.\n"));
-						return;
-					}
-					hostname = get_myname(talloc_tos());
-					if (!hostname) {
-						DEBUG(2,
-						("get_myname failed.\n"));
-						return;
-					}
-
+					get_mydnsdomname(domain);
+					get_myname(hostname);
+	
 					if (sizeof(outbuf) - PTR_DIFF(q, outbuf) < 8) {
 						return;
 					}
 					if (SVAL(uniuser, 0) == 0) {
-						SIVAL(q, 0, LOGON_SAM_LOGON_USER_UNKNOWN_EX);	/* user unknown */
+						SIVAL(q, 0, SAMLOGON_AD_UNK_R);	/* user unknown */
 					} else {
-						SIVAL(q, 0, LOGON_SAM_LOGON_RESPONSE_EX);
+						SIVAL(q, 0, SAMLOGON_AD_R);
 					}
 					q += 4;
 
-					SIVAL(q, 0, NBT_SERVER_PDC|NBT_SERVER_GC|NBT_SERVER_LDAP|NBT_SERVER_DS|
-						NBT_SERVER_KDC|NBT_SERVER_TIMESERV|NBT_SERVER_CLOSEST|NBT_SERVER_WRITABLE);
+					SIVAL(q, 0, ADS_PDC|ADS_GC|ADS_LDAP|ADS_DS|
+						ADS_KDC|ADS_TIMESERV|ADS_CLOSEST|ADS_WRITABLE);
 					q += 4;
 
 					/* Push Domain GUID */
@@ -480,7 +442,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					str_offset = q - q_orig;
 					dc = domain;
 					q1 = q;
-					while ((component = strtok_r(dc, ".", &saveptr)) != NULL) {
+					while ((component = strtok(dc, "."))) {
 						dc = NULL;
 						if (sizeof(outbuf) - PTR_DIFF(q, outbuf) < 1) {
 							return;
@@ -488,7 +450,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 						size = push_ascii(&q[1], component,
 							sizeof(outbuf) - PTR_DIFF(q+1, outbuf),
 							0);
-						if (size == (size_t)-1 || size > 0xff) {
+						if (size == (uint8)-1) {
 							return;
 						}
 						SCVAL(q, 0, size);
@@ -511,7 +473,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					size = push_ascii(&q[1], hostname,
 							sizeof(outbuf) - PTR_DIFF(q+1, outbuf),
 							0);
-					if (size == (size_t)-1 || size > 0xff) {
+					if (size == (uint8)-1) {
 						return;
 					}
 					SCVAL(q, 0, size);
@@ -529,7 +491,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					size = push_ascii(&q[1], lp_workgroup(),
 							sizeof(outbuf) - PTR_DIFF(q+1, outbuf),
 							STR_UPPER);
-					if (size == (size_t)-1 || size > 0xff) {
+					if (size == (uint8)-1) {
 						return;
 					}
 					SCVAL(q, 0, size);
@@ -539,7 +501,6 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					if (sizeof(outbuf) - PTR_DIFF(q, outbuf) < 2) {
 						return;
 					}
-
 					SCVAL(q, 0, 0);
 					q++;
 
@@ -547,7 +508,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					size = push_ascii(&q[1], my_name,
 							sizeof(outbuf) - PTR_DIFF(q+1, outbuf),
 							0);
-					if (size == (size_t)-1 || size > 0xff) {
+					if (size == (uint8)-1) {
 						return;
 					}
 					SCVAL(q, 0, size);
@@ -557,7 +518,6 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					if (sizeof(outbuf) - PTR_DIFF(q, outbuf) < 4) {
 						return;
 					}
-
 					SCVAL(q, 0, 0);
 					q++;
 
@@ -566,7 +526,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 						size = push_ascii(&q[1], ascuser,
 							sizeof(outbuf) - PTR_DIFF(q+1, outbuf),
 							0);
-						if (size == (size_t)-1 || size > 0xff) {
+						if (size == (uint8)-1) {
 							return;
 						}
 						SCVAL(q, 0, size);
@@ -581,7 +541,7 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 					size = push_ascii(&q[1], "Default-First-Site-Name",
 							sizeof(outbuf) - PTR_DIFF(q+1, outbuf),
 							0);
-					if (size == (size_t)-1 || size > 0xff) {
+					if (size == (uint8)-1) {
 						return;
 					}
 					SCVAL(q, 0, size);
@@ -602,13 +562,13 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 
 					SIVAL(q, 0, 0x00000002);
 					q += 4; /* unknown */
-					SIVAL(q, 0, ntohl(ip.s_addr));
+					SIVAL(q, 0, (iface_ip(p->ip))->s_addr);
 					q += 4;
 					SIVAL(q, 0, 0x00000000);
 					q += 4; /* unknown */
 					SIVAL(q, 0, 0x00000000);
 					q += 4; /* unknown */
-				}
+				}	
 #endif
 
 				if (sizeof(outbuf) - PTR_DIFF(q, outbuf) < 8) {
@@ -618,74 +578,124 @@ reporting %s domain %s 0x%x ntversion=%x lm_nt token=%x lm_20 token=%x\n",
 				/* tell the client what version we are */
 				SIVAL(q, 0, ((ntversion < 11) || (SEC_ADS != lp_security())) ? 1 : 13); 
 				/* our ntversion */
-				SSVAL(q, 4, 0xffff); /* our lmnttoken */
+				SSVAL(q, 4, 0xffff); /* our lmnttoken */ 
 				SSVAL(q, 6, 0xffff); /* our lm20token */
 				q += 8;
 
-				dump_data(4, (uint8 *)outbuf, PTR_DIFF(q, outbuf));
+				dump_data(4, outbuf, PTR_DIFF(q, outbuf));
 
 				pull_ascii_fstring(getdc_str, getdc);
 				pull_ascii_nstring(source_name, sizeof(source_name), dgram->source_name.name);
-				source_addr = SMB_STRDUP(inet_ntoa(dgram->header.source_ip));
-				if (source_addr == NULL) {
-					DEBUG(3, ("out of memory copying client"
-						  " address string\n"));
-					return;
-				}
 
-				/*
-				 * handle delay.
-				 * packets requeued after delay are marked as
-				 * locked.
-				 */
-				if ((p->locked == False) &&
-				    (strlen(ascuser) == 0) &&
-				    delay_logon(source_name, source_addr))
-				{
-					struct timeval when;
-
-					DEBUG(3, ("process_logon_packet: "
-						  "delaying initial logon "
-						  "reply for client %s(%s) for "
-						  "%u milliseconds\n",
-						  source_name, source_addr,
-						  lp_init_logon_delay()));
-
-					when = timeval_current_ofs(0,
-						lp_init_logon_delay() * 1000);
-					p->locked = true;
-					event_add_timed(nmbd_event_context(),
-							NULL,
-							when,
-							delayed_init_logon_handler,
-							p);
-				} else {
-					DEBUG(3, ("process_logon_packet: "
-						  "processing delayed initial "
-						  "logon reply for client "
-						  "%s(%s)\n",
-						  source_name, source_addr));
-
-					p->locked = false;
-					send_mailslot(true, getdc,
-						outbuf,PTR_DIFF(q,outbuf),
-						global_myname(), 0x0,
-						source_name,
-						dgram->source_name.name_type,
-						p->ip, ip, p->port);
-				}
-
-				SAFE_FREE(source_addr);
-
+				send_mailslot(True, getdc,
+					outbuf,PTR_DIFF(q,outbuf),
+					global_myname(), 0x0,
+					source_name,
+					dgram->source_name.name_type,
+					p->ip, *iface_ip(p->ip), p->port);  
 				break;
 			}
 
 		/* Announce change to UAS or SAM.  Send by the domain controller when a
 		replication event is required. */
 
-		case NETLOGON_ANNOUNCE_UAS:
-			DEBUG(5, ("Got NETLOGON_ANNOUNCE_UAS\n"));
-			break;
+		case SAM_UAS_CHANGE:
+			{
+				struct sam_database_info *db_info;
+				char *q = buf + 2;
+				int i, db_count;
+				uint32 low_serial;
+          
+				/* Header */
+          
+				if (PTR_DIFF(q + 16, buf) >= len) {
+					DEBUG(0,("process_logon_packet: bad packet\n"));
+					return;
+				}
+
+				low_serial = IVAL(q, 0); q += 4;     /* Low serial number */
+
+				q += 4;                   /* Date/time */
+				q += 4;                   /* Pulse */
+				q += 4;                   /* Random */
+          
+				/* Domain info */
+          
+				q = skip_string(buf,len,q);    /* PDC name */
+
+				if (!q || PTR_DIFF(q, buf) >= len) {
+					DEBUG(0,("process_logon_packet: bad packet\n"));
+					return;
+				}
+
+				q = skip_string(buf,len,q);    /* Domain name */
+
+				if (!q || PTR_DIFF(q, buf) >= len) {
+					DEBUG(0,("process_logon_packet: bad packet\n"));
+					return;
+				}
+
+				q = skip_unibuf(q, PTR_DIFF(buf + len, q)); /* Unicode PDC name */
+
+				if (PTR_DIFF(q, buf) >= len) {
+					DEBUG(0,("process_logon_packet: bad packet\n"));
+					return;
+				}
+
+				q = skip_unibuf(q, PTR_DIFF(buf + len, q)); /* Unicode domain name */
+          
+				/* Database info */
+          
+				if (PTR_DIFF(q + 2, buf) >= len) {
+					DEBUG(0,("process_logon_packet: bad packet\n"));
+					return;
+				}
+
+				db_count = SVAL(q, 0); q += 2;
+
+				if (PTR_DIFF(q + (db_count*20), buf) >= len) {
+					DEBUG(0,("process_logon_packet: bad packet\n"));
+					return;
+				}
+
+				db_info = SMB_MALLOC_ARRAY(struct sam_database_info, db_count);
+
+				if (db_info == NULL) {
+					DEBUG(3, ("out of memory allocating info for %d databases\n", db_count));
+					return;
+				}
+          
+				for (i = 0; i < db_count; i++) {
+					db_info[i].index = IVAL(q, 0);
+					db_info[i].serial_lo = IVAL(q, 4);
+					db_info[i].serial_hi = IVAL(q, 8);
+					db_info[i].date_lo = IVAL(q, 12);
+					db_info[i].date_hi = IVAL(q, 16);
+					q += 20;
+				}
+
+				/* Domain SID */
+
+#if 0
+				/* We must range check this. */
+				q += IVAL(q, 0) + 4;  /* 4 byte length plus data */
+          
+				q += 2;               /* Alignment? */
+
+				/* Misc other info */
+
+				q += 4;               /* NT version (0x1) */
+				q += 2;               /* LMNT token (0xff) */
+				q += 2;               /* LM20 token (0xff) */
+#endif
+
+				SAFE_FREE(db_info);        /* Not sure whether we need to do anything useful with these */
+
+				/* Send message to smbd */
+
+				send_repl_message(low_serial);
+				break;
+			}
 
 		default:
 			DEBUG(3,("process_logon_packet: Unknown domain request %d\n",code));

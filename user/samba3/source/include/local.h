@@ -49,7 +49,8 @@
 #define MAX_DIRECTORY_HANDLES 2048
 
 /* maximum number of file caches per smbd */
-#define MAX_WRITE_CACHES 10
+/* #define MAX_WRITE_CACHES 10 */
+#define MAX_WRITE_CACHES 2 /* AVM */
 
 /* define what facility to use for syslog */
 #ifndef SYSLOG_FACILITY
@@ -233,9 +234,6 @@
 /* Number of microseconds to wait before a sharing violation. */
 #define SHARING_VIOLATION_USEC_WAIT 950000
 
-/* Number of microseconds to wait before a updating the write time (2 secs). */
-#define WRITE_TIME_UPDATE_USEC_DELAY 2000000
-
 #define MAX_LDAP_REPLICATION_SLEEP_TIME 5000 /* In milliseconds. */
 
 /* tdb hash size for the open database. */
@@ -252,8 +250,5 @@
 
 /* Windows minimum lock resolution timeout in ms */
 #define WINDOWS_MINIMUM_LOCK_TIMEOUT_MS 200
-
-/* Maximum size of RPC data we will accept for one call. */
-#define MAX_RPC_DATA_SIZE (15*1024*1024)
 
 #endif

@@ -7,7 +7,7 @@ CC=gcc
 
 # Optimization for the compiler
 #OPTIMIZE=
-OPTIMIZE=-Os
+OPTIMIZE=-O2
 
 CFLAGS= $(DEBUG) $(OPTIMIZE)
 

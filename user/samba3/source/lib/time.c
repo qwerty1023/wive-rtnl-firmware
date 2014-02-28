@@ -8,7 +8,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -17,7 +17,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -117,7 +118,7 @@ void unix_to_nt_time(NTTIME *nt, time_t t)
  Check if it's a null unix time.
 ****************************************************************************/
 
-bool null_time(time_t t)
+BOOL null_time(time_t t)
 {
 	return t == 0 || 
 		t == (time_t)0xFFFFFFFF || 
@@ -128,7 +129,7 @@ bool null_time(time_t t)
  Check if it's a null NTTIME.
 ****************************************************************************/
 
-bool null_nttime(NTTIME t)
+BOOL null_nttime(NTTIME t)
 {
 	return t == 0 || t == (NTTIME)-1;
 }
@@ -137,7 +138,7 @@ bool null_nttime(NTTIME t)
  Check if it's a null timespec.
 ****************************************************************************/
 
-bool null_timespec(struct timespec ts)
+BOOL null_timespec(struct timespec ts)
 {
 	return ts.tv_sec == 0 || 
 		ts.tv_sec == (time_t)0xFFFFFFFF || 
@@ -303,13 +304,13 @@ time_t pull_dos_date3(const uint8_t *date_ptr, int zone_offset)
 
 char *http_timestring(time_t t)
 {
-	fstring buf;
+	static fstring buf;
 	struct tm *tm = localtime(&t);
 
 	if (t == TIME_T_MAX) {
-		fstrcpy(buf, "never");
+		slprintf(buf,sizeof(buf)-1,"never");
 	} else if (!tm) {
-		fstr_sprintf(buf, "%ld seconds since the Epoch", (long)t);
+		slprintf(buf,sizeof(buf)-1,"%ld seconds since the Epoch",(long)t);
 	} else {
 #ifndef HAVE_STRFTIME
 		const char *asct = asctime(tm);
@@ -321,7 +322,7 @@ char *http_timestring(time_t t)
 		strftime(buf, sizeof(buf)-1, "%a, %d %b %Y %H:%M:%S %Z", tm);
 #endif /* !HAVE_STRFTIME */
 	}
-	return talloc_strdup(talloc_tos(), buf);
+	return buf;
 }
 
 
@@ -401,7 +402,7 @@ struct timeval timeval_zero(void)
 /**
   return True if a timeval is zero
 */
-bool timeval_is_zero(const struct timeval *tv)
+BOOL timeval_is_zero(const struct timeval *tv)
 {
 	return tv->tv_sec == 0 && tv->tv_usec == 0;
 }
@@ -479,7 +480,7 @@ int timeval_compare(const struct timeval *tv1, const struct timeval *tv2)
 /**
   return True if a timer is in the past
 */
-bool timeval_expired(const struct timeval *tv)
+BOOL timeval_expired(const struct timeval *tv)
 {
 	struct timeval tv2 = timeval_current();
 	if (tv2.tv_sec > tv->tv_sec) return True;
@@ -634,7 +635,7 @@ int get_time_zone(time_t t)
  Check if NTTIME is 0.
 ****************************************************************************/
 
-bool nt_time_is_zero(const NTTIME *nt)
+BOOL nt_time_is_zero(const NTTIME *nt)
 {
 	return (*nt == 0);
 }
@@ -687,9 +688,9 @@ int set_server_zone_offset(time_t t)
  Return the date and time as a string
 ****************************************************************************/
 
-char *current_timestring(TALLOC_CTX *ctx, bool hires)
+char *current_timestring(BOOL hires)
 {
-	fstring TimeBuf;
+	static fstring TimeBuf;
 	struct timeval tp;
 	time_t t;
 	struct tm *tm;
@@ -739,7 +740,7 @@ char *current_timestring(TALLOC_CTX *ctx, bool hires)
 		}
 #endif
 	}
-	return talloc_strdup(ctx, TimeBuf);
+	return(TimeBuf);
 }
 
 
@@ -826,10 +827,14 @@ void put_long_date(char *p, time_t t)
  structure.
 ****************************************************************************/
 
-static time_t calc_create_time(const SMB_STRUCT_STAT *st)
+time_t get_create_time(const SMB_STRUCT_STAT *st,BOOL fake_dirs)
 {
 	time_t ret, ret1;
 
+	if(S_ISDIR(st->st_mode) && fake_dirs) {
+		return (time_t)315493200L;          /* 1/1/1980 */
+	}
+    
 	ret = MIN(st->st_ctime, st->st_mtime);
 	ret1 = MIN(ret, st->st_atime);
 
@@ -844,42 +849,12 @@ static time_t calc_create_time(const SMB_STRUCT_STAT *st)
 	return ret;
 }
 
-/****************************************************************************
- Return the 'create time' from a stat struct if it exists (birthtime) or else
- use the best approximation.
-****************************************************************************/
-
-struct timespec get_create_timespec(const SMB_STRUCT_STAT *pst,bool fake_dirs)
+struct timespec get_create_timespec(const SMB_STRUCT_STAT *st,BOOL fake_dirs)
 {
-	struct timespec ret;
-
-	if(S_ISDIR(pst->st_mode) && fake_dirs) {
-		ret.tv_sec = 315493200L;          /* 1/1/1980 */
-		ret.tv_nsec = 0;
-		return ret;
-	}
-
-#if defined(HAVE_STAT_ST_BIRTHTIMESPEC)
-	ret = pst->st_birthtimespec;
-#elif defined(HAVE_STAT_ST_BIRTHTIMENSEC)
-	ret.tv_sec = pst->st_birthtime;
-	ret.tv_nsec = pst->st_birthtimenspec;
-#elif defined(HAVE_STAT_ST_BIRTHTIME)
-	ret.tv_sec = pst->st_birthtime;
-	ret.tv_nsec = 0;
-#else
-	ret.tv_sec = calc_create_time(pst);
-	ret.tv_nsec = 0;
-#endif
-
-	/* Deal with systems that don't initialize birthtime correctly.
-	 * Pointed out by SATOH Fumiyasu <fumiyas@osstech.jp>.
-	 */
-	if (null_timespec(ret)) {
-		ret.tv_sec = calc_create_time(pst);
-		ret.tv_nsec = 0;
-	}
-	return ret;
+	struct timespec ts;
+	ts.tv_sec = get_create_time(st, fake_dirs);
+	ts.tv_nsec = 0;
+	return ts;
 }
 
 /****************************************************************************
@@ -903,18 +878,6 @@ struct timespec get_atimespec(const SMB_STRUCT_STAT *pst)
 	ret.tv_sec = pst->st_atime;
 	ret.tv_nsec = pst->st_atimensec;
 	return ret;
-#elif defined(HAVE_STAT_ST_ATIME_N)
-	struct timespec ret;
-	ret.tv_sec = pst->st_atime;
-	ret.tv_nsec = pst->st_atime_n;
-	return ret;
-#elif defined(HAVE_STAT_ST_UATIME)
-	struct timespec ret;
-	ret.tv_sec = pst->st_atime;
-	ret.tv_nsec = pst->st_uatime * 1000;
-	return ret;
-#elif defined(HAVE_STAT_ST_ATIMESPEC)
-	return pst->st_atimespec;
 #else
 #error	CONFIGURE_ERROR_IN_DETECTING_TIMESPEC_IN_STAT 
 #endif
@@ -931,15 +894,7 @@ void set_atimespec(SMB_STRUCT_STAT *pst, struct timespec ts)
 	pst->st_atim = ts;
 #elif defined(HAVE_STAT_ST_ATIMENSEC)
 	pst->st_atime = ts.tv_sec;
-	pst->st_atimensec = ts.tv_nsec;
-#elif defined(HAVE_STAT_ST_ATIME_N)
-	pst->st_atime = ts.tv_sec;
-	pst->st_atime_n = ts.tv_nsec;
-#elif defined(HAVE_STAT_ST_UATIME)
-	pst->st_atime = ts.tv_sec;
-	pst->st_uatime = ts.tv_nsec / 1000;
-#elif defined(HAVE_STAT_ST_ATIMESPEC)
-	pst->st_atimespec = ts;
+	pst->st_atimensec = ts.tv_nsec
 #else
 #error	CONFIGURE_ERROR_IN_DETECTING_TIMESPEC_IN_STAT 
 #endif
@@ -963,18 +918,6 @@ struct timespec get_mtimespec(const SMB_STRUCT_STAT *pst)
 	ret.tv_sec = pst->st_mtime;
 	ret.tv_nsec = pst->st_mtimensec;
 	return ret;
-#elif defined(HAVE_STAT_ST_MTIME_N)
-	struct timespec ret;
-	ret.tv_sec = pst->st_mtime;
-	ret.tv_nsec = pst->st_mtime_n;
-	return ret;
-#elif defined(HAVE_STAT_ST_UMTIME)
-	struct timespec ret;
-	ret.tv_sec = pst->st_mtime;
-	ret.tv_nsec = pst->st_umtime * 1000;
-	return ret;
-#elif defined(HAVE_STAT_ST_MTIMESPEC)
-	return pst->st_mtimespec;
 #else
 #error	CONFIGURE_ERROR_IN_DETECTING_TIMESPEC_IN_STAT 
 #endif
@@ -991,15 +934,7 @@ void set_mtimespec(SMB_STRUCT_STAT *pst, struct timespec ts)
 	pst->st_mtim = ts;
 #elif defined(HAVE_STAT_ST_MTIMENSEC)
 	pst->st_mtime = ts.tv_sec;
-	pst->st_mtimensec = ts.tv_nsec;
-#elif defined(HAVE_STAT_ST_MTIME_N)
-	pst->st_mtime = ts.tv_sec;
-	pst->st_mtime_n = ts.tv_nsec;
-#elif defined(HAVE_STAT_ST_UMTIME)
-	pst->st_mtime = ts.tv_sec;
-	pst->st_umtime = ts.tv_nsec / 1000;
-#elif defined(HAVE_STAT_ST_MTIMESPEC)
-	pst->st_mtimespec = ts;
+	pst->st_mtimensec = ts.tv_nsec
 #else
 #error	CONFIGURE_ERROR_IN_DETECTING_TIMESPEC_IN_STAT 
 #endif
@@ -1023,18 +958,6 @@ struct timespec get_ctimespec(const SMB_STRUCT_STAT *pst)
 	ret.tv_sec = pst->st_ctime;
 	ret.tv_nsec = pst->st_ctimensec;
 	return ret;
-#elif defined(HAVE_STAT_ST_CTIME_N)
-	struct timespec ret;
-	ret.tv_sec = pst->st_ctime;
-	ret.tv_nsec = pst->st_ctime_n;
-	return ret;
-#elif defined(HAVE_STAT_ST_UCTIME)
-	struct timespec ret;
-	ret.tv_sec = pst->st_ctime;
-	ret.tv_nsec = pst->st_uctime * 1000;
-	return ret;
-#elif defined(HAVE_STAT_ST_CTIMESPEC)
-	return pst->st_ctimespec;
 #else
 #error	CONFIGURE_ERROR_IN_DETECTING_TIMESPEC_IN_STAT 
 #endif
@@ -1051,15 +974,7 @@ void set_ctimespec(SMB_STRUCT_STAT *pst, struct timespec ts)
 	pst->st_ctim = ts;
 #elif defined(HAVE_STAT_ST_CTIMENSEC)
 	pst->st_ctime = ts.tv_sec;
-	pst->st_ctimensec = ts.tv_nsec;
-#elif defined(HAVE_STAT_ST_CTIME_N)
-	pst->st_ctime = ts.tv_sec;
-	pst->st_ctime_n = ts.tv_nsec;
-#elif defined(HAVE_STAT_ST_UCTIME)
-	pst->st_ctime = ts.tv_sec;
-	pst->st_uctime = ts.tv_nsec / 1000;
-#elif defined(HAVE_STAT_ST_CTIMESPEC)
-	pst->st_ctimespec = ts;
+	pst->st_ctimensec = ts.tv_nsec
 #else
 #error	CONFIGURE_ERROR_IN_DETECTING_TIMESPEC_IN_STAT 
 #endif
@@ -1267,17 +1182,17 @@ void cli_put_dos_date3(struct cli_state *cli, char *buf, int offset, time_t unix
 	put_dos_date3(buf, offset, unixdate, cli->serverzone);
 }
 
-time_t cli_make_unix_date(struct cli_state *cli, const void *date_ptr)
+time_t cli_make_unix_date(struct cli_state *cli, void *date_ptr)
 {
 	return make_unix_date(date_ptr, cli->serverzone);
 }
 
-time_t cli_make_unix_date2(struct cli_state *cli, const void *date_ptr)
+time_t cli_make_unix_date2(struct cli_state *cli, void *date_ptr)
 {
 	return make_unix_date2(date_ptr, cli->serverzone);
 }
 
-time_t cli_make_unix_date3(struct cli_state *cli, const void *date_ptr)
+time_t cli_make_unix_date3(struct cli_state *cli, void *date_ptr)
 {
 	return make_unix_date3(date_ptr, cli->serverzone);
 }
@@ -1329,7 +1244,7 @@ struct timespec nt_time_to_unix_timespec(NTTIME *nt)
  Check if two NTTIMEs are the same.
 ****************************************************************************/
 
-bool nt_time_equals(const NTTIME *nt1, const NTTIME *nt2)
+BOOL nt_time_equals(const NTTIME *nt1, const NTTIME *nt2)
 {
 	return (*nt1 == *nt2);
 }
@@ -1411,13 +1326,6 @@ time_t nt_time_to_unix_abs(const NTTIME *nt)
 	return (time_t)d;
 }
 
-time_t uint64s_nt_time_to_unix_abs(const uint64_t *src)
-{
-	NTTIME nttime;
-	nttime = *src;
-	return nt_time_to_unix_abs(&nttime);
-}
-
 /****************************************************************************
  Put a 8 byte filetime from a struct timespec. Uses GMT.
 ****************************************************************************/
@@ -1479,7 +1387,7 @@ void unix_to_nt_time_abs(NTTIME *nt, time_t t)
 	d = (double)(t);
 	d *= 1.0e7;
 
-	*nt = (NTTIME)d;
+	*nt = d;
 
 	/* convert to a negative value */
 	*nt=~*nt;
@@ -1490,7 +1398,7 @@ void unix_to_nt_time_abs(NTTIME *nt, time_t t)
  Check if it's a null mtime.
 ****************************************************************************/
 
-bool null_mtime(time_t mtime)
+BOOL null_mtime(time_t mtime)
 {
 	if (mtime == 0 || mtime == (time_t)0xFFFFFFFF || mtime == (time_t)-1)
 		return(True);
@@ -1520,6 +1428,8 @@ const char *time_to_asc(const time_t t)
 
 const char *display_time(NTTIME nttime)
 {
+	static fstring string;
+
 	float high;
 	float low;
 	int sec;
@@ -1540,18 +1450,18 @@ const char *display_time(NTTIME nttime)
 	low = ~(nttime & 0xFFFFFFFF);
 	low = low/(1000*1000*10);
 
-	sec=(int)(high+low);
+	sec=high+low;
 
 	days=sec/(60*60*24);
 	hours=(sec - (days*60*60*24)) / (60*60);
 	mins=(sec - (days*60*60*24) - (hours*60*60) ) / 60;
 	secs=sec - (days*60*60*24) - (hours*60*60) - (mins*60);
 
-	return talloc_asprintf(talloc_tos(), "%u days, %u hours, %u minutes, "
-			       "%u seconds", days, hours, mins, secs);
+	fstr_sprintf(string, "%u days, %u hours, %u minutes, %u seconds", days, hours, mins, secs);
+	return (string);
 }
 
-bool nt_time_is_set(const NTTIME *nt)
+BOOL nt_time_is_set(const NTTIME *nt)
 {
 	if (*nt == 0x7FFFFFFFFFFFFFFFLL) {
 		return False;

@@ -7,7 +7,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -16,7 +16,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 /**
@@ -30,10 +31,10 @@
 #include "includes.h"
 #include "web/swat_proto.h"
 
-static int demo_mode = False;
-static int passwd_only = False;
-static bool have_write_access = False;
-static bool have_read_access = False;
+static BOOL demo_mode = False;
+static BOOL passwd_only = False;
+static BOOL have_write_access = False;
+static BOOL have_read_access = False;
 static int iNumNonAutoPrintServices = 0;
 
 /*
@@ -50,11 +51,7 @@ static int iNumNonAutoPrintServices = 0;
 #define DISABLE_USER_FLAG "disable_user_flag"
 #define ENABLE_USER_FLAG "enable_user_flag"
 #define RHOST "remote_host"
-#define XSRF_TOKEN "xsrf"
-#define XSRF_TIME "xsrf_time"
-#define XSRF_TIMEOUT 300
 
-#define _(x) lang_msg_rotate(talloc_tos(),x)
 
 /****************************************************************************
 ****************************************************************************/
@@ -80,35 +77,21 @@ static char *fix_backslash(const char *str)
 	return newstring;
 }
 
-static const char *fix_quotes(TALLOC_CTX *ctx, const char *str)
+static char *fix_quotes(const char *str)
 {
-	char *newstring = NULL;
-	char *p = NULL;
-	size_t newstring_len;
+	static pstring newstring;
+	char *p = newstring;
+	size_t newstring_len = sizeof(newstring);
 	int quote_len = strlen("&quot;");
 
-	/* Count the number of quotes. */
-	newstring_len = 1;
-	p = (char *) str;
-	while (*p) {
-		if ( *p == '\"') {
-			newstring_len += quote_len;
-		} else {
-			newstring_len++;
-		}
-		++p;
-	}
-	newstring = TALLOC_ARRAY(ctx, char, newstring_len);
-	if (!newstring) {
-		return "";
-	}
-	for (p = newstring; *str; str++) {
-		if ( *str == '\"') {
-			strncpy( p, "&quot;", quote_len);
+	while (*str) {
+		if ( *str == '\"' && (newstring_len - PTR_DIFF(p, newstring) - 1) > quote_len ) {
+			strncpy( p, "&quot;", quote_len); 
 			p += quote_len;
 		} else {
 			*p++ = *str;
 		}
+		++str;
 	}
 	*p = '\0';
 	return newstring;
@@ -141,76 +124,6 @@ static char *make_parm_name(const char *label)
 	return parmname;
 }
 
-void get_xsrf_token(const char *username, const char *pass,
-		    const char *formname, time_t xsrf_time, char token_str[33])
-{
-	struct MD5Context md5_ctx;
-	uint8_t token[16];
-	int i;
-
-	token_str[0] = '\0';
-	ZERO_STRUCT(md5_ctx);
-	MD5Init(&md5_ctx);
-
-	MD5Update(&md5_ctx, (uint8_t *)formname, strlen(formname));
-	MD5Update(&md5_ctx, (uint8_t *)&xsrf_time, sizeof(time_t));
-	if (username != NULL) {
-		MD5Update(&md5_ctx, (uint8_t *)username, strlen(username));
-	}
-	if (pass != NULL) {
-		MD5Update(&md5_ctx, (uint8_t *)pass, strlen(pass));
-	}
-
-	MD5Final(token, &md5_ctx);
-
-	for(i = 0; i < sizeof(token); i++) {
-		char tmp[3];
-
-		snprintf(tmp, sizeof(tmp), "%02x", token[i]);
-		strncat(token_str, tmp, sizeof(tmp));
-	}
-}
-
-void print_xsrf_token(const char *username, const char *pass,
-		      const char *formname)
-{
-	char token[33];
-	time_t xsrf_time = time(NULL);
-
-	get_xsrf_token(username, pass, formname, xsrf_time, token);
-	printf("<input type=\"hidden\" name=\"%s\" value=\"%s\">\n",
-	       XSRF_TOKEN, token);
-	printf("<input type=\"hidden\" name=\"%s\" value=\"%lld\">\n",
-	       XSRF_TIME, (long long int)xsrf_time);
-}
-
-bool verify_xsrf_token(const char *formname)
-{
-	char expected[33];
-	const char *username = cgi_user_name();
-	const char *pass = cgi_user_pass();
-	const char *token = cgi_variable_nonull(XSRF_TOKEN);
-	const char *time_str = cgi_variable_nonull(XSRF_TIME);
-	time_t xsrf_time = 0;
-	time_t now = time(NULL);
-
-	if (sizeof(time_t) == sizeof(int)) {
-		xsrf_time = atoi(time_str);
-	} else if (sizeof(time_t) == sizeof(long)) {
-		xsrf_time = atol(time_str);
-	} else if (sizeof(time_t) == sizeof(long long)) {
-		xsrf_time = atoll(time_str);
-	}
-
-	if (abs(now - xsrf_time) > XSRF_TIMEOUT) {
-		return false;
-	}
-
-	get_xsrf_token(username, pass, formname, xsrf_time, expected);
-	return (strncmp(expected, token, sizeof(expected)) == 0);
-}
-
-
 /****************************************************************************
   include a lump of html in a page 
 ****************************************************************************/
@@ -229,9 +142,7 @@ static int include_html(const char *fname)
 	}
 
 	while ((ret = read(fd, buf, sizeof(buf))) > 0) {
-		if (write(1, buf, ret) == -1) {
-			break;
-		}
+		write(1, buf, ret);
 	}
 
 	close(fd);
@@ -269,24 +180,25 @@ static void print_header(void)
    "i18n_translated_parm" class is used to change the color of the
    translated parameter with CSS.
    **************************************************************** */
-static const char *get_parm_translated(TALLOC_CTX *ctx,
+static const char* get_parm_translated(
 	const char* pAnchor, const char* pHelp, const char* pLabel)
 {
-	const char *pTranslated = _(pLabel);
-	char *output;
-	if(strcmp(pLabel, pTranslated) != 0) {
-		output = talloc_asprintf(ctx,
+	const char* pTranslated = _(pLabel);
+	static pstring output;
+	if(strcmp(pLabel, pTranslated) != 0)
+	{
+		pstr_sprintf(output,
 		  "<A HREF=\"/swat/help/manpages/smb.conf.5.html#%s\" target=\"docs\"> %s</A>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %s <br><span class=\"i18n_translated_parm\">%s</span>",
 		   pAnchor, pHelp, pLabel, pTranslated);
 		return output;
 	}
-	output = talloc_asprintf(ctx,
+	pstr_sprintf(output, 
 	  "<A HREF=\"/swat/help/manpages/smb.conf.5.html#%s\" target=\"docs\"> %s</A>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; %s",
 	  pAnchor, pHelp, pLabel);
 	return output;
 }
 /****************************************************************************
- finish off the page
+ finish off the page 
 ****************************************************************************/
 static void print_footer(void)
 {
@@ -296,22 +208,19 @@ static void print_footer(void)
 }
 
 /****************************************************************************
-  display one editable parameter in a form
+  display one editable parameter in a form 
 ****************************************************************************/
 static void show_parameter(int snum, struct parm_struct *parm)
 {
 	int i;
 	void *ptr = parm->ptr;
 	char *utf8_s1, *utf8_s2;
-	size_t converted_size;
-	TALLOC_CTX *ctx = talloc_stackframe();
 
 	if (parm->p_class == P_LOCAL && snum >= 0) {
 		ptr = lp_local_ptr(snum, ptr);
 	}
 
-	printf("<tr><td>%s</td><td>", get_parm_translated(ctx,
-				stripspaceupper(parm->label), _("Help"), parm->label));
+	printf("<tr><td>%s</td><td>", get_parm_translated(stripspaceupper(parm->label), _("Help"), parm->label));
 	switch (parm->type) {
 	case P_CHAR:
 		printf("<input type=text size=2 name=\"parm_%s\" value=\"%c\">",
@@ -328,12 +237,12 @@ static void show_parameter(int snum, struct parm_struct *parm)
 			for (;*list;list++) {
 				/* enclose in HTML encoded quotes if the string contains a space */
 				if ( strchr_m(*list, ' ') ) {
-					push_utf8_allocate(&utf8_s1, *list, &converted_size);
-					push_utf8_allocate(&utf8_s2, ((*(list+1))?", ":""), &converted_size);
+					push_utf8_allocate(&utf8_s1, *list);
+					push_utf8_allocate(&utf8_s2, ((*(list+1))?", ":""));
 					printf("&quot;%s&quot;%s", utf8_s1, utf8_s2);
 				} else {
-					push_utf8_allocate(&utf8_s1, *list, &converted_size);
-					push_utf8_allocate(&utf8_s2, ((*(list+1))?", ":""), &converted_size);
+					push_utf8_allocate(&utf8_s1, *list);
+					push_utf8_allocate(&utf8_s2, ((*(list+1))?", ":""));
 					printf("%s%s", utf8_s1, utf8_s2);
 				}
 				SAFE_FREE(utf8_s1);
@@ -347,7 +256,7 @@ static void show_parameter(int snum, struct parm_struct *parm)
 			char **list = (char **)(parm->def.lvalue);
 			for (; *list; list++) {
 				/* enclose in HTML encoded quotes if the string contains a space */
-				if ( strchr_m(*list, ' ') )
+				if ( strchr_m(*list, ' ') ) 
 					printf("&quot;%s&quot;%s", *list, ((*(list+1))?", ":""));
 				else
 					printf("%s%s", *list, ((*(list+1))?", ":""));
@@ -358,9 +267,19 @@ static void show_parameter(int snum, struct parm_struct *parm)
 
 	case P_STRING:
 	case P_USTRING:
-		push_utf8_allocate(&utf8_s1, *(char **)ptr, &converted_size);
+		push_utf8_allocate(&utf8_s1, *(char **)ptr);
 		printf("<input type=text size=40 name=\"parm_%s\" value=\"%s\">",
-		       make_parm_name(parm->label), fix_quotes(ctx, utf8_s1));
+		       make_parm_name(parm->label), fix_quotes(utf8_s1));
+		SAFE_FREE(utf8_s1);
+		printf("<input type=button value=\"%s\" onClick=\"swatform.parm_%s.value=\'%s\'\">",
+			_("Set Default"), make_parm_name(parm->label),fix_backslash((char *)(parm->def.svalue)));
+		break;
+
+	case P_GSTRING:
+	case P_UGSTRING:
+		push_utf8_allocate(&utf8_s1, (char *)ptr);
+		printf("<input type=text size=40 name=\"parm_%s\" value=\"%s\">",
+		       make_parm_name(parm->label), fix_quotes(utf8_s1));
 		SAFE_FREE(utf8_s1);
 		printf("<input type=button value=\"%s\" onClick=\"swatform.parm_%s.value=\'%s\'\">",
 			_("Set Default"), make_parm_name(parm->label),fix_backslash((char *)(parm->def.svalue)));
@@ -368,20 +287,20 @@ static void show_parameter(int snum, struct parm_struct *parm)
 
 	case P_BOOL:
 		printf("<select name=\"parm_%s\">",make_parm_name(parm->label)); 
-		printf("<option %s>Yes", (*(bool *)ptr)?"selected":"");
-		printf("<option %s>No", (*(bool *)ptr)?"":"selected");
+		printf("<option %s>Yes", (*(BOOL *)ptr)?"selected":"");
+		printf("<option %s>No", (*(BOOL *)ptr)?"":"selected");
 		printf("</select>");
 		printf("<input type=button value=\"%s\" onClick=\"swatform.parm_%s.selectedIndex=\'%d\'\">",
-			_("Set Default"), make_parm_name(parm->label),(bool)(parm->def.bvalue)?0:1);
+			_("Set Default"), make_parm_name(parm->label),(BOOL)(parm->def.bvalue)?0:1);
 		break;
 
 	case P_BOOLREV:
 		printf("<select name=\"parm_%s\">",make_parm_name(parm->label)); 
-		printf("<option %s>Yes", (*(bool *)ptr)?"":"selected");
-		printf("<option %s>No", (*(bool *)ptr)?"selected":"");
+		printf("<option %s>Yes", (*(BOOL *)ptr)?"":"selected");
+		printf("<option %s>No", (*(BOOL *)ptr)?"selected":"");
 		printf("</select>");
 		printf("<input type=button value=\"%s\" onClick=\"swatform.parm_%s.selectedIndex=\'%d\'\">",
-			_("Set Default"), make_parm_name(parm->label),(bool)(parm->def.bvalue)?1:0);
+			_("Set Default"), make_parm_name(parm->label),(BOOL)(parm->def.bvalue)?1:0);
 		break;
 
 	case P_INTEGER:
@@ -390,19 +309,12 @@ static void show_parameter(int snum, struct parm_struct *parm)
 			_("Set Default"), make_parm_name(parm->label),(int)(parm->def.ivalue));
 		break;
 
-	case P_OCTAL: {
-		char *o;
-		o = octal_string(*(int *)ptr);
-		printf("<input type=text size=8 name=\"parm_%s\" value=%s>",
-		       make_parm_name(parm->label), o);
-		TALLOC_FREE(o);
-		o = octal_string((int)(parm->def.ivalue));
-		printf("<input type=button value=\"%s\" "
-		       "onClick=\"swatform.parm_%s.value=\'%s\'\">",
-		       _("Set Default"), make_parm_name(parm->label), o);
-		TALLOC_FREE(o);
+	case P_OCTAL:
+		printf("<input type=text size=8 name=\"parm_%s\" value=%s>", make_parm_name(parm->label), octal_string(*(int *)ptr));
+		printf("<input type=button value=\"%s\" onClick=\"swatform.parm_%s.value=\'%s\'\">",
+		       _("Set Default"), make_parm_name(parm->label),
+		       octal_string((int)(parm->def.ivalue)));
 		break;
-	}
 
 	case P_ENUM:
 		printf("<select name=\"parm_%s\">",make_parm_name(parm->label)); 
@@ -419,7 +331,6 @@ static void show_parameter(int snum, struct parm_struct *parm)
 		break;
 	}
 	printf("</td></tr>\n");
-	TALLOC_FREE(ctx);
 }
 
 /****************************************************************************
@@ -467,9 +378,14 @@ static void show_parameters(int snum, int allparameters, unsigned int parm_filte
 					if (!strcmp(*(char **)ptr,(char *)(parm->def.svalue))) continue;
 					break;
 
+				case P_GSTRING:
+				case P_UGSTRING:
+					if (!strcmp((char *)ptr,(char *)(parm->def.svalue))) continue;
+					break;
+
 				case P_BOOL:
 				case P_BOOLREV:
-					if (*(bool *)ptr == (bool)(parm->def.bvalue)) continue;
+					if (*(BOOL *)ptr == (BOOL)(parm->def.bvalue)) continue;
 					break;
 
 				case P_INTEGER:
@@ -503,25 +419,22 @@ static void show_parameters(int snum, int allparameters, unsigned int parm_filte
 /****************************************************************************
   load the smb.conf file into loadparm.
 ****************************************************************************/
-static bool load_config(bool save_def)
+static BOOL load_config(BOOL save_def)
 {
-	return lp_load(get_dyn_CONFIGFILE(),False,save_def,False,True);
+	lp_resetnumservices();
+	return lp_load(dyn_CONFIGFILE,False,save_def,False,True);
 }
 
 /****************************************************************************
   write a config file 
 ****************************************************************************/
-static void write_config(FILE *f, bool show_defaults)
+static void write_config(FILE *f, BOOL show_defaults)
 {
-	TALLOC_CTX *ctx = talloc_stackframe();
-
 	fprintf(f, "# Samba config file created using SWAT\n");
 	fprintf(f, "# from %s (%s)\n", cgi_remote_host(), cgi_remote_addr());
-	fprintf(f, "# Date: %s\n\n", current_timestring(ctx, False));
+	fprintf(f, "# Date: %s\n\n", current_timestring(False));
 	
 	lp_dump(f, show_defaults, iNumNonAutoPrintServices);
-
-	TALLOC_FREE(ctx);
 }
 
 /****************************************************************************
@@ -532,9 +445,9 @@ static int save_reload(int snum)
 	FILE *f;
 	struct stat st;
 
-	f = sys_fopen(get_dyn_CONFIGFILE(),"w");
+	f = sys_fopen(dyn_CONFIGFILE,"w");
 	if (!f) {
-		printf(_("failed to open %s for writing"), get_dyn_CONFIGFILE());
+		printf(_("failed to open %s for writing"), dyn_CONFIGFILE);
 		printf("\n");
 		return 0;
 	}
@@ -545,7 +458,7 @@ static int save_reload(int snum)
 #if defined HAVE_FCHMOD
 		fchmod(fileno(f), S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH);
 #else
-		chmod(get_dyn_CONFIGFILE(), S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH);
+		chmod(dyn_CONFIGFILE, S_IWUSR | S_IRUSR | S_IRGRP | S_IROTH);
 #endif
 	}
 
@@ -554,10 +467,10 @@ static int save_reload(int snum)
 		lp_dump_one(f, False, snum);
 	fclose(f);
 
-	lp_kill_all_services();
+	lp_killunused(NULL);
 
 	if (!load_config(False)) {
-                printf(_("Can't reload %s"), get_dyn_CONFIGFILE());
+                printf(_("Can't reload %s"), dyn_CONFIGFILE);
 		printf("\n");
                 return 0;
         }
@@ -597,17 +510,14 @@ static void commit_parameters(int snum)
 {
 	int i = 0;
 	struct parm_struct *parm;
-	char *label;
+	pstring label;
 	const char *v;
 
 	while ((parm = lp_next_parameter(snum, &i, 1))) {
-		if (asprintf(&label, "parm_%s", make_parm_name(parm->label)) > 0) {
-			if ((v = cgi_variable(label)) != NULL) {
-				if (parm->flags & FLAG_HIDE)
-					continue;
-				commit_parameter(snum, parm, v);
-			}
-			SAFE_FREE(label);
+		slprintf(label, sizeof(label)-1, "parm_%s", make_parm_name(parm->label));
+		if ((v = cgi_variable(label)) != NULL) {
+			if (parm->flags & FLAG_HIDE) continue;
+			commit_parameter(snum, parm, v); 
 		}
 	}
 }
@@ -683,20 +593,13 @@ static void welcome_page(void)
 static void viewconfig_page(void)
 {
 	int full_view=0;
-	const char form_name[] = "viewconfig";
-
-	if (!verify_xsrf_token(form_name)) {
-		goto output_page;
-	}
 
 	if (cgi_variable("full_view")) {
 		full_view = 1;
 	}
 
-output_page:
 	printf("<H2>%s</H2>\n", _("Current Config"));
 	printf("<form method=post>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), form_name);
 
 	if (full_view) {
 		printf("<input type=submit name=\"normal_view\" value=\"%s\">\n", _("Normal View"));
@@ -716,25 +619,18 @@ output_page:
 static void wizard_params_page(void)
 {
 	unsigned int parm_filter = FLAG_WIZARD;
-	const char form_name[] = "wizard_params";
 
 	/* Here we first set and commit all the parameters that were selected
  	   in the previous screen. */
 
 	printf("<H2>%s</H2>\n", _("Wizard Parameter Edit Page"));
 
-	if (!verify_xsrf_token(form_name)) {
-		goto output_page;
-	}
-
 	if (cgi_variable("Commit")) {
 		commit_parameters(GLOBAL_SECTION_SNUM);
 		save_reload(0);
 	}
 
-output_page:
 	printf("<form name=\"swatform\" method=post action=wizard_params>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), form_name);
 
 	if (have_write_access) {
 		printf("<input type=submit name=\"Commit\" value=\"Commit Changes\">\n");
@@ -770,11 +666,6 @@ static void wizard_page(void)
 	int have_home = -1;
 	int HomeExpo = 0;
 	int SerType = 0;
-	const char form_name[] = "wizard";
-
-	if (!verify_xsrf_token(form_name)) {
-		goto output_page;
-	}
 
 	if (cgi_variable("Rewrite")) {
 		(void) rewritecfg_file();
@@ -829,16 +720,17 @@ static void wizard_page(void)
 
 		/* Have to create Homes share? */
 		if ((HomeExpo == 1) && (have_home == -1)) {
-			const char *unix_share = HOMES_NAME;
-
+			pstring unix_share;
+			
+			pstrcpy(unix_share,HOMES_NAME);
 			load_config(False);
 			lp_copy_service(GLOBAL_SECTION_SNUM, unix_share);
+			iNumNonAutoPrintServices = lp_numservices();
 			have_home = lp_servicenumber(HOMES_NAME);
 			lp_do_parameter( have_home, "read only", "No");
 			lp_do_parameter( have_home, "valid users", "%S");
 			lp_do_parameter( have_home, "browseable", "No");
 			commit_parameters(have_home);
-			save_reload(have_home);
 		}
 
 		/* Need to Delete Homes share? */
@@ -857,6 +749,7 @@ static void wizard_page(void)
 			winstype = 1;
 		if (lp_wins_server_list() && strlen(*lp_wins_server_list()))
  		        winstype = 2;
+ 		
 
 		/* Do we have a homes share? */
 		have_home = lp_servicenumber(HOMES_NAME);
@@ -865,12 +758,10 @@ static void wizard_page(void)
 		winstype = 3;
 
 	role = lp_server_role();
-
-output_page:
+	
 	/* Here we go ... */
 	printf("<H2>%s</H2>\n", _("Samba Configuration Wizard"));
 	printf("<form method=post action=wizard>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), form_name);
 
 	if (have_write_access) {
 		printf("%s\n", _("The \"Rewrite smb.conf file\" button will clear the smb.conf file of all default values and of comments."));
@@ -939,13 +830,8 @@ static void globals_page(void)
 {
 	unsigned int parm_filter = FLAG_BASIC;
 	int mode = 0;
-	const char form_name[] = "globals";
 
 	printf("<H2>%s</H2>\n", _("Global Parameters"));
-
-	if (!verify_xsrf_token(form_name)) {
-		goto output_page;
-	}
 
 	if (cgi_variable("Commit")) {
 		commit_parameters(GLOBAL_SECTION_SNUM);
@@ -959,9 +845,7 @@ static void globals_page(void)
 	if ( cgi_variable("AdvMode"))
 		mode = 1;
 
-output_page:
 	printf("<form name=\"swatform\" method=post action=globals>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), form_name);
 
 	ViewModeBoxes( mode );
 	switch ( mode ) {
@@ -1000,23 +884,15 @@ static void shares_page(void)
 	int i;
 	int mode = 0;
 	unsigned int parm_filter = FLAG_BASIC;
-	size_t converted_size;
-	const char form_name[] = "shares";
-
-	printf("<H2>%s</H2>\n", _("Share Parameters"));
-
-	if (!verify_xsrf_token(form_name)) {
-		goto output_page;
-	}
 
 	if (share)
 		snum = lp_servicenumber(share);
 
+	printf("<H2>%s</H2>\n", _("Share Parameters"));
 
 	if (cgi_variable("Commit") && snum >= 0) {
 		commit_parameters(snum);
 		save_reload(0);
-		snum = lp_servicenumber(share);
 	}
 
 	if (cgi_variable("Delete") && snum >= 0) {
@@ -1027,15 +903,16 @@ static void shares_page(void)
 	}
 
 	if (cgi_variable("createshare") && (share=cgi_variable("newshare"))) {
+		load_config(False);
+		lp_copy_service(GLOBAL_SECTION_SNUM, share);
+		iNumNonAutoPrintServices = lp_numservices();
+		save_reload(0);
 		snum = lp_servicenumber(share);
-		if (snum < 0) {
-			load_config(False);
-			lp_copy_service(GLOBAL_SECTION_SNUM, share);
-			snum = lp_servicenumber(share);
-			save_reload(snum);
-			snum = lp_servicenumber(share);
-		}
 	}
+
+	printf("<FORM name=\"swatform\" method=post>\n");
+
+	printf("<table>\n");
 
 	if ( cgi_variable("ViewMode") )
 		mode = atoi(cgi_variable_nonull("ViewMode"));
@@ -1043,12 +920,6 @@ static void shares_page(void)
 		mode = 0;
 	if ( cgi_variable("AdvMode"))
 		mode = 1;
-
-output_page:
-	printf("<FORM name=\"swatform\" method=post>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), form_name);
-
-	printf("<table>\n");
 
 	ViewModeBoxes( mode );
 	switch ( mode ) {
@@ -1067,11 +938,12 @@ output_page:
 	for (i=0;i<lp_numservices();i++) {
 		s = lp_servicename(i);
 		if (s && (*s) && strcmp(s,"IPC$") && !lp_print_ok(i)) {
-			push_utf8_allocate(&utf8_s, s, &converted_size);
+			push_utf8_allocate(&utf8_s, s);
 			printf("<option %s value=\"%s\">%s\n", 
 			       (share && strcmp(share,s)==0)?"SELECTED":"",
 			       utf8_s, utf8_s);
 			SAFE_FREE(utf8_s);
+			
 		}
 	}
 	printf("</select></td>\n");
@@ -1110,13 +982,13 @@ output_page:
 /*************************************************************
 change a password either locally or remotely
 *************************************************************/
-static bool change_password(const char *remote_machine, const char *user_name, 
+static BOOL change_password(const char *remote_machine, const char *user_name, 
 			    const char *old_passwd, const char *new_passwd, 
 				int local_flags)
 {
 	NTSTATUS ret;
-	char *err_str = NULL;
-	char *msg_str = NULL;
+	pstring err_str;
+	pstring msg_str;
 
 	if (demo_mode) {
 		printf("%s\n<p>", _("password change in demo mode rejected"));
@@ -1124,29 +996,26 @@ static bool change_password(const char *remote_machine, const char *user_name,
 	}
 	
 	if (remote_machine != NULL) {
-		ret = remote_password_change(remote_machine, user_name,
-					     old_passwd, new_passwd, &err_str);
-		if (err_str != NULL)
+		ret = remote_password_change(remote_machine, user_name, old_passwd, 
+									 new_passwd, err_str, sizeof(err_str));
+		if(*err_str)
 			printf("%s\n<p>", err_str);
-		SAFE_FREE(err_str);
 		return NT_STATUS_IS_OK(ret);
 	}
 
-	if(!initialize_password_db(True, NULL)) {
+	if(!initialize_password_db(True)) {
 		printf("%s\n<p>", _("Can't setup password database vectors."));
 		return False;
 	}
 	
-	ret = local_password_change(user_name, local_flags, new_passwd,
-					&err_str, &msg_str);
+	ret = local_password_change(user_name, local_flags, new_passwd, err_str, sizeof(err_str),
+					 msg_str, sizeof(msg_str));
 
-	if(msg_str)
+	if(*msg_str)
 		printf("%s\n<p>", msg_str);
-	if(err_str)
+	if(*err_str)
 		printf("%s\n<p>", err_str);
 
-	SAFE_FREE(msg_str);
-	SAFE_FREE(err_str);
 	return NT_STATUS_IS_OK(ret);
 }
 
@@ -1156,7 +1025,7 @@ static bool change_password(const char *remote_machine, const char *user_name,
 static void chg_passwd(void)
 {
 	const char *host;
-	bool rslt;
+	BOOL rslt;
 	int local_flags = 0;
 
 	/* Make sure users name has been specified */
@@ -1229,9 +1098,11 @@ static void chg_passwd(void)
 	if(cgi_variable(CHG_S_PASSWD_FLAG)) {
 		printf("<p>");
 		if (rslt == True) {
-			printf("%s\n", _(" The passwd has been changed."));
+			printf(_(" The passwd for '%s' has been changed."), cgi_variable_nonull(SWAT_USER));
+			printf("\n");
 		} else {
-			printf("%s\n", _(" The passwd has NOT been changed."));
+			printf(_(" The passwd for '%s' has NOT been changed."), cgi_variable_nonull(SWAT_USER));
+			printf("\n");
 		}
 	}
 	
@@ -1244,15 +1115,20 @@ static void chg_passwd(void)
 static void passwd_page(void)
 {
 	const char *new_name = cgi_user_name();
-	const char passwd_form[] = "passwd";
-	const char rpasswd_form[] = "rpasswd";
+
+	/* 
+	 * After the first time through here be nice. If the user
+	 * changed the User box text to another users name, remember it.
+	 */
+	if (cgi_variable(SWAT_USER)) {
+		new_name = cgi_variable_nonull(SWAT_USER);
+	} 
 
 	if (!new_name) new_name = "";
 
 	printf("<H2>%s</H2>\n", _("Server Password Management"));
 
 	printf("<FORM name=\"swatform\" method=post>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), passwd_form);
 
 	printf("<table>\n");
 
@@ -1292,16 +1168,14 @@ static void passwd_page(void)
 	 * Do some work if change, add, disable or enable was
 	 * requested. It could be this is the first time through this
 	 * code, so there isn't anything to do.  */
-	if (verify_xsrf_token(passwd_form) &&
-	   ((cgi_variable(CHG_S_PASSWD_FLAG)) || (cgi_variable(ADD_USER_FLAG)) || (cgi_variable(DELETE_USER_FLAG)) ||
-	    (cgi_variable(DISABLE_USER_FLAG)) || (cgi_variable(ENABLE_USER_FLAG)))) {
+	if ((cgi_variable(CHG_S_PASSWD_FLAG)) || (cgi_variable(ADD_USER_FLAG)) || (cgi_variable(DELETE_USER_FLAG)) ||
+	    (cgi_variable(DISABLE_USER_FLAG)) || (cgi_variable(ENABLE_USER_FLAG))) {
 		chg_passwd();		
 	}
 
 	printf("<H2>%s</H2>\n", _("Client/Server Password Management"));
 
 	printf("<FORM name=\"swatform\" method=post>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), rpasswd_form);
 
 	printf("<table>\n");
 
@@ -1334,7 +1208,7 @@ static void passwd_page(void)
 	 * password somewhere other than the server. It could be this
 	 * is the first time through this code, so there isn't
 	 * anything to do.  */
-	if (verify_xsrf_token(passwd_form) && cgi_variable(CHG_R_PASSWD_FLAG)) {
+	if (cgi_variable(CHG_R_PASSWD_FLAG)) {
 		chg_passwd();		
 	}
 
@@ -1351,14 +1225,17 @@ static void printers_page(void)
 	int i;
 	int mode = 0;
 	unsigned int parm_filter = FLAG_BASIC;
-	const char form_name[] = "printers";
-
-	if (!verify_xsrf_token(form_name)) {
-		goto output_page;
-	}
 
 	if (share)
 		snum = lp_servicenumber(share);
+
+        printf("<H2>%s</H2>\n", _("Printer Parameters"));
+ 
+        printf("<H3>%s</H3>\n", _("Important Note:"));
+        printf(_("Printer names marked with [*] in the Choose Printer drop-down box "));
+        printf(_("are autoloaded printers from "));
+        printf("<A HREF=\"/swat/help/smb.conf.5.html#printcapname\" target=\"docs\">%s</A>\n", _("Printcap Name"));
+        printf("%s\n", _("Attempting to delete these printers from SWAT will have no effect."));
 
 	if (cgi_variable("Commit") && snum >= 0) {
 		commit_parameters(snum);
@@ -1366,7 +1243,6 @@ static void printers_page(void)
 		    save_reload(snum);
 		else
 		    save_reload(0);
-		snum = lp_servicenumber(share);
 	}
 
 	if (cgi_variable("Delete") && snum >= 0) {
@@ -1377,16 +1253,16 @@ static void printers_page(void)
 	}
 
 	if (cgi_variable("createshare") && (share=cgi_variable("newshare"))) {
+		load_config(False);
+		lp_copy_service(GLOBAL_SECTION_SNUM, share);
+		iNumNonAutoPrintServices = lp_numservices();
 		snum = lp_servicenumber(share);
-		if (snum < 0 || snum >= iNumNonAutoPrintServices) {
-			load_config(False);
-			lp_copy_service(GLOBAL_SECTION_SNUM, share);
-			snum = lp_servicenumber(share);
-			lp_do_parameter(snum, "print ok", "Yes");
-			save_reload(snum);
-			snum = lp_servicenumber(share);
-		}
+		lp_do_parameter(snum, "print ok", "Yes");
+		save_reload(0);
+		snum = lp_servicenumber(share);
 	}
+
+	printf("<FORM name=\"swatform\" method=post>\n");
 
 	if ( cgi_variable("ViewMode") )
 		mode = atoi(cgi_variable_nonull("ViewMode"));
@@ -1394,19 +1270,6 @@ static void printers_page(void)
                 mode = 0;
         if ( cgi_variable("AdvMode"))
                 mode = 1;
-
-output_page:
-        printf("<H2>%s</H2>\n", _("Printer Parameters"));
-
-        printf("<H3>%s</H3>\n", _("Important Note:"));
-        printf("%s",_("Printer names marked with [*] in the Choose Printer drop-down box "));
-        printf("%s",_("are autoloaded printers from "));
-        printf("<A HREF=\"/swat/help/smb.conf.5.html#printcapname\" target=\"docs\">%s</A>\n", _("Printcap Name"));
-        printf("%s\n", _("Attempting to delete these printers from SWAT will have no effect."));
-
-
-	printf("<FORM name=\"swatform\" method=post>\n");
-	print_xsrf_token(cgi_user_name(), cgi_user_pass(), form_name);
 
 	ViewModeBoxes( mode );
 	switch ( mode ) {
@@ -1466,32 +1329,6 @@ output_page:
 	printf("</FORM>\n");
 }
 
-/*
-  when the _() translation macro is used there is no obvious place to free
-  the resulting string and there is no easy way to give a static pointer.
-  All we can do is rotate between some static buffers and hope a single d_printf()
-  doesn't have more calls to _() than the number of buffers
-*/
-
-const char *lang_msg_rotate(TALLOC_CTX *ctx, const char *msgid)
-{
-	const char *msgstr;
-	const char *ret;
-
-	msgstr = lang_msg(msgid);
-	if (!msgstr) {
-		return msgid;
-	}
-
-	ret = talloc_strdup(ctx, msgstr);
-
-	lang_msg_free(msgstr);
-	if (!ret) {
-		return msgid;
-	}
-
-	return ret;
-}
 
 /**
  * main function for SWAT.
@@ -1507,7 +1344,6 @@ const char *lang_msg_rotate(TALLOC_CTX *ctx, const char *msgid)
 		POPT_COMMON_SAMBA
 		POPT_TABLEEND
 	};
-	TALLOC_CTX *frame = talloc_stackframe();
 
 	fault_setup(NULL);
 	umask(S_IWGRP | S_IWOTH);
@@ -1547,23 +1383,23 @@ const char *lang_msg_rotate(TALLOC_CTX *ctx, const char *msgid)
 	iNumNonAutoPrintServices = lp_numservices();
 	load_printers();
 
-	cgi_setup(get_dyn_SWATDIR(), !demo_mode);
+	cgi_setup(dyn_SWATDIR, !demo_mode);
 
 	print_header();
 
 	cgi_load_variables();
 
-	if (!file_exist(get_dyn_CONFIGFILE(), NULL)) {
+	if (!file_exist(dyn_CONFIGFILE, NULL)) {
 		have_read_access = True;
 		have_write_access = True;
 	} else {
 		/* check if the authenticated user has write access - if not then
 		   don't show write options */
-		have_write_access = (access(get_dyn_CONFIGFILE(),W_OK) == 0);
+		have_write_access = (access(dyn_CONFIGFILE,W_OK) == 0);
 
 		/* if the user doesn't have read access to smb.conf then
 		   don't let them view it */
-		have_read_access = (access(get_dyn_CONFIGFILE(),R_OK) == 0);
+		have_read_access = (access(dyn_CONFIGFILE,R_OK) == 0);
 	}
 
 	show_main_buttons();
@@ -1594,8 +1430,6 @@ const char *lang_msg_rotate(TALLOC_CTX *ctx, const char *msgid)
 	}
 
 	print_footer();
-
-	TALLOC_FREE(frame);
 	return 0;
 }
 

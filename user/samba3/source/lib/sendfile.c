@@ -6,7 +6,7 @@
 
  This program is free software; you can redistribute it and/or modify
  it under the terms of the GNU General Public License as published by
- the Free Software Foundation; either version 3 of the License, or
+ the Free Software Foundation; either version 2 of the License, or
  (at your option) any later version.
  This program is distributed in the hope that it will be useful,
  but WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -14,7 +14,8 @@
  GNU General Public License for more details.
 
  You should have received a copy of the GNU General Public License
- along with this program; if not, see <http://www.gnu.org/licenses/>.
+ along with this program; if not, write to the Free Software
+ Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 /*
@@ -383,8 +384,7 @@ ssize_t sys_sendfile(int tofd, int fromfd, const DATA_BLOB *header, SMB_OFF_T of
 				hdtrl.iov_base = NULL;
 				hdtrl.iov_len = 0;
 			} else {
-				hdtrl.iov_base =
-				    (caddr_t)hdtrl.iov_base + nwritten;
+				hdtrl.iov_base += nwritten;
 				hdtrl.iov_len -= nwritten;
 				nwritten = 0;
 			}

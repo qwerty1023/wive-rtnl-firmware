@@ -1,21 +1,21 @@
-/*
+/* 
    Unix SMB/CIFS implementation.
    Copyright (C) 2001 by Martin Pool <mbp@samba.org>
    Copyright (C) 2003 by Jim McDonough <jmcd@us.ibm.com>
-   Copyright (C) 2007 by Jeremy Allison <jra@samba.org>
-
+   
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -40,65 +40,33 @@
  * table?  There's kind of a chicken-and-egg situation there...
  **/
 
-#define DEFINE_DYN_CONFIG_PARAM(name) \
-static char *dyn_##name; \
-\
- const char *get_dyn_##name(void) \
-{\
-	if (dyn_##name == NULL) {\
-		return name;\
-	}\
-	return dyn_##name;\
-}\
-\
- const char *set_dyn_##name(const char *newpath) \
-{\
-	if (dyn_##name) {\
-		SAFE_FREE(dyn_##name);\
-	}\
-	dyn_##name = SMB_STRDUP(newpath);\
-	return dyn_##name;\
-}\
-\
- bool is_default_dyn_##name(void) \
-{\
-	return (dyn_##name == NULL);\
-}
+char const *dyn_SBINDIR = SBINDIR,
+	*dyn_BINDIR = BINDIR,
+	*dyn_SWATDIR = SWATDIR;
 
-DEFINE_DYN_CONFIG_PARAM(SBINDIR)
-DEFINE_DYN_CONFIG_PARAM(BINDIR)
-DEFINE_DYN_CONFIG_PARAM(SWATDIR)
-DEFINE_DYN_CONFIG_PARAM(CONFIGFILE) /**< Location of smb.conf file. **/
-DEFINE_DYN_CONFIG_PARAM(LOGFILEBASE) /** Log file directory. **/
-DEFINE_DYN_CONFIG_PARAM(LMHOSTSFILE) /** Statically configured LanMan hosts. **/
-DEFINE_DYN_CONFIG_PARAM(CODEPAGEDIR)
-DEFINE_DYN_CONFIG_PARAM(LIBDIR)
-DEFINE_DYN_CONFIG_PARAM(MODULESDIR)
-DEFINE_DYN_CONFIG_PARAM(SHLIBEXT)
-DEFINE_DYN_CONFIG_PARAM(LOCKDIR)
-DEFINE_DYN_CONFIG_PARAM(PIDDIR)
-DEFINE_DYN_CONFIG_PARAM(SMB_PASSWD_FILE)
-DEFINE_DYN_CONFIG_PARAM(PRIVATE_DIR)
+pstring dyn_CONFIGFILE = CONFIGFILE; /**< Location of smb.conf file. **/
 
-/* In non-FHS mode, these should be configurable using 'lock dir =';
-   but in FHS mode, they are their own directory.  Implement as wrapper
-   functions so that everything can still be kept in dynconfig.c.
- */
+/** Log file directory. **/
+pstring dyn_LOGFILEBASE = LOGFILEBASE;
 
-const char *get_dyn_STATEDIR(void)
-{
-#ifdef FHS_COMPATIBLE
-	return STATEDIR;
-#else
-	return lp_lockdir();
-#endif
-}
+/** Statically configured LanMan hosts. **/
+pstring dyn_LMHOSTSFILE = LMHOSTSFILE;
 
-const char *get_dyn_CACHEDIR(void)
-{
-#ifdef FHS_COMPATIBLE
-	return CACHEDIR;
-#else
-	return lp_lockdir();
-#endif
-}
+/**
+ * @brief Samba library directory.
+ *
+ * @sa lib_path() to get the path to a file inside the LIBDIR.
+ **/
+pstring dyn_LIBDIR = LIBDIR;
+fstring dyn_SHLIBEXT = SHLIBEXT;
+
+/**
+ * @brief Directory holding lock files.
+ *
+ * Not writable, but used to set a default in the parameter table.
+ **/
+pstring dyn_LOCKDIR = LOCKDIR;
+pstring dyn_PIDDIR  = PIDDIR;
+
+pstring dyn_SMB_PASSWD_FILE = SMB_PASSWD_FILE;
+pstring dyn_PRIVATE_DIR = PRIVATE_DIR;

@@ -9,7 +9,7 @@
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *  
  * This program is distributed in the hope that it will be useful,
@@ -18,10 +18,13 @@
  * GNU General Public License for more details.
  *  
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include "includes.h"
+
+extern struct current_user current_user;
 
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_VFS
@@ -37,26 +40,26 @@ static int fake_perms_stat(vfs_handle_struct *handle, const char *fname, SMB_STR
 		} else {
 			sbuf->st_mode = S_IRWXU;
 		}
-		sbuf->st_uid = handle->conn->server_info->utok.uid;
-		sbuf->st_gid = handle->conn->server_info->utok.gid;
+		sbuf->st_uid = current_user.ut.uid;
+		sbuf->st_gid = current_user.ut.gid;
 	}
 
 	return ret;
 }
 
-static int fake_perms_fstat(vfs_handle_struct *handle, files_struct *fsp, SMB_STRUCT_STAT *sbuf)
+static int fake_perms_fstat(vfs_handle_struct *handle, files_struct *fsp, int fd, SMB_STRUCT_STAT *sbuf)
 {
 	int ret = -1;
 
-	ret = SMB_VFS_NEXT_FSTAT(handle, fsp, sbuf);
+	ret = SMB_VFS_NEXT_FSTAT(handle, fsp, fd, sbuf);
 	if (ret == 0) {
 		if (S_ISDIR(sbuf->st_mode)) {
 			sbuf->st_mode = S_IFDIR | S_IRWXU;
 		} else {
 			sbuf->st_mode = S_IRWXU;
 		}
-		sbuf->st_uid = handle->conn->server_info->utok.uid;
-		sbuf->st_gid = handle->conn->server_info->utok.gid;
+		sbuf->st_uid = current_user.ut.uid;
+		sbuf->st_gid = current_user.ut.gid;
 	}
 	return ret;
 }

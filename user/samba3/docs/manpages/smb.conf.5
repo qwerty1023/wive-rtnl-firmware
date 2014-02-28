@@ -1,12 +1,12 @@
 .\"     Title: smb.conf
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
-.\"      Date: 02/22/2010
+.\"      Date: 09/30/2009
 .\"    Manual: File Formats and Conventions
-.\"    Source: Samba 3.3
+.\"    Source: Samba 3.0
 .\"  Language: English
 .\"
-.TH "SMB\&.CONF" "5" "02/22/2010" "Samba 3\&.3" "File Formats and Conventions"
+.TH "SMB\&.CONF" "5" "09/30/2009" "Samba 3\&.0" "File Formats and Conventions"
 .\" -----------------------------------------------------------------
 .\" * (re)Define some macros
 .\" -----------------------------------------------------------------
@@ -219,7 +219,7 @@ Any line ending in a
 \(lq\FC\e\F[]\(rq
 is continued on the next line in the customary UNIX fashion\&.
 .PP
-The values following the equals sign in parameters are all either a string (no quotes needed) or a boolean, which may be given as yes/no, 1/0 or true/false\&. Case is not significant in boolean values, but is preserved in string values\&. Some items such as create masks are numeric\&.
+The values following the equals sign in parameters are all either a string (no quotes needed) or a boolean, which may be given as yes/no, 0/1 or true/false\&. Case is not significant in boolean values, but is preserved in string values\&. Some items such as create masks are numeric\&.
 .SH "SECTION DESCRIPTIONS"
 .PP
 Each section in the configuration file (except for the [global] section) describes a shared resource (known as a
@@ -946,77 +946,6 @@ If the service is a guest service, a connection is made as the username given in
 \FCguest account =\F[]
 for the service, irrespective of the supplied password\&.
 .RE
-.SH "REGISTRY-BASED CONFIGURATION"
-.PP
-Starting with Samba version 3\&.2\&.0, the capability to store Samba configuration in the registry is available\&. The configuration is stored in the registry key
-\fI\FCHKLM\eSoftware\eSamba\esmbconf\F[]\fR\&. There are two levels of registry configuration:
-.sp
-.RS 4
-.ie n \{\
-\h'-04' 1.\h'+01'\c
-.\}
-.el \{\
-.sp -1
-.IP "  1." 4.2
-.\}
-Share definitions stored in registry are used\&. This is triggered by setting the global parameter
-\fIregistry shares\fR
-to
-\(lqyes\(rq
-in
-\fIsmb\&.conf\fR\&.
-.sp
-The registry shares are loaded not at startup but on demand at runtime by
-\fIsmbd\fR\&. Shares defined in
-\fIsmb\&.conf\fR
-take priority over shares of the same name defined in registry\&.
-.RE
-.sp
-.RS 4
-.ie n \{\
-\h'-04' 2.\h'+01'\c
-.\}
-.el \{\
-.sp -1
-.IP "  2." 4.2
-.\}
-Global
-\fIsmb\&.conf\fR
-options stored in registry are used\&. This can be activated in two different ways:
-.sp
-Firstly, a registry only configuration is triggered by setting
-\m[blue]\fBconfig backend = registry\fR\m[]
-in the [global] section of
-\fIsmb\&.conf\fR\&. This resets everything that has been read from config files to this point and reads the content of the global configuration section from the registry\&. This is the recommended method of using registry based configuration\&.
-.sp
-Secondly, a mixed configuration can be activated by a special new meaning of the parameter
-\m[blue]\fBinclude = registry\fR\m[]
-in the [global] section of
-\fIsmb\&.conf\fR\&. This reads the global options from registry with the same priorities as for an include of a text file\&. This may be especially useful in cases where an initial configuration is needed to access the registry\&.
-.sp
-Activation of global registry options automatically activates registry shares\&. So in the registry only case, shares are loaded on demand only\&.
-.RE
-.sp
-.RE
-.PP
-Note: To make registry\-based configurations foolproof at least to a certain extent, the use of
-\fIlock directory\fR
-and
-\fIconfig backend\fR
-inside the registry configuration has been disabled: Especially by changing the
-\fIlock directory\fR
-inside the registry configuration, one would create a broken setup where the daemons do not see the configuration they loaded once it is active\&.
-.PP
-The registry configuration can be accessed with tools like
-\fIregedit\fR
-or
-\fInet (rpc) registry\fR
-in the key
-\fI\FCHKLM\eSoftware\eSamba\esmbconf\F[]\fR\&. More conveniently, the
-\fIconf\fR
-subcommand of the
-\fBnet\fR(8)
-utility offers a dedicated interface to read and write the registry based configuration locally, i\&.e\&. directly accessing the database file, circumventing the server\&.
 .SH "EXPLANATION OF EACH PARAMETER"
 
 
@@ -1030,7 +959,7 @@ that should stop a shutdown procedure issued by the
 \m[blue]\fBshutdown script\fR\m[]\&.
 .sp
 If the connected user posseses the
-\fBSeRemoteShutdownPrivilege\fR, right, this command will be run as root\&.
+\fBSeRemoteShutdownPrivilege\fR, right, this command will be run as user\&.
 .sp
 Default:
 \fI\fIabort shutdown script\fR\fR\fI = \fR\fI\FC""\F[]\fR\fI \fR
@@ -1046,7 +975,7 @@ acl check permissions (S)
 This boolean parameter controls what
 \fBsmbd\fR(8)does on receiving a protocol request of "open for delete" from a Windows client\&. If a Windows client doesn\'t have permissions to delete a file then they expect this to be denied at open time\&. POSIX systems normally only detect restrictions on delete by actually attempting to delete the file or directory\&. As Windows clients can (and do) "back out" a delete request by unsetting the "delete on close" bit Samba cannot delete the file immediately on "open for delete" request as we cannot restore such a deleted file\&. With this parameter set to true (the default) then smbd checks the file system permissions directly on "open for delete" and denies the request without actually deleting the file if the file system permissions would seem to deny it\&. This is not perfect, as it\'s possible a user could have deleted a file without Samba being able to check the permissions correctly, but it is close enough to Windows semantics for mostly correct behaviour\&. Samba will correctly check POSIX ACL semantics in this case\&.
 .sp
-If this parameter is set to "false" Samba doesn\'t check permissions on "open for delete" and allows the open\&. If the user doesn\'t have permission to delete the file this will only be discovered at close time, which is too late for the Windows user tools to display an error message to the user\&. The symptom of this is files that appear to have been deleted "magically" re\-appearing on a Windows explorer refresh\&. This is an extremely advanced protocol option which should not need to be changed\&. This parameter was introduced in its final form in 3\&.0\&.21, an earlier version with slightly different semantics was introduced in 3\&.0\&.20\&. That older version is not documented here\&.
+If this parameter is set to "false" Samba doesn\'t check permissions on "open for delete" and allows the open\&. If the user doesn\'t have permission to delete the file this will only be discovered at close time, which is too late for the Windows user tools to display an error message to the user\&. The symptom of this is files that appear to have been deleted "magically" re\-appearing on a Windows explorer refersh\&. This is an extremely advanced protocol option which should not need to be changed\&. This parameter was introduced in its final form in 3\&.0\&.21, an earlier version with slightly different semantics was introduced in 3\&.0\&.20\&. That older version is not documented here\&.
 .sp
 Default:
 \fI\fIacl check permissions\fR\fR\fI = \fR\fI\FCTrue\F[]\fR\fI \fR
@@ -1182,14 +1111,14 @@ Example:
 \fI\fIadd port command\fR\fR\fI = \fR\fI\FC/etc/samba/scripts/addport\&.sh\F[]\fR\fI \fR
 .RE
 
-addprinter command (G)
-.\" addprinter command
+add printer command (G)
+.\" add printer command
 .PP
 .RS 4
 With the introduction of MS\-RPC based printing support for Windows NT/2000 clients in Samba 2\&.2, The MS Add Printer Wizard (APW) icon is now also available in the "Printers\&.\&.\&." folder displayed a share listing\&. The APW allows for printers to be add remotely to a Samba or Windows NT/2000 print server\&.
 .sp
 For a Samba host this means that the printer must be physically added to the underlying printing system\&. The
-\fIaddprinter command\fR
+\fIadd printer command\fR
 defines a script to be run which will perform the necessary operations for adding the printer to the print system and to add the appropriate service definition to the
 \FCsmb\&.conf\F[]
 file in order that it can be shared by
@@ -1277,15 +1206,13 @@ to determine if the share defined by the APW exists\&. If the sharename is still
 \FCsmbd \F[]
 will return an ACCESS_DENIED error to the client\&.
 .sp
-The
-\fIaddprinter command\fR
-program can output a single line of text, which Samba will set as the port the new printer is connected to\&. If this line isn\'t output, Samba won\'t reload its printer shares\&.
+The "add printer command" program can output a single line of text, which Samba will set as the port the new printer is connected to\&. If this line isn\'t output, Samba won\'t reload its printer shares\&.
 .sp
 Default:
-\fI\fIaddprinter command\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
+\fI\fIadd printer command\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
 .sp
 Example:
-\fI\fIaddprinter command\fR\fR\fI = \fR\fI\FC/usr/bin/addprinter\F[]\fR\fI \fR
+\fI\fIadd printer command\fR\fR\fI = \fR\fI\FC/usr/bin/addprinter\F[]\fR\fI \fR
 .RE
 
 add share command (G)
@@ -1462,22 +1389,6 @@ Example:
 \fI\fIadd user to group script\fR\fR\fI = \fR\fI\FC/usr/sbin/adduser %u %g\F[]\fR\fI \fR
 .RE
 
-administrative share (S)
-.\" administrative share
-.PP
-.RS 4
-If this parameter is set to
-\fByes\fR
-for a share, then the share will be an administrative share\&. The Administrative Shares are the default network shares created by all Windows NT\-based operating systems\&. These are shares like C$, D$ or ADMIN$\&. The type of these shares is STYPE_DISKTREE_HIDDEN\&.
-.sp
-See the section below on
-\m[blue]\fBsecurity\fR\m[]
-for more information about this option\&.
-.sp
-Default:
-\fI\fIadministrative share\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
-.RE
-
 admin users (S)
 .\" admin users
 .PP
@@ -1543,23 +1454,6 @@ Default:
 .sp
 Example:
 \fI\fIaio read size\fR\fR\fI = \fR\fI\FC16384 # Use asynchronous I/O for reads bigger than 16KB request size\F[]\fR\fI \fR
-.RE
-
-aio write behind (S)
-.\" aio write behind
-.PP
-.RS 4
-If Samba has been built with asynchronous I/O support, Samba will not wait until write requests are finished before returning the result to the client for files listed in this parameter\&. Instead, Samba will immediately return that the write request has been finished successfully, no matter if the operation will succeed or not\&. This might speed up clients without aio support, but is really dangerous, because data could be lost and files could be damaged\&.
-.sp
-The syntax is identical to the
-\m[blue]\fBveto files\fR\m[]
-parameter\&.
-.sp
-Default:
-\fI\fIaio write behind\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIaio write behind\fR\fR\fI = \fR\fI\FC/*\&.tmp/\F[]\fR\fI \fR
 .RE
 
 aio write size (S)
@@ -1741,13 +1635,13 @@ to bind only to the interface list given in the
 \m[blue]\fBinterfaces\fR\m[]
 parameter\&. This restricts the networks that
 \FCsmbd\F[]
-will serve, to packets coming in on those interfaces\&. Note that you should not use this parameter for machines that are serving PPP or other intermittent or non\-broadcast network interfaces as it will not cope with non\-permanent interfaces\&.
+will serve to packets coming in those interfaces\&. Note that you should not use this parameter for machines that are serving PPP or other intermittent or non\-broadcast network interfaces as it will not cope with non\-permanent interfaces\&.
 .sp
 If
 \m[blue]\fBbind interfaces only\fR\m[]
-is set and the network address
+is set then unless the network address
 \fI127\&.0\&.0\&.1\fR
-is not added to the
+is added to the
 \m[blue]\fBinterfaces\fR\m[]
 parameter list
 \fBsmbpasswd\fR(8)
@@ -1999,19 +1893,17 @@ check password script (G)
 .\" check password script
 .PP
 .RS 4
-The name of a program that can be used to check password complexity\&. The password is sent to the program\'s standard input\&.
+The name of a program that can be used to check password complexity\&. The password is sent to the program\'s standrad input\&.
 .sp
-The program must return 0 on a good password, or any other value if the password is bad\&. In case the password is considered weak (the program does not return 0) the user will be notified and the password change will fail\&.
+The program must return 0 on good password any other value otherwise\&. In case the password is considered weak (the program do not return 0) the user will be notified and the password change will fail\&.
 .sp
-Note: In the example directory is a sample program called
-\FCcrackcheck\F[]
-that uses cracklib to check the password quality\&.
+Note: In the example directory there is a sample program called crackcheck that uses cracklib to checkpassword quality\&.
 .sp
 Default:
 \fI\fIcheck password script\fR\fR\fI = \fR\fI\FCDisabled\F[]\fR\fI \fR
 .sp
 Example:
-\fI\fIcheck password script\fR\fR\fI = \fR\fI\FC/usr/local/sbin/crackcheck\F[]\fR\fI \fR
+\fI\fIcheck password script\fR\fR\fI = \fR\fI\FCcheck password script = /usr/local/sbin/crackcheck\F[]\fR\fI \fR
 .RE
 
 client lanman auth (G)
@@ -2022,55 +1914,18 @@ This parameter determines whether or not
 \fBsmbclient\fR(8)
 and other samba client tools will attempt to authenticate itself to servers using the weaker LANMAN password hash\&. If disabled, only server which support NT password hashes (e\&.g\&. Windows NT/2000, Samba, etc\&.\&.\&. but not Windows 95/98) will be able to be connected from the Samba client\&.
 .sp
-The LANMAN encrypted response is easily broken, due to its case\-insensitive nature, and the choice of algorithm\&. Clients without Windows 95/98 servers are advised to disable this option\&.
+The LANMAN encrypted response is easily broken, due to it\'s case\-insensitive nature, and the choice of algorithm\&. Clients without Windows 95/98 servers are advised to disable this option\&.
 .sp
 Disabling this option will also disable the
 \FCclient plaintext auth\F[]
-option\&.
+option
 .sp
 Likewise, if the
 \FCclient ntlmv2 auth\F[]
 parameter is enabled, then only NTLMv2 logins will be attempted\&.
 .sp
 Default:
-\fI\fIclient lanman auth\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
-.RE
-
-client ldap sasl wrapping (G)
-.\" client ldap sasl wrapping
-.PP
-.RS 4
-The
-\m[blue]\fBclient ldap sasl wrapping\fR\m[]
-defines whether ldap traffic will be signed or signed and encrypted (sealed)\&. Possible values are
-\fIplain\fR,
-\fIsign\fR
-and
-\fIseal\fR\&.
-.sp
-The values
-\fIsign\fR
-and
-\fIseal\fR
-are only available if Samba has been compiled against a modern OpenLDAP version (2\&.3\&.x or higher)\&.
-.sp
-This option is needed in the case of Domain Controllers enforcing the usage of signed LDAP connections (e\&.g\&. Windows 2000 SP3 or higher)\&. LDAP sign and seal can be controlled with the registry key "\FCHKLM\eSystem\eCurrentControlSet\eServices\e\F[]
-\FCNTDS\eParameters\eLDAPServerIntegrity\F[]" on the Windows server side\&.
-.sp
-Depending on the used KRB5 library (MIT and older Heimdal versions) it is possible that the message "integrity only" is not supported\&. In this case,
-\fIsign\fR
-is just an alias for
-\fIseal\fR\&.
-.sp
-The default value is
-\fIplain\fR
-which is not irritable to KRB5 clock skew errors\&. That implies synchronizing the time with the KDC in the case of using
-\fIsign\fR
-or
-\fIseal\fR\&.
-.sp
-Default:
-\fI\fIclient ldap sasl wrapping\fR\fR\fI = \fR\fI\FCplain\F[]\fR\fI \fR
+\fI\fIclient lanman auth\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
 .RE
 
 client ntlmv2 auth (G)
@@ -2105,7 +1960,7 @@ client plaintext auth (G)
 Specifies whether a client should send a plaintext password if the server does not support encrypted passwords\&.
 .sp
 Default:
-\fI\fIclient plaintext auth\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
+\fI\fIclient plaintext auth\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
 .RE
 
 client schannel (G)
@@ -2131,7 +1986,7 @@ client signing (G)
 .\" client signing
 .PP
 .RS 4
-This controls whether the client is allowed or required to use SMB signing\&. Possible values are
+This controls whether the client offers or requires the server it talks to to use SMB signing\&. Possible values are
 \fIauto\fR,
 \fImandatory\fR
 and
@@ -2153,33 +2008,6 @@ Default:
 \fI\fIclient use spnego\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
 .RE
 
-cluster addresses (G)
-.\" cluster addresses
-.PP
-.RS 4
-With this parameter you can add additional addresses nmbd will register with a WINS server\&. These addresses are not necessarily present on all nodes simultaneously, but they will be registered with the WINS server so that clients can contact any of the nodes\&.
-.sp
-Default:
-\fI\fIcluster addresses\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIcluster addresses\fR\fR\fI = \fR\fI\FC10\&.0\&.0\&.1 10\&.0\&.0\&.2 10\&.0\&.0\&.3\F[]\fR\fI \fR
-.RE
-
-clustering (G)
-.\" clustering
-.PP
-.RS 4
-This parameter specifies whether Samba should contact ctdb for accessing its tdb files and use ctdb as a backend for its messaging backend\&.
-.sp
-Set this parameter to
-\FCyes\F[]
-only if you have a cluster setup with ctdb running\&.
-.sp
-Default:
-\fI\fIclustering\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
-.RE
-
 comment (S)
 .\" comment
 .PP
@@ -2197,30 +2025,6 @@ Default:
 .sp
 Example:
 \fI\fIcomment\fR\fR\fI = \fR\fI\FCFred\'s Files\F[]\fR\fI \fR
-.RE
-
-config backend (G)
-.\" config backend
-.PP
-.RS 4
-This controls the backend for storing the configuration\&. Possible values are
-\fIfile\fR
-(the default) and
-\fIregistry\fR\&. When
-\m[blue]\fBconfig backend = registry\fR\m[]
-is encountered while loading
-\fIsmb\&.conf\fR, the configuration read so far is dropped and the global options are read from registry instead\&. So this triggers a registry only configuration\&. Share definitions are not read immediately but instead
-\fIregistry shares\fR
-is set to
-\fIyes\fR\&.
-.sp
-Note: This option can not be set inside the registry configuration itself\&.
-.sp
-Default:
-\fI\fIconfig backend\fR\fR\fI = \fR\fI\FCfile\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIconfig backend\fR\fR\fI = \fR\fI\FCregistry\F[]\fR\fI \fR
 .RE
 
 config file (G)
@@ -2316,38 +2120,6 @@ Example:
 \fI\fIcsc policy\fR\fR\fI = \fR\fI\FCprograms\F[]\fR\fI \fR
 .RE
 
-ctdbd socket (G)
-.\" ctdbd socket
-.PP
-.RS 4
-If you set
-\FCclustering=yes\F[], you need to tell Samba where ctdbd listens on its unix domain socket\&. The default path as of ctdb 1\&.0 is /tmp/ctdb\&.socket which you have to explicitly set for Samba in smb\&.conf\&.
-.sp
-Default:
-\fI\fIctdbd socket\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIctdbd socket\fR\fR\fI = \fR\fI\FC/tmp/ctdb\&.socket\F[]\fR\fI \fR
-.RE
-
-cups connection timeout (G)
-.\" cups connection timeout
-.PP
-.RS 4
-This parameter is only applicable if
-\m[blue]\fBprinting\fR\m[]
-is set to
-\fBcups\fR\&.
-.sp
-If set, this option specifies the number of seconds that smbd will wait whilst trying to contact to the CUPS server\&. The connection will fail if it takes longer than this number of seconds\&.
-.sp
-Default:
-\fI\fIcups connection timeout\fR\fR\fI = \fR\fI\FC30\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIcups connection timeout\fR\fR\fI = \fR\fI\FC60\F[]\fR\fI \fR
-.RE
-
 cups options (S)
 .\" cups options
 .PP
@@ -2416,19 +2188,6 @@ Default:
 .sp
 Example:
 \fI\fIdeadtime\fR\fR\fI = \fR\fI\FC15\F[]\fR\fI \fR
-.RE
-
-debug class (G)
-.\" debug class
-.PP
-.RS 4
-With this boolean parameter enabled, the debug class (DBGC_CLASS) will be displayed in the debug header\&.
-.sp
-For more information about currently available debug classes, see section about
-\m[blue]\fBlog level\fR\m[]\&.
-.sp
-Default:
-\fI\fIdebug class\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
 debug hires timestamp (G)
@@ -2613,9 +2372,9 @@ deleteprinter command (G)
 .\" deleteprinter command
 .PP
 .RS 4
-With the introduction of MS\-RPC based printer support for Windows NT/2000 clients in Samba 2\&.2, it is now possible to delete a printer at run time by issuing the DeletePrinter() RPC call\&.
+With the introduction of MS\-RPC based printer support for Windows NT/2000 clients in Samba 2\&.2, it is now possible to delete printer at run time by issuing the DeletePrinter() RPC call\&.
 .sp
-For a Samba host this means that the printer must be physically deleted from the underlying printing system\&. The
+For a Samba host this means that the printer must be physically deleted from underlying printing system\&. The
 \m[blue]\fBdeleteprinter command\fR\m[]
 defines a script to be run which will perform the necessary operations for removing the printer from the print system and from
 \FCsmb\&.conf\F[]\&.
@@ -2631,7 +2390,7 @@ has been executed,
 \FCsmbd\F[]
 will reparse the
 \FC smb\&.conf\F[]
-to check that the associated printer no longer exists\&. If the sharename is still valid, then
+to associated printer no longer exists\&. If the sharename is still valid, then
 \FCsmbd \F[]
 will return an ACCESS_DENIED error to the client\&.
 .sp
@@ -3151,24 +2910,10 @@ enable asu support (G)
 .\" enable asu support
 .PP
 .RS 4
-Hosts running the "Advanced Server for Unix (ASU)" product require some special accomodations such as creating a builtin [ADMIN$] share that only supports IPC connections\&. The has been the default behavior in smbd for many years\&. However, certain Microsoft applications such as the Print Migrator tool require that the remote server support an [ADMIN$} file share\&. Disabling this parameter allows for creating an [ADMIN$] file share in smb\&.conf\&.
+Hosts running the "Advanced Server for Unix (ASU)" product require some special accomodations such as creating a builting [ADMIN$] share that only supports IPC connections\&. The has been the default behavior in smbd for many years\&. However, certain Microsoft applications such as the Print Migrator tool require that the remote server support an [ADMIN$} file share\&. Disabling this parameter allows for creating an [ADMIN$] file share in smb\&.conf\&.
 .sp
 Default:
 \fI\fIenable asu support\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
-.RE
-
-enable core files (G)
-.\" enable core files
-.PP
-.RS 4
-This parameter specifies whether core dumps should be written on internal exits\&. Normally set to
-\fByes\fR\&. You should never need to change this\&.
-.sp
-Default:
-\fI\fIenable core files\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIenable core files\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
 enable privileges (G)
@@ -3221,7 +2966,7 @@ This option enables a couple of enhancements to cross\-subnet browse propagation
 .sp
 The first enhancement to browse propagation consists of a regular wildcard query to a Samba WINS server for all Domain Master Browsers, followed by a browse synchronization with each of the returned DMBs\&. The second enhancement consists of a regular randomised browse synchronization with all currently known DMBs\&.
 .sp
-You may wish to disable this option if you have a problem with empty workgroups not disappearing from browse lists\&. Due to the restrictions of the browse protocols, these enhancements can cause a empty workgroup to stay around forever which can be annoying\&.
+You may wish to disable this option if you have a problem with empty workgroups not disappearing from browse lists\&. Due to the restrictions of the browse protocols these enhancements can cause a empty workgroup to stay around forever which can be annoying\&.
 .sp
 In general you should leave this option enabled as it makes cross\-subnet browse propagation much more reliable\&.
 .sp
@@ -3325,11 +3070,11 @@ force create mode (S)
 .RS 4
 This parameter specifies a set of UNIX mode bit permissions that will
 \fIalways\fR
-be set on a file created by Samba\&. This is done by bitwise \'OR\'ing these bits onto the mode bits of a file that is being created\&. The default for this parameter is (in octal) 000\&. The modes in this parameter are bitwise \'OR\'ed onto the file mode after the mask set in the
+be set on a file created by Samba\&. This is done by bitwise \'OR\'ing these bits onto the mode bits of a file that is being created or having its permissions changed\&. The default for this parameter is (in octal) 000\&. The modes in this parameter are bitwise \'OR\'ed onto the file mode after the mask set in the
 \fIcreate mask\fR
 parameter is applied\&.
 .sp
-The example below would force all newly created files to have read and execute permissions set for \'group\' and \'other\' as well as the read/write/execute bits set for the \'user\'\&.
+The example below would force all created files to have read and execute permissions set for \'group\' and \'other\' as well as the read/write/execute bits set for the \'user\'\&.
 .sp
 Default:
 \fI\fIforce create mode\fR\fR\fI = \fR\fI\FC000\F[]\fR\fI \fR
@@ -4099,11 +3844,9 @@ idmap alloc backend (G)
 .\" idmap alloc backend
 .PP
 .RS 4
-The idmap alloc backend provides a plugin interface for Winbind to use when allocating Unix uids/gids for Windows SIDs\&. This option refers to the name of the idmap module which will provide the id allocation functionality\&. Please refer to the man page for each idmap plugin to determine whether or not the module implements the allocation feature\&. The most common plugins are the tdb (\fBidmap_tdb\fR(8)) and ldap (\fBidmap_ldap\fR(8)) libraries\&.
-.sp
-This parameter defaults to the value
-\m[blue]\fBidmap backend\fR\m[]
-was set to, so by default winbind will allocate Unix IDs from the default backend\&. You will only need to set this parameter explicitly if you have an external source for Unix IDs, like a central database service somewhere in your company\&.
+The idmap alloc backend provides a plugin interface for Winbind to use when allocating Unix uids/gids for Windows SIDs\&. This option is to be used in conjunction with the
+\m[blue]\fBidmap domains\fR\m[]
+parameter and refers to the name of the idmap module which will provide the id allocation functionality\&. Please refer to the man page for each idmap plugin to determine whether or not the module implements the allocation feature\&. The most common plugins are the tdb (\fBidmap_tdb\fR(8)) and ldap (\fBidmap_ldap\fR(8)) libraries\&.
 .sp
 Also refer to the
 \m[blue]\fBidmap alloc config\fR\m[]
@@ -4130,28 +3873,11 @@ idmap backend (G)
 .\" idmap backend
 .PP
 .RS 4
-The idmap backend provides a plugin interface for Winbind to use varying backends to store SID/uid/gid mapping tables\&.
+The idmap backend provides a plugin interface for Winbind to use varying backends to store SID/uid/gid mapping tables\&. This option is mutually exclusive with the newer and more flexible
+\m[blue]\fBidmap domains\fR\m[]
+parameter\&. The main difference between the "idmap backend" and the "idmap domains" is that the former only allows one backend for all domains while the latter supports configuring backends on a per domain basis\&.
 .sp
-This option specifies the default backend that is used when no special configuration set by
-\m[blue]\fBidmap config\fR\m[]
-matches the specific request\&.
-.sp
-This default backend also specifies the place where winbind\-generated idmap entries will be stored\&. So it is highly recommended that you specify a writable backend like
-\fBidmap_tdb\fR(8)
-or
-\fBidmap_ldap\fR(8)
-as the idmap backend\&. The
-\fBidmap_rid\fR(8)
-and
-\fBidmap_ad\fR(8)
-backends are not writable and thus will generate unexpected results if set as idmap backend\&.
-.sp
-To use the rid and ad backends, please specify them via the
-\m[blue]\fBidmap config\fR\m[]
-parameter, possibly also for the domain your machine is member of, specified by
-\m[blue]\fBworkgroup\fR\m[]\&.
-.sp
-Examples of SID/uid/gid backends include tdb (\fBidmap_tdb\fR(8)), ldap (\fBidmap_ldap\fR(8)), rid (\fBidmap_rid\fR(8)), and ad (\fBidmap_ad\fR(8))\&.
+Examples of SID/uid/gid backends include tdb (\fBidmap_tdb\fR(8)), ldap (\fBidmap_ldap\fR(8)), rid (\fBidmap_rid\fR(8)), and ad (\fBidmap_tdb\fR(8))\&.
 .sp
 Default:
 \fI\fIidmap backend\fR\fR\fI = \fR\fI\FCtdb\F[]\fR\fI \fR
@@ -4164,35 +3890,38 @@ idmap cache time (G)
 This parameter specifies the number of seconds that Winbind\'s idmap interface will cache positive SID/uid/gid query results\&.
 .sp
 Default:
-\fI\fIidmap cache time\fR\fR\fI = \fR\fI\FC604800 (one week)\F[]\fR\fI \fR
+\fI\fIidmap cache time\fR\fR\fI = \fR\fI\FC900\F[]\fR\fI \fR
 .RE
 
 idmap config (G)
 .\" idmap config
 .PP
 .RS 4
-The idmap config prefix provides a means of managing each trusted domain separately\&. The idmap config prefix should be followed by the name of the domain, a colon, and a setting specific to the chosen backend\&. There are three options available for all domains:
+The idmap config prefix provides a means of managing each domain defined by the
+\m[blue]\fBidmap domains\fR\m[]
+option using Samba\'s parametric option support\&. The idmap config prefix should be followed by the name of the domain, a colon, and a setting specific to the chosen backend\&. There are three options available for all domains:
 .PP
 backend = backend_name
 .RS 4
 Specifies the name of the idmap plugin to use as the SID/uid/gid backend for this domain\&.
 .RE
 .PP
-range = low \- high
+default = [yes|no]
 .RS 4
-Defines the available matching uid and gid range for which the backend is authoritative\&. Note that the range commonly matches the allocation range due to the fact that the same backend will store and retrieve SID/uid/gid mapping entries\&.
-.sp
-winbind uses this parameter to find the backend that is authoritative for a unix ID to SID mapping, so it must be set for each individually configured domain, and it must be disjoint from the ranges set via
-\m[blue]\fBidmap uid\fR\m[]
-and
-\m[blue]\fBidmap gid\fR\m[]\&.
+The default domain/backend will be used for searching for users and groups not belonging to one of the explicitly listed domains (matched by comparing the account SID and the domain SID)\&.
+.RE
+.PP
+readonly = [yes|no]
+.RS 4
+Mark the domain as readonly which means that no attempts to allocate a uid or gid (by the
+\m[blue]\fBidmap alloc backend\fR\m[]) for any user or group in that domain will be attempted\&.
 .RE
 .sp
 The following example illustrates how to configure the
 \fBidmap_ad\fR(8)
 for the CORP domain and the
 \fBidmap_tdb\fR(8)
-backend for all other domains\&. This configuration assumes that the admin of CORP assigns unix ids below 1000000 via the SFU extensions, and winbind is supposed to use the next million entries for its own mappings from trusted domains and for local groups for example\&.
+backend for all other domains\&. The TRUSTEDDOMAINS string is simply an arbitrary key used to reference the "idmap config" settings and does not represent the actual name of a domain\&. It is a catchall domain backend for any domain not explicitly listed\&.
 .sp
 .if n \{\
 .RS 4
@@ -4206,12 +3935,14 @@ backend for all other domains\&. This configuration assumes that the admin of CO
 .BB lightgray adjust-for-leading-newline
 .sp -1
 
-	idmap backend = tdb
-	idmap uid = 1000000\-1999999
-	idmap gid = 1000000\-1999999
+	idmap domains = CORP TRUSTEDDOMAINS
 
-	idmap config CORP : backend  = ad
-	idmap config CORP : range = 1000\-999999
+	idmap config CORP:backend  = ad
+	idmap config CORP:readonly = yes
+
+	idmap config TRUSTEDDOMAINS:backend = tdb
+	idmap config TRUSTEDDOMAINS:default = yes
+	idmap config TRUSTEDDOMAINS:range   = 1000 \- 9999
 	
 .EB lightgray adjust-for-leading-newline
 .if t \{\
@@ -4225,6 +3956,26 @@ backend for all other domains\&. This configuration assumes that the admin of CO
 .\}
 .sp
 \fINo default\fR
+.RE
+
+idmap domains (G)
+.\" idmap domains
+.PP
+.RS 4
+The idmap domains option defines a list of Windows domains which will each have a separately configured backend for managing Winbind\'s SID/uid/gid tables\&. This parameter is mutually exclusive with the older
+\m[blue]\fBidmap backend\fR\m[]
+option\&.
+.sp
+Values consist of the short domain name for Winbind\'s primary or collection of trusted domains\&. You may also use an arbitrary string to represent a catchall domain backend for any domain not explicitly listed\&.
+.sp
+Refer to the
+\m[blue]\fBidmap config\fR\m[]
+for details about managing the SID/uid/gid backend for each domain\&.
+.sp
+\fINo default\fR
+.sp
+Example:
+\fI\fIidmap domains\fR\fR\fI = \fR\fI\FCdefault AD CORP\F[]\fR\fI \fR
 .RE
 
 winbind gid
@@ -4242,7 +3993,8 @@ idmap gid (G)
 The idmap gid parameter specifies the range of group ids that are allocated for the purpose of mapping UNX groups to NT group SIDs\&. This range of group ids should have no existing local or NIS groups within it as strange conflicts can occur otherwise\&.
 .sp
 See also the
-\m[blue]\fBidmap backend\fR\m[], and
+\m[blue]\fBidmap backend\fR\m[],
+\m[blue]\fBidmap domains\fR\m[], and
 \m[blue]\fBidmap config\fR\m[]
 options\&.
 .sp
@@ -4278,8 +4030,8 @@ idmap uid (G)
 The idmap uid parameter specifies the range of user ids that are allocated for use in mapping UNIX users to NT user SIDs\&. This range of ids should have no existing local or NIS users within it as strange conflicts can occur otherwise\&.
 .sp
 See also the
-\m[blue]\fBidmap backend\fR\m[]
-and
+\m[blue]\fBidmap backend\fR\m[],
+\m[blue]\fBidmap domains\fR\m[], and
 \m[blue]\fBidmap config\fR\m[]
 options\&.
 .sp
@@ -4301,14 +4053,6 @@ It takes the standard substitutions, except
 \fI%P\fR
 and
 \fI%S\fR\&.
-.sp
-The parameter
-\fIinclude = registry\fR
-has a special meaning: It does
-\fInot\fR
-include a file named
-\fIregistry\fR
-from the current working directory, but instead reads the global configuration options from the registry\&. See the section on registry\-based configuration for details\&. Note that this option automatically activates registry shares\&.
 .sp
 Default:
 \fI\fIinclude\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
@@ -4370,39 +4114,11 @@ Default:
 \fI\fIinherit permissions\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
-init logon delayed hosts (G)
-.\" init logon delayed hosts
-.PP
-.RS 4
-This parameter takes a list of host names, addresses or networks for which the initial samlogon reply should be delayed (so other DCs get preferred by XP workstations if there are any)\&.
-.sp
-The length of the delay can be specified with the
-\m[blue]\fBinit logon delay\fR\m[]
-parameter\&.
-.sp
-Default:
-\fI\fIinit logon delayed hosts\fR\fR\fI = \fR\fI\FC\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIinit logon delayed hosts\fR\fR\fI = \fR\fI\FC150\&.203\&.5\&. myhost\&.mynet\&.de\F[]\fR\fI \fR
-.RE
-
-init logon delay (G)
-.\" init logon delay
-.PP
-.RS 4
-This parameter specifies a delay in milliseconds for the hosts configured for delayed initial samlogon with
-\m[blue]\fBinit logon delayed hosts\fR\m[]\&.
-.sp
-Default:
-\fI\fIinit logon delay\fR\fR\fI = \fR\fI\FC100\F[]\fR\fI \fR
-.RE
-
 interfaces (G)
 .\" interfaces
 .PP
 .RS 4
-This option allows you to override the default network interfaces list that Samba will use for browsing, name registration and other NetBIOS over TCP/IP (NBT) traffic\&. By default Samba will query the kernel for the list of all active interfaces and use any interfaces except 127\&.0\&.0\&.1 that are broadcast capable\&.
+This option allows you to override the default network interfaces list that Samba will use for browsing, name registration and other NBT traffic\&. By default Samba will query the kernel for the list of all active interfaces and use any interfaces except 127\&.0\&.0\&.1 that are broadcast capable\&.
 .sp
 The option takes a list of interface strings\&. Each string can be in any of the following forms:
 .sp
@@ -4571,7 +4287,7 @@ This parameter determines whether or not
 \fBsmbd\fR(8)
 will attempt to authenticate users or permit password changes using the LANMAN password hash\&. If disabled, only clients which support NT password hashes (e\&.g\&. Windows NT/2000 clients, smbclient, but not Windows 95/98 or the MS DOS network client) will be able to connect to the Samba host\&.
 .sp
-The LANMAN encrypted response is easily broken, due to its case\-insensitive nature, and the choice of algorithm\&. Servers without Windows 95/98/ME or MS DOS clients are advised to disable this option\&.
+The LANMAN encrypted response is easily broken, due to it\'s case\-insensitive nature, and the choice of algorithm\&. Servers without Windows 95/98/ME or MS DOS clients are advised to disable this option\&.
 .sp
 Unlike the
 \FCencrypt passwords\F[]
@@ -4584,7 +4300,7 @@ If this option, and
 are both disabled, then only NTLMv2 logins will be permited\&. Not all clients support NTLMv2, and most will require special configuration to use it\&.
 .sp
 Default:
-\fI\fIlanman auth\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
+\fI\fIlanman auth\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
 .RE
 
 large readwrite (G)
@@ -4593,7 +4309,7 @@ large readwrite (G)
 .RS 4
 This parameter determines whether or not
 \fBsmbd\fR(8)
-supports the new 64k streaming read and write variant SMB requests introduced with Windows 2000\&. Note that due to Windows 2000 client redirector bugs this requires Samba to be running on a 64\-bit capable operating system such as IRIX, Solaris or a Linux 2\&.4 kernel\&. Can improve performance by 10% with Windows 2000 clients\&. Defaults to on\&. Not as tested as some other Samba code paths\&.
+supports the new 64k streaming read and write varient SMB requests introduced with Windows 2000\&. Note that due to Windows 2000 client redirector bugs this requires Samba to be running on a 64\-bit capable operating system such as IRIX, Solaris or a Linux 2\&.4 kernel\&. Can improve performance by 10% with Windows 2000 clients\&. Defaults to on\&. Not as tested as some other Samba code paths\&.
 .sp
 Default:
 \fI\fIlarge readwrite\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
@@ -4621,55 +4337,6 @@ is not appended to the
 \m[blue]\fBldap admin dn\fR\m[]\&.
 .sp
 \fINo default\fR
-.RE
-
-ldap connection timeout (G)
-.\" ldap connection timeout
-.PP
-.RS 4
-This parameter tells the LDAP library calls which timeout in seconds they should honor during initial connection establishments to LDAP servers\&. It is very useful in failover scenarios in particular\&. If one or more LDAP servers are not reachable at all, we do not have to wait until TCP timeouts are over\&. This feature must be supported by your LDAP library\&.
-.sp
-This parameter is different from
-\m[blue]\fBldap timeout\fR\m[]
-which affects operations on LDAP servers using an existing connection and not establishing an initial connection\&.
-.sp
-Default:
-\fI\fIldap connection timeout\fR\fR\fI = \fR\fI\FC2\F[]\fR\fI \fR
-.RE
-
-ldap debug level (G)
-.\" ldap debug level
-.PP
-.RS 4
-This parameter controls the debug level of the LDAP library calls\&. In the case of OpenLDAP, it is the same bit\-field as understood by the server and documented in the
-\fBslapd.conf\fR(5)
-manpage\&. A typical useful value will be
-\fI1\fR
-for tracing function calls\&.
-.sp
-The debug ouput from the LDAP libraries appears with the prefix [LDAP] in Samba\'s logging output\&. The level at which LDAP logging is printed is controlled by the parameter
-\fIldap debug threshold\fR\&.
-.sp
-Default:
-\fI\fIldap debug level\fR\fR\fI = \fR\fI\FC0\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIldap debug level\fR\fR\fI = \fR\fI\FC1\F[]\fR\fI \fR
-.RE
-
-ldap debug threshold (G)
-.\" ldap debug threshold
-.PP
-.RS 4
-This parameter controls the Samba debug level at which the ldap library debug output is printed in the Samba logs\&. See the description of
-\fIldap debug level\fR
-for details\&.
-.sp
-Default:
-\fI\fIldap debug threshold\fR\fR\fI = \fR\fI\FC10\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIldap debug threshold\fR\fR\fI = \fR\fI\FC5\F[]\fR\fI \fR
 .RE
 
 ldap delete dn (G)
@@ -4731,21 +4398,6 @@ Default:
 .sp
 Example:
 \fI\fIldap machine suffix\fR\fR\fI = \fR\fI\FCou=Computers\F[]\fR\fI \fR
-.RE
-
-ldap page size (G)
-.\" ldap page size
-.PP
-.RS 4
-This parameter specifies the number of entries per page\&.
-.sp
-If the LDAP server supports paged results, clients can request subsets of search results (pages) instead of the entire list\&. This parameter specifies the size of these pages\&.
-.sp
-Default:
-\fI\fIldap page size\fR\fR\fI = \fR\fI\FC1024\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIldap page size\fR\fR\fI = \fR\fI\FC512\F[]\fR\fI \fR
 .RE
 
 ldap passwd sync (G)
@@ -4869,7 +4521,7 @@ An example configuration can be the following:
 .RE
 .\}
 .sp
-This configuration assumes a directory layout like described in the following ldif:
+This configuration assume the ldap server have been loaded with a base tree like described in the following ldif:
 .sp
 .if n \{\
 .RS 4
@@ -4948,26 +4600,6 @@ Default:
 \fI\fIldapsam:trusted\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
-ldap ssl ads (G)
-.\" ldap ssl ads
-.PP
-.RS 4
-This option is used to define whether or not Samba should use SSL when connecting to the ldap server using
-\fIads\fR
-methods\&. Rpc methods are not affected by this parameter\&. Please note, that this parameter won\'t have any effect if
-\m[blue]\fBldap ssl\fR\m[]
-is set to
-\fIno\fR\&.
-.sp
-See
-smb\&.conf(5)
-for more information on
-\m[blue]\fBldap ssl\fR\m[]\&.
-.sp
-Default:
-\fI\fIldap ssl ads\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
-.RE
-
 ldap ssl (G)
 .\" ldap ssl
 .PP
@@ -4980,12 +4612,9 @@ option to the
 \FCconfigure\F[]
 script\&.
 .sp
-LDAP connections should be secured where possible\&. This may be done setting
-\fIeither\fR
-this parameter to
+LDAP connections should be secured where possible\&. This may be done setting either this parameter to
 \fIStart_tls\fR
-\fIor\fR
-by specifying
+or by specifying
 \fIldaps://\fR
 in the URL argument of
 \m[blue]\fBpassdb backend\fR\m[]\&.
@@ -5014,23 +4643,12 @@ can be set to one of two values:
 .sp -1
 .IP \(bu 2.3
 .\}
-\fIstart tls\fR
+\fIStart_tls\fR
 = Use the LDAPv3 StartTLS extended operation (RFC2830) for communicating with the directory server\&.
 .sp
 .RE
-Please note that this parameter does only affect
-\fIrpc\fR
-methods\&. To enable the LDAPv3 StartTLS extended operation (RFC2830) for
-\fIads\fR, set
-\m[blue]\fBldap ssl = yes\fR\m[]
-\fIand\fR
-\m[blue]\fBldap ssl ads = yes\fR\m[]\&. See
-smb\&.conf(5)
-for more information on
-\m[blue]\fBldap ssl ads\fR\m[]\&.
-.sp
 Default:
-\fI\fIldap ssl\fR\fR\fI = \fR\fI\FCstart tls\F[]\fR\fI \fR
+\fI\fIldap ssl\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
 ldap suffix (G)
@@ -5057,7 +4675,7 @@ ldap timeout (G)
 .\" ldap timeout
 .PP
 .RS 4
-This parameter defines the number of seconds that Samba should use as timeout for LDAP operations\&.
+When Samba connects to an ldap server that servermay be down or unreachable\&. To prevent Samba from hanging whilst waiting for the connection this parameter specifies in seconds how long Samba should wait before failing the connect\&. The default is to only wait fifteen seconds for the ldap server to respond to the connect request\&.
 .sp
 Default:
 \fI\fIldap timeout\fR\fR\fI = \fR\fI\FC15\F[]\fR\fI \fR
@@ -5210,8 +4828,6 @@ lock directory (G)
 This option specifies the directory where lock files will be placed\&. The lock files are used to implement the
 \m[blue]\fBmax connections\fR\m[]
 option\&.
-.sp
-Note: This option can not be set inside registry configurations\&.
 .sp
 Default:
 \fI\fIlock directory\fR\fR\fI = \fR\fI\FC${prefix}/var/locks\F[]\fR\fI \fR
@@ -6011,6 +5627,36 @@ Example:
 \fI\fImagic script\fR\fR\fI = \fR\fI\FCuser\&.csh\F[]\fR\fI \fR
 .RE
 
+mangled map (S)
+.\" mangled map
+.PP
+.RS 4
+This is for those who want to directly map UNIX file names which cannot be represented on Windows/DOS\&. The mangling of names is not always what is needed\&. In particular you may have documents with file extensions that differ between DOS and UNIX\&. For example, under UNIX it is common to use
+\FC\&.html\F[]
+for HTML files, whereas under Windows/DOS
+\FC\&.htm\F[]
+is more commonly used\&.
+.sp
+So to map
+\FChtml\F[]
+to
+\FChtm\F[]
+you would use:
+.sp
+
+\m[blue]\fBmangled map = (*\&.html *\&.htm)\fR\m[]\&.
+.sp
+One very useful case is to remove the annoying
+\FC;1\F[]
+off the ends of filenames on some CDROMs (only visible under some UNIXes)\&. To do this use a map of (*;1 *;)\&.
+.sp
+Default:
+\fI\fImangled map\fR\fR\fI = \fR\fI\FC # no mangled map\F[]\fR\fI \fR
+.sp
+Example:
+\fI\fImangled map\fR\fR\fI = \fR\fI\FC(*;1 *;)\F[]\fR\fI \fR
+.RE
+
 mangled names (S)
 .\" mangled names
 .PP
@@ -6187,7 +5833,7 @@ The three settings are :
 .\}
 
 \fBYes\fR
-\- The read only DOS attribute is mapped to the inverse of the user or owner write bit in the unix permission mode set\&. If the owner write bit is not set, the read only attribute is reported as being set on the file\&. If the read only DOS attribute is set, Samba sets the owner, group and others write bits to zero\&. Write bits set in an ACL are ignored by Samba\&. If the read only DOS attribute is unset, Samba simply sets the write bit of the owner to one\&.
+\- The read only DOS attribute is mapped to the inverse of the user or owner write bit in the unix permission mode set\&. If the owner write bit is not set, the read only attribute is reported as being set on the file\&.
 .RE
 .sp
 .RS 4
@@ -6776,22 +6422,6 @@ Example:
 \fI\fImin protocol\fR\fR\fI = \fR\fI\FCNT1\F[]\fR\fI \fR
 .RE
 
-min receivefile size (G)
-.\" min receivefile size
-.PP
-.RS 4
-This option changes the behavior of
-\fBsmbd\fR(8)
-when processing SMBwriteX calls\&. Any incoming SMBwriteX call on a non\-signed SMB/CIFS connection greater than this value will not be processed in the normal way but will be passed to any underlying kernel recvfile or splice system call (if there is no such call Samba will emulate in user space)\&. This allows zero\-copy writes directly from network socket buffers into the filesystem buffer cache, if available\&. It may improve performance but user testing is recommended\&. If set to zero Samba processes SMBwriteX calls in the normal way\&. To enable POSIX large write support (SMB/CIFS writes up to 16Mb) this option must be nonzero\&. The maximum value is 128k\&. Values greater than 128k will be silently set to 128k\&.
-.sp
-Note this option will have NO EFFECT if set on a SMB signed connection\&.
-.sp
-The default is zero, which diables this option\&.
-.sp
-Default:
-\fI\fImin receivefile size\fR\fR\fI = \fR\fI\FC0\F[]\fR\fI \fR
-.RE
-
 min wins ttl (G)
 .\" min wins ttl
 .PP
@@ -7011,7 +6641,7 @@ will attempt to authenticate users using the NTLM encrypted password response\&.
 .sp
 If this option, and
 \FClanman auth\F[]
-are both disabled, then only NTLMv2 logins will be permited\&. Not all clients support NTLMv2, and most will require special configuration to use it\&.
+are both disabled, then only NTLMv2 logins will be permited\&. Not all clients support NTLMv2, and most will require special configuration to us it\&.
 .sp
 Default:
 \fI\fIntlm auth\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
@@ -7091,6 +6721,19 @@ list will be just the service name, which for home directories is the name of th
 .sp
 Default:
 \fI\fIonly user\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
+.RE
+
+open files database hash size (G)
+.\" open files database hash size
+.PP
+.RS 4
+This parameter was added in Samba 3\&.0\&.23\&. This is an internal tuning parameter that sets the hash size of the tdb used for the open file databases\&. The presence of this parameter allows tuning of the system for very large (thousands of concurrent users) Samba setups\&. The default setting of this parameter should be sufficient for most normal environments\&. It is advised not to change this parameter unless advised to by a Samba Team member\&.
+.sp
+Default:
+\fI\fIopen files database hash size\fR\fR\fI = \fR\fI\FC10007\F[]\fR\fI \fR
+.sp
+Example:
+\fI\fIopen files database hash size\fR\fR\fI = \fR\fI\FC1338457\F[]\fR\fI \fR
 .RE
 
 oplock break wait time (G)
@@ -7412,7 +7055,7 @@ and what to expect back\&. If the expected output is not received then the passw
 .sp
 This chat sequence is often quite site specific, depending on what local methods are used for password control (such as NIS etc)\&.
 .sp
-Note that this parameter only is used if the
+Note that this parameter only is only used if the
 \m[blue]\fBunix password sync\fR\m[]
 parameter is set to
 \fByes\fR\&. This sequence is then called
@@ -7524,7 +7167,7 @@ password server (G)
 .RS 4
 By specifying the name of another SMB server or Active Directory domain controller with this option, and using
 \FCsecurity = [ads|domain|server]\F[]
-it is possible to get Samba to do all its username/password validation using a specific remote server\&.
+it is possible to get Samba to to do all its username/password validation using a specific remote server\&.
 .sp
 This option sets the name or IP address of the password server to use\&. New syntax has been added to support defining the port to use when connecting to the server the case of an ADS realm\&. To define a port other than the default LDAP port of 389, add the port number using a colon after the name or IP address (e\&.g\&. 192\&.168\&.1\&.100:389)\&. If you do not specify a port, Samba will use the standard LDAP port of tcp/389\&. Note that port numbers have no effect on password servers for Windows NT 4\&.0 domains or netbios connections\&.
 .sp
@@ -8207,6 +7850,19 @@ Example:
 \fI\fIqueueresume command\fR\fR\fI = \fR\fI\FCenable %p\F[]\fR\fI \fR
 .RE
 
+read bmpx (G)
+.\" read bmpx
+.PP
+.RS 4
+This boolean parameter controls whether
+\fBsmbd\fR(8)
+will support the "Read Block Multiplex" SMB\&. This is now rarely used and defaults to
+\fBno\fR\&. You should never need to set this parameter\&.
+.sp
+Default:
+\fI\fIread bmpx\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
+.RE
+
 read list (S)
 .\" read list
 .PP
@@ -8276,36 +7932,12 @@ Example:
 \fI\fIrealm\fR\fR\fI = \fR\fI\FCmysambabox\&.mycompany\&.com\F[]\fR\fI \fR
 .RE
 
-registry shares (G)
-.\" registry shares
-.PP
-.RS 4
-This turns on or off support for share definitions read from registry\&. Shares defined in
-\fIsmb\&.conf\fR
-take precedence over shares with the same name defined in registry\&. See the section on registry\-based configuration for details\&.
-.sp
-Note that this parameter defaults to
-\fIno\fR, but it is set to
-\fIyes\fR
-when
-\fIconfig backend\fR
-is set to
-\fIregistry\fR\&.
-.sp
-Default:
-\fI\fIregistry shares\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
-.sp
-Example:
-\fI\fIregistry shares\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
-.RE
-
 remote announce (G)
 .\" remote announce
 .PP
 .RS 4
 This option allows you to setup
-\fBnmbd\fR(8)
-to periodically announce itself to arbitrary IP addresses with an arbitrary workgroup name\&.
+\fBnmbd\fR(8)to periodically announce itself to arbitrary IP addresses with an arbitrary workgroup name\&.
 .sp
 This is useful if you want your Samba server to appear in a remote workgroup for which the normal browse propagation rules don\'t work\&. The remote workgroup can be anywhere that you can send IP packets to\&.
 .sp
@@ -8337,7 +7969,7 @@ For example:
 .sp
 the above line would cause
 \FCnmbd\F[]
-to announce itself to the two given IP addresses using the given workgroup names\&. If you leave out the workgroup name, then the one given in the
+to announce itself to the two given IP addresses using the given workgroup names\&. If you leave out the workgroup name then the one given in the
 \m[blue]\fBworkgroup\fR\m[]
 parameter is used instead\&.
 .sp
@@ -8639,8 +8271,7 @@ You should also use
 \FCsecurity = share\F[]
 if you want to mainly setup shares without a password (guest shares)\&. This is commonly used for a shared printer server\&. It is more difficult to setup guest shares with
 \FCsecurity = user\F[], see the
-\m[blue]\fBmap to guest\fR\m[]
-parameter for details\&.
+\m[blue]\fBmap to guest\fR\m[]parameter for details\&.
 .sp
 It is possible to use
 \FCsmbd\F[]
@@ -8653,7 +8284,7 @@ The different settings will now be explained\&.
 .sp
 \fISECURITY = SHARE\fR
 .sp
-When clients connect to a share level security server, they need not log onto the server with a valid username and password before attempting to connect to a shared resource (although modern clients such as Windows 95/98 and Windows NT will send a logon request with a username but no password when talking to a
+When clients connect to a share level security server they need not log onto the server with a valid username and password before attempting to connect to a shared resource (although modern clients such as Windows 95/98 and Windows NT will send a logon request with a username but no password when talking to a
 \FCsecurity = share \F[]
 server)\&. Instead, the clients send authentication information (passwords) on a per\-share basis, at the time they attempt to connect to that share\&.
 .sp
@@ -8858,7 +8489,7 @@ This mode of operation has significant pitfalls since it is more vulnerable to m
 \fBNote\fR
 .ps -1
 .br
-From the client\'s point of view,
+From the client\'s point of view
 \FCsecurity = server\F[]
 is the same as
 \FCsecurity = user\F[]\&. It only affects how the server deals with the authentication, it does not in any way affect what the client sees\&.
@@ -8910,7 +8541,8 @@ offers the schannel but does not enforce it, and
 denies access if the client is not able to speak netlogon schannel\&. This is only the case for Windows NT4 before SP4\&.
 .sp
 Please note that with this set to
-\FCno\F[], you will have to apply the WindowsXP
+\FCno\F[]
+you will have to apply the WindowsXP
 \FCWinXP_SignOrSeal\&.reg\F[]
 registry patch found in the docs/registry subdirectory of the Samba distribution tarball\&.
 .sp
@@ -8925,7 +8557,7 @@ server signing (G)
 .\" server signing
 .PP
 .RS 4
-This controls whether the client is allowed or required to use SMB signing\&. Possible values are
+This controls whether the server offers or requires the client it talks to to use SMB signing\&. Possible values are
 \fIauto\fR,
 \fImandatory\fR
 and
@@ -9162,13 +8794,18 @@ This enables or disables the honoring of the
 \fIshare modes\fR
 during a file open\&. These modes are used by clients to gain exclusive read or write access to a file\&.
 .sp
-This is a deprecated option from old versions of Samba, and will be removed in the next major release\&.
+These open modes are not directly supported by UNIX, so they are simulated using shared memory, or lock files if your UNIX doesn\'t support shared memory (almost all do)\&.
 .sp
-These open modes are not directly supported by UNIX, so they are simulated using shared memory\&.
+The share modes that are enabled by this option are
+\fBDENY_DOS\fR,
+\fBDENY_ALL\fR,
+\fBDENY_READ\fR,
+\fBDENY_WRITE\fR,
+\fBDENY_NONE\fR
+and
+\fBDENY_FCB\fR\&.
 .sp
-The share modes that are enabled by this option are the standard Windows share modes\&.
-.sp
-This option gives full share compatibility and is enabled by default\&.
+This option gives full share compatibility and enabled by default\&.
 .sp
 You should
 \fINEVER\fR
@@ -9237,7 +8874,7 @@ This a full path name to a script called by
 that should start a shutdown procedure\&.
 .sp
 If the connected user posseses the
-\fBSeRemoteShutdownPrivilege\fR, right, this command will be run as root\&.
+\fBSeRemoteShutdownPrivilege\fR, right, this command will be run as user\&.
 .sp
 The %z %t %r %f variables are expanded as follows:
 .sp
@@ -9306,13 +8943,12 @@ Shutdown script example:
 .sp -1
 
 #!/bin/bash
-
-time=$2
-let time="${time} / 60"
-let time="${time} + 1"
+		
+$time=0
+let "time/60"
+let "time++"
 
 /sbin/shutdown $3 $4 +$time $1 &
-
 .EB lightgray adjust-for-leading-newline
 .if t \{\
 .sp 1
@@ -9331,30 +8967,6 @@ Default:
 .sp
 Example:
 \fI\fIshutdown script\fR\fR\fI = \fR\fI\FC/usr/local/samba/sbin/shutdown %m %t %r %f\F[]\fR\fI \fR
-.RE
-
-smb encrypt (S)
-.\" smb encrypt
-.PP
-.RS 4
-This is a new feature introduced with Samba 3\&.2 and above\&. It is an extension to the SMB/CIFS protocol negotiated as part of the UNIX extensions\&. SMB encryption uses the GSSAPI (SSPI on Windows) ability to encrypt and sign every request/response in a SMB protocol stream\&. When enabled it provides a secure method of SMB/CIFS communication, similar to an ssh protected session, but using SMB/CIFS authentication to negotiate encryption and signing keys\&. Currently this is only supported by Samba 3\&.2 smbclient, and hopefully soon Linux CIFSFS and MacOS/X clients\&. Windows clients do not support this feature\&.
-.sp
-This controls whether the remote client is allowed or required to use SMB encryption\&. Possible values are
-\fIauto\fR,
-\fImandatory\fR
-and
-\fIdisabled\fR\&. This may be set on a per\-share basis, but clients may chose to encrypt the entire session, not just traffic to a specific share\&. If this is set to mandatory then all traffic to a share
-\fImust\fR
-must be encrypted once the connection has been made to the share\&. The server would return "access denied" to all non\-encrypted requests on such a share\&. Selecting encrypted traffic reduces throughput as smaller packet sizes must be used (no huge UNIX style read/writes allowed) as well as the overhead of encrypting and signing all the data\&.
-.sp
-If SMB encryption is selected, Windows style SMB signing (see the
-\m[blue]\fBserver signing\fR\m[]
-option) is no longer necessary, as the GSSAPI flags use select both signing and sealing of the data\&.
-.sp
-When set to auto, SMB encryption is offered, but not enforced\&. When set to mandatory, SMB encryption is required and if set to disabled, SMB encryption can not be negotiated\&.
-.sp
-Default:
-\fI\fIsmb encrypt\fR\fR\fI = \fR\fI\FCauto\F[]\fR\fI \fR
 .RE
 
 smb passwd file (G)
@@ -9633,7 +9245,7 @@ strict locking (S)
 This is an enumerated type that controls the handling of file locking in the server\&. When this is set to
 \fByes\fR, the server will check every read and write access for file locks, and deny access if locks exist\&. This can be slow on some systems\&.
 .sp
-When strict locking is set to Auto (the default), the server performs file lock checks only on non\-oplocked files\&. As most Windows redirectors perform file locking checks locally on oplocked files this is a good trade off for improved performance\&.
+When strict locking is set to Auto (the default), the server performs file lock checks only on non\-oplocked files\&. As most Windows redirectors perform file locking checks locally on oplocked files this is a good trade off for inproved performance\&.
 .sp
 When strict locking is disabled, the server performs file lock checks only when the client explicitly asks for them\&.
 .sp
@@ -9801,11 +9413,7 @@ unix extensions (G)
 .\" unix extensions
 .PP
 .RS 4
-This boolean parameter controls whether Samba implements the CIFS UNIX extensions, as defined by HP\&. These extensions enable Samba to better serve UNIX CIFS clients by supporting features such as symbolic links, hard links, etc\&.\&.\&. These extensions require a similarly enabled client, and are of no current use to Windows clients\&.
-.sp
-Note if this parameter is turned on, the
-\m[blue]\fBwide links\fR\m[]
-parameter will automatically be disabled\&.
+This boolean parameter controls whether Samba implments the CIFS UNIX extensions, as defined by HP\&. These extensions enable Samba to better serve UNIX CIFS clients by supporting features such as symbolic links, hard links, etc\&.\&.\&. These extensions require a similarly enabled client, and are of no current use to Windows clients\&.
 .sp
 Default:
 \fI\fIunix extensions\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
@@ -9831,7 +9439,7 @@ update encrypted (G)
 .\" update encrypted
 .PP
 .RS 4
-This boolean parameter allows a user logging on with a plaintext password to have their encrypted (hashed) password in the smbpasswd file to be updated automatically as they log on\&. This option allows a site to migrate from plaintext password authentication (users authenticate with plaintext password over the wire, and are checked against a UNIX account database) to encrypted password authentication (the SMB challenge/response authentication mechanism) without forcing all users to re\-enter their passwords via smbpasswd at the time the change is made\&. This is a convenience option to allow the change over to encrypted passwords to be made over a longer period\&. Once all users have encrypted representations of their passwords in the smbpasswd file this parameter should be set to
+This boolean parameter allows a user logging on with a plaintext password to have their encrypted (hashed) password in the smbpasswd file to be updated automatically as they log on\&. This option allows a site to migrate from plaintext password authentication (users authenticate with plaintext password over the wire, and are checked against a UNIX account atabase) to encrypted password authentication (the SMB challenge/response authentication mechanism) without forcing all users to re\-enter their passwords via smbpasswd at the time the change is made\&. This is a convenience option to allow the change over to encrypted passwords to be made over a longer period\&. Once all users have encrypted representations of their passwords in the smbpasswd file this parameter should be set to
 \fBno\fR\&.
 .sp
 In order for this parameter to be operative the
@@ -9844,7 +9452,7 @@ for this
 \m[blue]\fBupdate encrypted\fR\m[]
 to work\&.
 .sp
-Note that even when this parameter is set, a user authenticating to
+Note that even when this parameter is set a user authenticating to
 \FCsmbd\F[]
 must still enter a valid password in order to connect correctly, and to update their hashed (smbpasswd) passwords\&.
 .sp
@@ -9862,7 +9470,7 @@ This parameter applies only to Windows NT/2000 clients\&. It has no effect on Wi
 The differentiating factor is that under normal circumstances, the NT/2000 client will attempt to open the network printer using MS\-RPC\&. The problem is that because the client considers the printer to be local, it will attempt to issue the OpenPrinterEx() call requesting access rights associated with the logged on user\&. If the user possesses local administator rights but not root privilege on the Samba host (often the case), the OpenPrinterEx() call will fail\&. The result is that the client will now display an "Access Denied; Unable to connect" message in the printer queue window (even though jobs may successfully be printed)\&.
 .sp
 If this parameter is enabled for a printer, then any attempt to open the printer with the PRINTER_ACCESS_ADMINISTER right is mapped to PRINTER_ACCESS_USE instead\&. Thus allowing the OpenPrinterEx() call to succeed\&.
-\fIThis parameter MUST not be enabled on a print share which has valid print driver installed on the Samba server\&.\fR
+\fIThis parameter MUST not be able enabled on a print share which has valid print driver installed on the Samba server\&.\fR
 .sp
 Default:
 \fI\fIuse client driver\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
@@ -10210,7 +9818,7 @@ usershare allow guests (G)
 .RS 4
 This parameter controls whether user defined shares are allowed to be accessed by non\-authenticated users or not\&. It is the equivalent of allowing people who can create a share the option of setting
 \fIguest ok = yes\fR
-in a share definition\&. Due to its security sensitive nature, the default is set to off\&.
+in a share definition\&. Due to the security sensitive nature of this the default is set to off\&.
 .sp
 Default:
 \fI\fIusershare allow guests\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
@@ -10282,7 +9890,7 @@ usershare prefix allow list (G)
 .\" usershare prefix allow list
 .PP
 .RS 4
-This parameter specifies a list of absolute pathnames the root of which are allowed to be exported by user defined share definitions\&. If the pathname to be exported doesn\'t start with one of the strings in this list, the user defined share will not be allowed\&. This allows the Samba administrator to restrict the directories on the system that can be exported by user defined shares\&.
+This parameter specifies a list of absolute pathnames the root of which are allowed to be exported by user defined share definitions\&. If the pathname exported doesn\'t start with one of the strings in this list the user defined share will not be allowed\&. This allows the Samba administrator to restrict the directories on the system that can be exported by user defined shares\&.
 .sp
 If there is a "usershare prefix deny list" and also a "usershare prefix allow list" the deny list is processed first, followed by the allow list, thus leading to the most restrictive interpretation\&.
 .sp
@@ -10312,7 +9920,7 @@ usershare template share (G)
 .\" usershare template share
 .PP
 .RS 4
-User defined shares only have limited possible parameters such as path, guest ok, etc\&. This parameter allows usershares to "cloned" from an existing share\&. If "usershare template share" is set to the name of an existing share, then all usershares created have their defaults set from the parameters set on this share\&.
+User defined shares only have limited possible parameters such as path, guest ok etc\&. This parameter allows usershares to "cloned" from an existing share\&. If "usershare template share" is set to the name of an existing share, then all usershares created have their defaults set from the parameters set on this share\&.
 .sp
 The target share may be set to be invalid for real file sharing by setting the parameter "\-valid = False" on the template share definition\&. This causes it not to be seen as a real exported share but to be able to be used as a template for usershares\&.
 .sp
@@ -10553,12 +10161,10 @@ wide links (S)
 .RS 4
 This parameter controls whether or not links in the UNIX file system may be followed by the server\&. Links that point to areas within the directory tree exported by the server are always allowed; this parameter controls access only to areas that are outside the directory tree being exported\&.
 .sp
-Note: Turning this parameter on when UNIX extensions are enabled will allow UNIX clients to create symbolic links on the share that can point to files or directories outside restricted path exported by the share definition\&. This can cause access to areas outside of the share\&. Due to this problem, this parameter will be automatically disabled (with a message in the log file) if the
-\m[blue]\fBunix extensions\fR\m[]
-option is on\&.
+Note that setting this parameter can have a negative effect on your server performance due to the extra system calls that Samba has to do in order to perform the link checks\&.
 .sp
 Default:
-\fI\fIwide links\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
+\fI\fIwide links\fR\fR\fI = \fR\fI\FCyes\F[]\fR\fI \fR
 .RE
 
 winbind cache time (G)
@@ -10653,20 +10259,6 @@ Default:
 \fI\fIwinbind enum users\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
-winbind expand groups (G)
-.\" winbind expand groups
-.PP
-.RS 4
-This option controls the maximum depth that winbindd will traverse when flattening nested group memberships of Windows domain groups\&. This is different from the
-\m[blue]\fBwinbind nested groups\fR\m[]
-option which implements the Windows NT4 model of local group nesting\&. The "winbind expand groups" parameter specifically applies to the membership of domain groups\&.
-.sp
-Be aware that a high value for this parameter can result in system slowdown as the main parent winbindd daemon must perform the group unrolling and will be unable to answer incoming NSS or authentication requests during this time\&.
-.sp
-Default:
-\fI\fIwinbind expand groups\fR\fR\fI = \fR\fI\FC1\F[]\fR\fI \fR
-.RE
-
 winbind nested groups (G)
 .\" winbind nested groups
 .PP
@@ -10681,9 +10273,7 @@ winbind normalize names (G)
 .\" winbind normalize names
 .PP
 .RS 4
-This parameter controls whether winbindd will replace whitespace in user and group names with an underscore (_) character\&. For example, whether the name "Space Kadet" should be replaced with the string "space_kadet"\&. Frequently Unix shell scripts will have difficulty with usernames contains whitespace due to the default field separator in the shell\&. If your domain possesses names containing the underscore character, this option may cause problems unless the name aliasing feature is supported by your nss_info plugin\&.
-.sp
-This feature also enables the name aliasing API which can be used to make domain user and group names to a non\-qualified version\&. Please refer to the manpage for the configured idmap and nss_info plugin for the specifics on how to configure name aliasing for a specific configuration\&. Name aliasing takes precedence (and is mutually exclusive) over the whitespace replacement mechanism discussed previsouly\&.
+This parameter controls whether winbindd will replace whitespace in user and group names with an underscore (_) character\&. For example, whether the name "Space Kadet" should be replaced with the string "space_kadet"\&. Frequently Unix shell scripts will have difficulty with usernames contains whitespace due to the default field separator in the shell\&. Do not enable this option if the underscore character is used in account names within your domain
 .sp
 Default:
 \fI\fIwinbind normalize names\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
@@ -10752,18 +10342,6 @@ Example:
 \fI\fIwinbind offline logon\fR\fR\fI = \fR\fI\FCtrue\F[]\fR\fI \fR
 .RE
 
-winbind reconnect delay (G)
-.\" winbind reconnect delay
-.PP
-.RS 4
-This parameter specifies the number of seconds the
-\fBwinbindd\fR(8)
-daemon will wait between attempts to contact a Domain controller for a domain that is determined to be down or not contactable\&.
-.sp
-Default:
-\fI\fIwinbind reconnect delay\fR\fR\fI = \fR\fI\FC30\F[]\fR\fI \fR
-.RE
-
 winbind refresh tickets (G)
 .\" winbind refresh tickets
 .PP
@@ -10777,18 +10355,6 @@ Default:
 .sp
 Example:
 \fI\fIwinbind refresh tickets\fR\fR\fI = \fR\fI\FCtrue\F[]\fR\fI \fR
-.RE
-
-winbind rpc only (G)
-.\" winbind rpc only
-.PP
-.RS 4
-Setting this parameter to
-\FCyes\F[]
-forces winbindd to use RPC instead of LDAP to retrieve information from Domain Controllers\&.
-.sp
-Default:
-\fI\fIwinbind rpc only\fR\fR\fI = \fR\fI\FCno\F[]\fR\fI \fR
 .RE
 
 winbind separator (G)
@@ -10820,6 +10386,8 @@ This parameter is designed to allow Samba servers that are members of a Samba co
 would be mapped to the account user1 in /etc/passwd instead of allocating a new uid for him or her\&.
 .sp
 This parameter is now deprecated in favor of the newer idmap_nss backend\&. Refer to the
+\m[blue]\fBidmap domains\fR\m[]
+smb\&.conf option and the
 \fBidmap_nss\fR(8)
 man page for more information\&.
 .sp
@@ -11104,7 +10672,7 @@ and
 special sections make life for an administrator easy, but the various combinations of default attributes can be tricky\&. Take extreme care when designing these sections\&. In particular, ensure that the permissions on spool directories are correct\&.
 .SH "VERSION"
 .PP
-This man page is correct for version 3 of the Samba suite\&.
+This man page is correct for version 3\&.0 of the Samba suite\&.
 .SH "SEE ALSO"
 .PP
 

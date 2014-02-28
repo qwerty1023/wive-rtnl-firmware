@@ -5,7 +5,7 @@
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -14,14 +14,12 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.  
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  
  */
 
 #include "includes.h"
 #include "regfio.h"
-
-#undef DBGC_CLASS
-#define DBGC_CLASS DBGC_REGISTRY
 
 /*******************************************************************
  *
@@ -46,19 +44,19 @@ static int write_block( REGF_FILE *file, prs_struct *ps, uint32 offset )
 	/* check for end of file */
 
 	if ( sys_fstat( file->fd, &sbuf ) ) {
-		DEBUG(1,("write_block: stat() failed! (%s)\n", strerror(errno)));
+		DEBUG(0,("write_block: stat() failed! (%s)\n", strerror(errno)));
 		return -1;
 	}
 
 	if ( lseek( file->fd, offset, SEEK_SET ) == -1 ) {
-		DEBUG(1,("write_block: lseek() failed! (%s)\n", strerror(errno) ));
+		DEBUG(0,("write_block: lseek() failed! (%s)\n", strerror(errno) ));
 		return -1;
 	}
 	
 	bytes_written = returned = 0;
 	while ( bytes_written < buffer_size ) {
 		if ( (returned = write( file->fd, buffer+bytes_written, buffer_size-bytes_written )) == -1 ) {
-			DEBUG(1,("write_block: write() failed! (%s)\n", strerror(errno) ));
+			DEBUG(0,("write_block: write() failed! (%s)\n", strerror(errno) ));
 			return False;
 		}
 				
@@ -80,7 +78,7 @@ static int read_block( REGF_FILE *file, prs_struct *ps, uint32 file_offset, uint
 	/* check for end of file */
 
 	if ( sys_fstat( file->fd, &sbuf ) ) {
-		DEBUG(1,("read_block: stat() failed! (%s)\n", strerror(errno)));
+		DEBUG(0,("read_block: stat() failed! (%s)\n", strerror(errno)));
 		return -1;
 	}
 
@@ -94,20 +92,20 @@ static int read_block( REGF_FILE *file, prs_struct *ps, uint32 file_offset, uint
 		char hdr[0x20];
 
 		if ( lseek( file->fd, file_offset, SEEK_SET ) == -1 ) {
-			DEBUG(1,("read_block: lseek() failed! (%s)\n", strerror(errno) ));
+			DEBUG(0,("read_block: lseek() failed! (%s)\n", strerror(errno) ));
 			return -1;
 		}
 
 		returned = read( file->fd, hdr, 0x20 );
 		if ( (returned == -1) || (returned < 0x20) ) {
-			DEBUG(1,("read_block: failed to read in HBIN header. Is the file corrupt?\n"));
+			DEBUG(0,("read_block: failed to read in HBIN header. Is the file corrupt?\n"));
 			return -1;
 		}
 
 		/* make sure this is an hbin header */
 
 		if ( strncmp( hdr, "hbin", HBIN_HDR_SIZE ) != 0 ) {
-			DEBUG(1,("read_block: invalid block header!\n"));
+			DEBUG(0,("read_block: invalid block header!\n"));
 			return -1;
 		}
 
@@ -119,24 +117,21 @@ static int read_block( REGF_FILE *file, prs_struct *ps, uint32 file_offset, uint
 	/* set the offset, initialize the buffer, and read the block from disk */
 
 	if ( lseek( file->fd, file_offset, SEEK_SET ) == -1 ) {
-		DEBUG(1,("read_block: lseek() failed! (%s)\n", strerror(errno) ));
+		DEBUG(0,("read_block: lseek() failed! (%s)\n", strerror(errno) ));
 		return -1;
 	}
 	
-	if (!prs_init( ps, block_size, file->mem_ctx, UNMARSHALL )) {
-		DEBUG(1,("read_block: prs_init() failed! (%s)\n", strerror(errno) ));
-		return -1;
-	}
+	prs_init( ps, block_size, file->mem_ctx, UNMARSHALL );
 	buffer = prs_data_p( ps );
 	bytes_read = returned = 0;
 
 	while ( bytes_read < block_size ) {
 		if ( (returned = read( file->fd, buffer+bytes_read, block_size-bytes_read )) == -1 ) {
-			DEBUG(1,("read_block: read() failed (%s)\n", strerror(errno) ));
+			DEBUG(0,("read_block: read() failed (%s)\n", strerror(errno) ));
 			return False;
 		}
 		if ( (returned == 0) && (bytes_read < block_size) ) {
-			DEBUG(1,("read_block: not a vald registry file ?\n" ));
+			DEBUG(0,("read_block: not a vald registry file ?\n" ));
 			return False;
 		}	
 		
@@ -149,7 +144,7 @@ static int read_block( REGF_FILE *file, prs_struct *ps, uint32 file_offset, uint
 /*******************************************************************
 *******************************************************************/
 
-static bool write_hbin_block( REGF_FILE *file, REGF_HBIN *hbin )
+static BOOL write_hbin_block( REGF_FILE *file, REGF_HBIN *hbin )
 {
 	if ( !hbin->dirty )
 		return True;
@@ -175,7 +170,7 @@ static bool write_hbin_block( REGF_FILE *file, REGF_HBIN *hbin )
 /*******************************************************************
 *******************************************************************/
 
-static bool hbin_block_close( REGF_FILE *file, REGF_HBIN *hbin )
+static BOOL hbin_block_close( REGF_FILE *file, REGF_HBIN *hbin )
 {
 	REGF_HBIN *p;
 
@@ -188,7 +183,7 @@ static bool hbin_block_close( REGF_FILE *file, REGF_HBIN *hbin )
 		DLIST_REMOVE( file->block_list, hbin );
 	}
 	else
-		DEBUG(1,("hbin_block_close: block not in open list!\n"));
+		DEBUG(0,("hbin_block_close: block not in open list!\n"));
 
 	if ( !write_hbin_block( file, hbin ) )
 		return False;
@@ -199,7 +194,7 @@ static bool hbin_block_close( REGF_FILE *file, REGF_HBIN *hbin )
 /*******************************************************************
 *******************************************************************/
 
-static bool prs_regf_block( const char *desc, prs_struct *ps, int depth, REGF_FILE *file )
+static BOOL prs_regf_block( const char *desc, prs_struct *ps, int depth, REGF_FILE *file )
 {
 	prs_debug(ps, depth, desc, "prs_regf_block");
 	depth++;
@@ -259,7 +254,7 @@ static bool prs_regf_block( const char *desc, prs_struct *ps, int depth, REGF_FI
 /*******************************************************************
 *******************************************************************/
 
-static bool prs_hbin_block( const char *desc, prs_struct *ps, int depth, REGF_HBIN *hbin )
+static BOOL prs_hbin_block( const char *desc, prs_struct *ps, int depth, REGF_HBIN *hbin )
 {
 	uint32 block_size2;
 
@@ -294,7 +289,7 @@ static bool prs_hbin_block( const char *desc, prs_struct *ps, int depth, REGF_HB
 /*******************************************************************
 *******************************************************************/
 
-static bool prs_nk_rec( const char *desc, prs_struct *ps, int depth, REGF_NK_REC *nk )
+static BOOL prs_nk_rec( const char *desc, prs_struct *ps, int depth, REGF_NK_REC *nk )
 {
 	uint16 class_length, name_length;
 	uint32 start;
@@ -421,7 +416,7 @@ static uint32 regf_block_checksum( prs_struct *ps )
 /*******************************************************************
 *******************************************************************/
 
-static bool read_regf_block( REGF_FILE *file )
+static BOOL read_regf_block( REGF_FILE *file )
 {
 	prs_struct ps;
 	uint32 checksum;
@@ -441,7 +436,7 @@ static bool read_regf_block( REGF_FILE *file )
 	prs_mem_free( &ps );
 	
 	if ( file->checksum !=  checksum ) {
-		DEBUG(1,("read_regf_block: invalid checksum\n" ));
+		DEBUG(0,("read_regf_block: invalid checksum\n" ));
 		return False;
 	}
 
@@ -542,7 +537,7 @@ static REGF_HBIN* read_hbin_block( REGF_FILE *file, off_t offset )
  block for it
 *******************************************************************/
 
-static bool hbin_contains_offset( REGF_HBIN *hbin, uint32 offset )
+static BOOL hbin_contains_offset( REGF_HBIN *hbin, uint32 offset )
 {
 	if ( !hbin )
 		return False;
@@ -597,7 +592,7 @@ static REGF_HBIN* lookup_hbin_block( REGF_FILE *file, uint32 offset )
 /*******************************************************************
 *******************************************************************/
 
-static bool prs_hash_rec( const char *desc, prs_struct *ps, int depth, REGF_HASH_REC *hash )
+static BOOL prs_hash_rec( const char *desc, prs_struct *ps, int depth, REGF_HASH_REC *hash )
 {
 	prs_debug(ps, depth, desc, "prs_hash_rec");
 	depth++;
@@ -613,7 +608,7 @@ static bool prs_hash_rec( const char *desc, prs_struct *ps, int depth, REGF_HASH
 /*******************************************************************
 *******************************************************************/
 
-static bool hbin_prs_lf_records( const char *desc, REGF_HBIN *hbin, int depth, REGF_NK_REC *nk )
+static BOOL hbin_prs_lf_records( const char *desc, REGF_HBIN *hbin, int depth, REGF_NK_REC *nk )
 {
 	int i;
 	REGF_LF_REC *lf = &nk->subkeys;
@@ -677,7 +672,7 @@ static bool hbin_prs_lf_records( const char *desc, REGF_HBIN *hbin, int depth, R
 /*******************************************************************
 *******************************************************************/
 
-static bool hbin_prs_sk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_SK_REC *sk )
+static BOOL hbin_prs_sk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_SK_REC *sk )
 {
 	prs_struct *ps = &hbin->ps;
 	uint16 tag = 0xFFFF;
@@ -732,7 +727,7 @@ static bool hbin_prs_sk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_
 /*******************************************************************
 *******************************************************************/
 
-static bool hbin_prs_vk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_VK_REC *vk, REGF_FILE *file )
+static BOOL hbin_prs_vk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_VK_REC *vk, REGF_FILE *file )
 {
 	uint32 offset;
 	uint16 name_length;
@@ -788,7 +783,7 @@ static bool hbin_prs_vk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_
 	/* get the data if necessary */
 
 	if ( vk->data_size != 0 ) {
-		bool charmode = False;
+		BOOL charmode = False;
 
 		if ( (vk->type == REG_SZ) || (vk->type == REG_MULTI_SZ) )
 			charmode = True;
@@ -849,7 +844,7 @@ static bool hbin_prs_vk_rec( const char *desc, REGF_HBIN *hbin, int depth, REGF_
  in the prs_struct *ps.
 *******************************************************************/
 
-static bool hbin_prs_vk_records( const char *desc, REGF_HBIN *hbin, int depth, REGF_NK_REC *nk, REGF_FILE *file )
+static BOOL hbin_prs_vk_records( const char *desc, REGF_HBIN *hbin, int depth, REGF_NK_REC *nk, REGF_FILE *file )
 {
 	int i;
 	uint32 record_size;
@@ -892,7 +887,7 @@ static bool hbin_prs_vk_records( const char *desc, REGF_HBIN *hbin, int depth, R
 		if ( !hbin_contains_offset( hbin, nk->values[i].rec_off ) ) {
 			sub_hbin = lookup_hbin_block( file, nk->values[i].rec_off );
 			if ( !sub_hbin ) {
-				DEBUG(1,("hbin_prs_vk_records: Failed to find HBIN block containing offset [0x%x]\n", 
+				DEBUG(0,("hbin_prs_vk_records: Failed to find HBIN block containing offset [0x%x]\n", 
 					nk->values[i].hbin_off));
 				return False;
 			}
@@ -948,7 +943,7 @@ static REGF_SK_REC* find_sk_record_by_sec_desc( REGF_FILE *file, SEC_DESC *sd )
 /*******************************************************************
 *******************************************************************/
 
-static bool hbin_prs_key( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk )
+static BOOL hbin_prs_key( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk )
 {
 	int depth = 0;
 	REGF_HBIN *sub_hbin;
@@ -968,7 +963,7 @@ static bool hbin_prs_key( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk )
 		if ( !hbin_contains_offset( hbin, nk->values_off ) ) {
 			sub_hbin = lookup_hbin_block( file, nk->values_off );
 			if ( !sub_hbin ) {
-				DEBUG(1,("hbin_prs_key: Failed to find HBIN block containing value_list_offset [0x%x]\n", 
+				DEBUG(0,("hbin_prs_key: Failed to find HBIN block containing value_list_offset [0x%x]\n", 
 					nk->values_off));
 				return False;
 			}
@@ -985,7 +980,7 @@ static bool hbin_prs_key( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk )
 		if ( !hbin_contains_offset( hbin, nk->subkeys_off ) ) {
 			sub_hbin = lookup_hbin_block( file, nk->subkeys_off );
 			if ( !sub_hbin ) {
-				DEBUG(1,("hbin_prs_key: Failed to find HBIN block containing subkey_offset [0x%x]\n", 
+				DEBUG(0,("hbin_prs_key: Failed to find HBIN block containing subkey_offset [0x%x]\n", 
 					nk->subkeys_off));
 				return False;
 			}
@@ -1003,7 +998,7 @@ static bool hbin_prs_key( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk )
 		if ( !hbin_contains_offset( hbin, nk->sk_off ) ) {
 			sub_hbin = lookup_hbin_block( file, nk->sk_off );
 			if ( !sub_hbin ) {
-				DEBUG(1,("hbin_prs_key: Failed to find HBIN block containing sk_offset [0x%x]\n", 
+				DEBUG(0,("hbin_prs_key: Failed to find HBIN block containing sk_offset [0x%x]\n", 
 					nk->subkeys_off));
 				return False;
 			}
@@ -1027,12 +1022,12 @@ static bool hbin_prs_key( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk )
 /*******************************************************************
 *******************************************************************/
 
-static bool next_record( REGF_HBIN *hbin, const char *hdr, bool *eob )
+static BOOL next_record( REGF_HBIN *hbin, const char *hdr, BOOL *eob )
 {
 	uint8 header[REC_HDR_SIZE];
 	uint32 record_size;
 	uint32 curr_off, block_size;
-	bool found = False;
+	BOOL found = False;
 	prs_struct *ps = &hbin->ps;
 	
 	curr_off = prs_offset( ps );
@@ -1090,7 +1085,7 @@ static bool next_record( REGF_HBIN *hbin, const char *hdr, bool *eob )
 /*******************************************************************
 *******************************************************************/
 
-static bool next_nk_record( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk, bool *eob )
+static BOOL next_nk_record( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk, BOOL *eob )
 {
 	if ( next_record( hbin, "nk", eob ) && hbin_prs_key( file, hbin, nk ) )
 		return True;
@@ -1103,10 +1098,10 @@ static bool next_nk_record( REGF_FILE *file, REGF_HBIN *hbin, REGF_NK_REC *nk, b
  block header to disk 
 *******************************************************************/
 
-static bool init_regf_block( REGF_FILE *file )
+static BOOL init_regf_block( REGF_FILE *file )
 {	
 	prs_struct ps;
-	bool result = True;
+	BOOL result = True;
 	
 	if ( !prs_init( &ps, REGF_BLOCKSIZE, file->mem_ctx, MARSHALL ) )
 		return False;
@@ -1146,7 +1141,7 @@ static bool init_regf_block( REGF_FILE *file )
 	}
 		
 	if ( write_block( file, &ps, 0 ) == -1 ) {
-		DEBUG(1,("init_regf_block: Failed to initialize registry header block!\n"));
+		DEBUG(0,("init_regf_block: Failed to initialize registry header block!\n"));
 		result = False;
 		goto out;
 	}
@@ -1166,7 +1161,7 @@ out:
 	REGF_FILE *rb;
 	
 	if ( !(rb = SMB_MALLOC_P(REGF_FILE)) ) {
-		DEBUG(1,("ERROR allocating memory\n"));
+		DEBUG(0,("ERROR allocating memory\n"));
 		return NULL;
 	}
 	ZERO_STRUCTP( rb );
@@ -1182,7 +1177,7 @@ out:
 	/* open and existing file */
 
 	if ( (rb->fd = open(filename, flags, mode)) == -1 ) {
-		DEBUG(1,("regfio_open: failure to open %s (%s)\n", filename, strerror(errno)));
+		DEBUG(0,("regfio_open: failure to open %s (%s)\n", filename, strerror(errno)));
 		regfio_close( rb );
 		return NULL;
 	}
@@ -1191,7 +1186,7 @@ out:
 		
 	if ( flags & (O_CREAT|O_TRUNC) ) {
 		if ( !init_regf_block( rb ) ) {
-			DEBUG(1,("regfio_open: Failed to read initial REGF block\n"));
+			DEBUG(0,("regfio_open: Failed to read initial REGF block\n"));
 			regfio_close( rb );
 			return NULL;
 		}
@@ -1203,7 +1198,7 @@ out:
 	/* read in an existing file */
 	
 	if ( !read_regf_block( rb ) ) {
-		DEBUG(1,("regfio_open: Failed to read initial REGF block\n"));
+		DEBUG(0,("regfio_open: Failed to read initial REGF block\n"));
 		regfio_close( rb );
 		return NULL;
 	}
@@ -1233,7 +1228,7 @@ static void regfio_mem_free( REGF_FILE *file )
 
 	/* cleanup for a file opened for write */
 
-	if ((file->fd != -1) && (file->open_flags & (O_WRONLY|O_RDWR))) {
+	if ( file->open_flags & (O_WRONLY|O_RDWR) ) {
 		prs_struct ps;
 		REGF_SK_REC *sk;
 
@@ -1267,7 +1262,7 @@ static void regfio_mem_free( REGF_FILE *file )
 
 			/* now we are ready to write it to disk */
 			if ( write_block( file, &ps, 0 ) == -1 )
-				DEBUG(1,("regfio_close: failed to update the regf header block!\n"));
+				DEBUG(0,("regfio_close: failed to update the regf header block!\n"));
 		}
 
 		prs_mem_free( &ps );
@@ -1277,7 +1272,7 @@ static void regfio_mem_free( REGF_FILE *file )
 
 	/* nothing tdo do if there is no open file */
 
-	if (file->fd == -1)
+	if ( !file || (file->fd == -1) )
 		return 0;
 		
 	fd = file->fd;
@@ -1309,14 +1304,14 @@ REGF_NK_REC* regfio_rootkey( REGF_FILE *file )
 	REGF_NK_REC *nk;
 	REGF_HBIN   *hbin;
 	uint32      offset = REGF_BLOCKSIZE;
-	bool        found = False;
-	bool        eob;
+	BOOL        found = False;
+	BOOL        eob;
 	
 	if ( !file )
 		return NULL;
 		
 	if ( !(nk = TALLOC_ZERO_P( file->mem_ctx, REGF_NK_REC )) ) {
-		DEBUG(1,("regfio_rootkey: talloc() failed!\n"));
+		DEBUG(0,("regfio_rootkey: talloc() failed!\n"));
 		return NULL;
 	}
 	
@@ -1345,7 +1340,7 @@ REGF_NK_REC* regfio_rootkey( REGF_FILE *file )
 	}
 	
 	if ( !found ) {
-		DEBUG(1,("regfio_rootkey: corrupt registry file ?  No root key record located\n"));
+		DEBUG(0,("regfio_rootkey: corrupt registry file ?  No root key record located\n"));
 		return NULL;
 	}
 
@@ -1373,7 +1368,7 @@ REGF_NK_REC* regfio_rootkey( REGF_FILE *file )
 	/* find the HBIN block which should contain the nk record */
 	
 	if ( !(hbin = lookup_hbin_block( file, nk->subkeys.hashes[nk->subkey_index].nk_off )) ) {
-		DEBUG(1,("hbin_prs_key: Failed to find HBIN block containing offset [0x%x]\n", 
+		DEBUG(0,("hbin_prs_key: Failed to find HBIN block containing offset [0x%x]\n", 
 			nk->subkeys.hashes[nk->subkey_index].nk_off));
 		return NULL;
 	}
@@ -1408,7 +1403,7 @@ static REGF_HBIN* regf_hbin_allocate( REGF_FILE *file, uint32 block_size )
 
 
 	if ( sys_fstat( file->fd, &sbuf ) ) {
-		DEBUG(1,("regf_hbin_allocate: stat() failed! (%s)\n", strerror(errno)));
+		DEBUG(0,("regf_hbin_allocate: stat() failed! (%s)\n", strerror(errno)));
 		return NULL;
 	}
 
@@ -1456,7 +1451,7 @@ static REGF_HBIN* find_free_space( REGF_FILE *file, uint32 size )
 {
 	REGF_HBIN *hbin, *p_hbin;
 	uint32 block_off;
-	bool cached;
+	BOOL cached;
 
 	/* check open block list */
 
@@ -1518,7 +1513,7 @@ static REGF_HBIN* find_free_space( REGF_FILE *file, uint32 size )
 		alloc_size = (((size+HBIN_HEADER_REC_SIZE) / REGF_ALLOC_BLOCK ) + 1 ) * REGF_ALLOC_BLOCK;
 
 		if ( !(hbin = regf_hbin_allocate( file, alloc_size )) ) {
-			DEBUG(1,("find_free_space: regf_hbin_allocate() failed!\n"));
+			DEBUG(0,("find_free_space: regf_hbin_allocate() failed!\n"));
 			return NULL;
 		}
 		DLIST_ADD( file->block_list, hbin );
@@ -1553,7 +1548,7 @@ static uint32 sk_record_data_size( SEC_DESC * sd )
 
 	/* the record size is sizeof(hdr) + name + static members + data_size_field */
 
-	size = sizeof(uint32)*5 + ndr_size_security_descriptor(sd, 0) + sizeof(uint32);
+	size = sizeof(uint32)*5 + sec_desc_size( sd ) + sizeof(uint32);
 
 	/* multiple of 8 */
 	size_mod8 = size & 0xfffffff8;
@@ -1635,7 +1630,7 @@ static uint32 nk_record_data_size( REGF_NK_REC *nk )
 /*******************************************************************
 *******************************************************************/
 
-static bool create_vk_record( REGF_FILE *file, REGF_VK_REC *vk, REGISTRY_VALUE *value )
+static BOOL create_vk_record( REGF_FILE *file, REGF_VK_REC *vk, REGISTRY_VALUE *value )
 {
 	char *name = regval_name(value);
 	REGF_HBIN *data_hbin;
@@ -1693,7 +1688,7 @@ static int hashrec_cmp( REGF_HASH_REC *h1, REGF_HASH_REC *h2 )
 *******************************************************************/
 
  REGF_NK_REC* regfio_write_key( REGF_FILE *file, const char *name, 
-                               REGVAL_CTR *values, struct regsubkey_ctr *subkeys,
+                               REGVAL_CTR *values, REGSUBKEY_CTR *subkeys, 
                                SEC_DESC *sec_desc, REGF_NK_REC *parent )
 {
 	REGF_NK_REC *nk;
@@ -1783,8 +1778,7 @@ static int hashrec_cmp( REGF_HASH_REC *h1, REGF_HASH_REC *h2 )
 			nk->sec_desc->ref_count = 0;
 			
 			/* size value must be self-inclusive */
-			nk->sec_desc->size      = ndr_size_security_descriptor(sec_desc, 0)
-				+ sizeof(uint32);
+			nk->sec_desc->size      = sec_desc_size(sec_desc) + sizeof(uint32);
 
 			DLIST_ADD_END( file->sec_desc_list, nk->sec_desc, REGF_SK_REC *);
 

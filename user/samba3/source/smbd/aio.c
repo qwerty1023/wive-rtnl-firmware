@@ -6,7 +6,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -24,17 +25,7 @@
 
 /* The signal we'll use to signify aio done. */
 #ifndef RT_SIGNAL_AIO
-#ifndef SIGRTMIN
-#define SIGRTMIN	NSIG
-#endif
-#define RT_SIGNAL_AIO	(SIGRTMIN+3)
-#endif
-
-#ifndef HAVE_STRUCT_SIGEVENT_SIGEV_VALUE_SIVAL_PTR
-#ifdef HAVE_STRUCT_SIGEVENT_SIGEV_VALUE_SIGVAL_PTR
-#define sival_int	sigval_int
-#define sival_ptr	sigval_ptr
-#endif
+#define RT_SIGNAL_AIO (SIGRTMIN+3)
 #endif
 
 /****************************************************************************
@@ -45,7 +36,7 @@ struct aio_extra {
 	struct aio_extra *next, *prev;
 	SMB_STRUCT_AIOCB acb;
 	files_struct *fsp;
-	bool read_req;
+	BOOL read_req;
 	uint16 mid;
 	char *inbuf;
 	char *outbuf;
@@ -151,27 +142,21 @@ static struct aio_extra *find_aio_ex(uint16 mid)
  We can have these many aio buffers in flight.
 *****************************************************************************/
 
-static int aio_pending_size;
+#define AIO_PENDING_SIZE 10
 static sig_atomic_t signals_received;
 static int outstanding_aio_calls;
-static uint16 *aio_pending_array;
+static uint16 aio_pending_array[AIO_PENDING_SIZE];
 
 /****************************************************************************
  Signal handler when an aio request completes.
 *****************************************************************************/
 
-void aio_request_done(uint16_t mid)
-{
-	if (signals_received < aio_pending_size) {
-		aio_pending_array[signals_received] = mid;
-		signals_received++;
-	}
-	/* Else signal is lost. */
-}
-
 static void signal_handler(int sig, siginfo_t *info, void *unused)
 {
-	aio_request_done(info->si_value.sival_int);
+	if (signals_received < AIO_PENDING_SIZE) {
+		aio_pending_array[signals_received] = info->si_value.sival_int;
+		signals_received++;
+	} /* Else signal is lost. */
 	sys_select_signal(RT_SIGNAL_AIO);
 }
 
@@ -179,7 +164,7 @@ static void signal_handler(int sig, siginfo_t *info, void *unused)
  Is there a signal waiting ?
 *****************************************************************************/
 
-bool aio_finished(void)
+BOOL aio_finished(void)
 {
 	return (signals_received != 0);
 }
@@ -191,10 +176,6 @@ bool aio_finished(void)
 void initialize_async_io_handler(void)
 {
 	struct sigaction act;
-
-	aio_pending_size = lp_maxmux();
-	aio_pending_array = SMB_MALLOC_ARRAY(uint16, aio_pending_size);
-	SMB_ASSERT(aio_pending_array != NULL);
 
 	ZERO_STRUCT(act);
 	act.sa_sigaction = signal_handler;
@@ -212,8 +193,9 @@ void initialize_async_io_handler(void)
  Set up an aio request from a SMBreadX call.
 *****************************************************************************/
 
-bool schedule_aio_read_and_X(connection_struct *conn,
-			     struct smb_request *req,
+BOOL schedule_aio_read_and_X(connection_struct *conn,
+			     char *inbuf, char *outbuf,
+			     int length, int len_outbuf,
 			     files_struct *fsp, SMB_OFF_T startpos,
 			     size_t smb_maxcnt)
 {
@@ -222,14 +204,7 @@ bool schedule_aio_read_and_X(connection_struct *conn,
 	size_t bufsize;
 	size_t min_aio_read_size = lp_aio_read_size(SNUM(conn));
 
-	if (fsp->base_fsp != NULL) {
-		/* No AIO on streams yet */
-		DEBUG(10, ("AIO on streams not yet supported\n"));
-		return false;
-	}
-
-	if ((!min_aio_read_size || (smb_maxcnt < min_aio_read_size))
-	    && !SMB_VFS_AIO_FORCE(fsp)) {
+	if (!min_aio_read_size || (smb_maxcnt < min_aio_read_size)) {
 		/* Too small a read for aio request. */
 		DEBUG(10,("schedule_aio_read_and_X: read size (%u) too small "
 			  "for minimum aio_read of %u\n",
@@ -240,30 +215,30 @@ bool schedule_aio_read_and_X(connection_struct *conn,
 
 	/* Only do this on non-chained and non-chaining reads not using the
 	 * write cache. */
-        if (chain_size !=0 || (CVAL(req->inbuf,smb_vwv0) != 0xFF)
+        if (chain_size !=0 || (CVAL(inbuf,smb_vwv0) != 0xFF)
 	    || (lp_write_cache_size(SNUM(conn)) != 0) ) {
 		return False;
 	}
 
-	if (outstanding_aio_calls >= aio_pending_size) {
+	if (outstanding_aio_calls >= AIO_PENDING_SIZE) {
 		DEBUG(10,("schedule_aio_read_and_X: Already have %d aio "
 			  "activities outstanding.\n",
 			  outstanding_aio_calls ));
 		return False;
 	}
 
-	/* The following is safe from integer wrap as we've already checked
-	   smb_maxcnt is 128k or less. Wct is 12 for read replies */
+	/* The following is safe from integer wrap as we've already
+	   checked smb_maxcnt is 128k or less. */
+	bufsize = PTR_DIFF(smb_buf(outbuf),outbuf) + smb_maxcnt;
 
-	bufsize = smb_size + 12 * 2 + smb_maxcnt;
-
-	if ((aio_ex = create_aio_ex_read(fsp, bufsize, req->mid)) == NULL) {
+	if ((aio_ex = create_aio_ex_read(fsp, bufsize,
+					 SVAL(inbuf,smb_mid))) == NULL) {
 		DEBUG(10,("schedule_aio_read_and_X: malloc fail.\n"));
 		return False;
 	}
 
-	construct_reply_common((char *)req->inbuf, aio_ex->outbuf);
-	srv_set_message(aio_ex->outbuf, 12, 0, True);
+	/* Copy the SMB header already setup in outbuf. */
+	memcpy(aio_ex->outbuf, outbuf, smb_buf(outbuf) - outbuf);
 	SCVAL(aio_ex->outbuf,smb_vwv0,0xFF); /* Never a chained reply. */
 
 	a = &aio_ex->acb;
@@ -302,26 +277,20 @@ bool schedule_aio_read_and_X(connection_struct *conn,
  Set up an aio request from a SMBwriteX call.
 *****************************************************************************/
 
-bool schedule_aio_write_and_X(connection_struct *conn,
-			      struct smb_request *req,
-			      files_struct *fsp, char *data,
-			      SMB_OFF_T startpos,
-			      size_t numtowrite)
+BOOL schedule_aio_write_and_X(connection_struct *conn,
+				char *inbuf, char *outbuf,
+				int length, int len_outbuf,
+				files_struct *fsp, char *data,
+				SMB_OFF_T startpos,
+				size_t numtowrite)
 {
 	struct aio_extra *aio_ex;
 	SMB_STRUCT_AIOCB *a;
 	size_t inbufsize, outbufsize;
-	bool write_through = BITSETW(req->inbuf+smb_vwv7,0);
+	BOOL write_through = BITSETW(inbuf+smb_vwv7,0);
 	size_t min_aio_write_size = lp_aio_write_size(SNUM(conn));
 
-	if (fsp->base_fsp != NULL) {
-		/* No AIO on streams yet */
-		DEBUG(10, ("AIO on streams not yet supported\n"));
-		return false;
-	}
-
-	if ((!min_aio_write_size || (numtowrite < min_aio_write_size))
-	    && !SMB_VFS_AIO_FORCE(fsp)) {
+	if (!min_aio_write_size || (numtowrite < min_aio_write_size)) {
 		/* Too small a write for aio request. */
 		DEBUG(10,("schedule_aio_write_and_X: write size (%u) too "
 			  "small for minimum aio_write of %u\n",
@@ -332,12 +301,12 @@ bool schedule_aio_write_and_X(connection_struct *conn,
 
 	/* Only do this on non-chained and non-chaining reads not using the
 	 * write cache. */
-        if (chain_size !=0 || (CVAL(req->inbuf,smb_vwv0) != 0xFF)
+        if (chain_size !=0 || (CVAL(inbuf,smb_vwv0) != 0xFF)
 	    || (lp_write_cache_size(SNUM(conn)) != 0) ) {
 		return False;
 	}
 
-	if (outstanding_aio_calls >= aio_pending_size) {
+	if (outstanding_aio_calls >= AIO_PENDING_SIZE) {
 		DEBUG(3,("schedule_aio_write_and_X: Already have %d aio "
 			 "activities outstanding.\n",
 			  outstanding_aio_calls ));
@@ -346,25 +315,23 @@ bool schedule_aio_write_and_X(connection_struct *conn,
 			  "(mid = %u)\n",
 			  fsp->fsp_name, (double)startpos,
 			  (unsigned int)numtowrite,
-			  (unsigned int)req->mid ));
+			  (unsigned int)SVAL(inbuf,smb_mid) ));
 		return False;
 	}
 
-	inbufsize =  smb_len(req->inbuf) + 4;
-	reply_outbuf(req, 6, 0);
-	outbufsize = smb_len(req->outbuf) + 4;
+	inbufsize =  smb_len(inbuf) + 4;
+	outbufsize = smb_len(outbuf) + 4;
 	if (!(aio_ex = create_aio_ex_write(fsp, inbufsize, outbufsize,
-					   req->mid))) {
+					   SVAL(inbuf,smb_mid)))) {
 		DEBUG(0,("schedule_aio_write_and_X: malloc fail.\n"));
 		return False;
 	}
 
 	/* Copy the SMB header already setup in outbuf. */
-	memcpy(aio_ex->inbuf, req->inbuf, inbufsize);
+	memcpy(aio_ex->inbuf, inbuf, inbufsize);
 
 	/* Copy the SMB header already setup in outbuf. */
-	memcpy(aio_ex->outbuf, req->outbuf, outbufsize);
-	TALLOC_FREE(req->outbuf);
+	memcpy(aio_ex->outbuf, outbuf, outbufsize);
 	SCVAL(aio_ex->outbuf,smb_vwv0,0xFF); /* Never a chained reply. */
 
 	a = &aio_ex->acb;
@@ -372,7 +339,7 @@ bool schedule_aio_write_and_X(connection_struct *conn,
 	/* Now set up the aio record for the write call. */
 	
 	a->aio_fildes = fsp->fh->fd;
-	a->aio_buf = aio_ex->inbuf + (PTR_DIFF(data, req->inbuf));
+	a->aio_buf = aio_ex->inbuf + (PTR_DIFF(data, inbuf));
 	a->aio_nbytes = numtowrite;
 	a->aio_offset = startpos;
 	a->aio_sigevent.sigev_notify = SIGEV_SIGNAL;
@@ -388,8 +355,6 @@ bool schedule_aio_write_and_X(connection_struct *conn,
 		return False;
 	}
 	unbecome_root();
-	
-	release_level_2_oplocks_on_change(fsp);
 
 	if (!write_through && !lp_syncalways(SNUM(fsp->conn))
 	    && fsp->aio_write_behind) {
@@ -398,9 +363,8 @@ bool schedule_aio_write_and_X(connection_struct *conn,
 	        SSVAL(aio_ex->outbuf,smb_vwv2,numtowrite);
                 SSVAL(aio_ex->outbuf,smb_vwv4,(numtowrite>>16)&1);
 		show_msg(aio_ex->outbuf);
-		if (!srv_send_smb(smbd_server_fd(),aio_ex->outbuf,
-				IS_CONN_ENCRYPTED(fsp->conn))) {
-			exit_server_cleanly("handle_aio_write: srv_send_smb "
+		if (!send_smb(smbd_server_fd(),aio_ex->outbuf)) {
+			exit_server_cleanly("handle_aio_write: send_smb "
 					    "failed.");
 		}
 		DEBUG(10,("schedule_aio_write_and_X: scheduled aio_write "
@@ -425,8 +389,9 @@ bool schedule_aio_write_and_X(connection_struct *conn,
  Returns errno or zero if all ok.
 *****************************************************************************/
 
-static int handle_aio_read_complete(struct aio_extra *aio_ex, int errcode)
+static int handle_aio_read_complete(struct aio_extra *aio_ex)
 {
+	int ret = 0;
 	int outsize;
 	char *outbuf = aio_ex->outbuf;
 	char *data = smb_buf(outbuf);
@@ -438,34 +403,37 @@ static int handle_aio_read_complete(struct aio_extra *aio_ex, int errcode)
 		   will return an error. Hopefully this is
 		   true.... JRA. */
 
-		DEBUG( 3,( "handle_aio_read_complete: file %s nread == %d. "
-			   "Error = %s\n",
-			   aio_ex->fsp->fsp_name, (int)nread, strerror(errcode) ));
+		/* If errno is ECANCELED then don't return anything to the
+		 * client. */
+		if (errno == ECANCELED) {
+			srv_cancel_sign_response(aio_ex->mid);
+			return 0;
+		}
 
-		ERROR_NT(map_nt_error_from_unix(errcode));
-		outsize = srv_set_message(outbuf,0,0,true);
+		DEBUG( 3,( "handle_aio_read_complete: file %s nread == -1. "
+			   "Error = %s\n",
+			   aio_ex->fsp->fsp_name, strerror(errno) ));
+
+		outsize = (UNIXERROR(ERRDOS,ERRnoaccess));
+		ret = errno;
 	} else {
-		outsize = srv_set_message(outbuf,12,nread,False);
+		outsize = set_message(outbuf,12,nread,False);
 		SSVAL(outbuf,smb_vwv2,0xFFFF); /* Remaining - must be * -1. */
 		SSVAL(outbuf,smb_vwv5,nread);
 		SSVAL(outbuf,smb_vwv6,smb_offset(data,outbuf));
 		SSVAL(outbuf,smb_vwv7,((nread >> 16) & 1));
 		SSVAL(smb_buf(outbuf),-2,nread);
 
-		aio_ex->fsp->fh->pos = aio_ex->acb.aio_offset + nread;
-		aio_ex->fsp->fh->position_information = aio_ex->fsp->fh->pos;
-
 		DEBUG( 3, ( "handle_aio_read_complete file %s max=%d "
 			    "nread=%d\n",
 			    aio_ex->fsp->fsp_name,
-			    (int)aio_ex->acb.aio_nbytes, (int)nread ) );
+			    aio_ex->acb.aio_nbytes, (int)nread ) );
 
 	}
 	smb_setlen(outbuf,outsize - 4);
 	show_msg(outbuf);
-	if (!srv_send_smb(smbd_server_fd(),outbuf,
-			IS_CONN_ENCRYPTED(aio_ex->fsp->conn))) {
-		exit_server_cleanly("handle_aio_read_complete: srv_send_smb "
+	if (!send_smb(smbd_server_fd(),outbuf)) {
+		exit_server_cleanly("handle_aio_read_complete: send_smb "
 				    "failed.");
 	}
 
@@ -474,7 +442,7 @@ static int handle_aio_read_complete(struct aio_extra *aio_ex, int errcode)
 		  aio_ex->fsp->fsp_name, (double)aio_ex->acb.aio_offset,
 		  (unsigned int)nread ));
 
-	return errcode;
+	return ret;
 }
 
 /****************************************************************************
@@ -482,8 +450,9 @@ static int handle_aio_read_complete(struct aio_extra *aio_ex, int errcode)
  Returns errno or zero if all ok.
 *****************************************************************************/
 
-static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
+static int handle_aio_write_complete(struct aio_extra *aio_ex)
 {
+	int ret = 0;
 	files_struct *fsp = aio_ex->fsp;
 	char *outbuf = aio_ex->outbuf;
 	ssize_t numtowrite = aio_ex->acb.aio_nbytes;
@@ -495,7 +464,8 @@ static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
 				DEBUG(5,("handle_aio_write_complete: "
 					 "aio_write_behind failed ! File %s "
 					 "is corrupt ! Error %s\n",
-					 fsp->fsp_name, strerror(errcode) ));
+					 fsp->fsp_name, strerror(errno) ));
+				ret = errno;
 			} else {
 				DEBUG(0,("handle_aio_write_complete: "
 					 "aio_write_behind failed ! File %s "
@@ -503,14 +473,13 @@ static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
 					 "only wrote %d\n", fsp->fsp_name,
 					 (unsigned int)numtowrite,
 					 (int)nwritten ));
-				errcode = EIO;
+				ret = EIO;
 			}
 		} else {
 			DEBUG(10,("handle_aio_write_complete: "
 				  "aio_write_behind completed for file %s\n",
 				  fsp->fsp_name ));
 		}
-		/* TODO: should no return 0 in case of an error !!! */
 		return 0;
 	}
 
@@ -523,10 +492,17 @@ static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
 			   fsp->fsp_name, (unsigned int)numtowrite,
 			   (int)nwritten, strerror(errno) ));
 
-		ERROR_NT(map_nt_error_from_unix(errcode));
-		srv_set_message(outbuf,0,0,true);
+		/* If errno is ECANCELED then don't return anything to the
+		 * client. */
+		if (errno == ECANCELED) {
+			srv_cancel_sign_response(aio_ex->mid);
+			return 0;
+		}
+
+		UNIXERROR(ERRHRD,ERRdiskfull);
+		ret = errno;
         } else {
-		bool write_through = BITSETW(aio_ex->inbuf+smb_vwv7,0);
+		BOOL write_through = BITSETW(aio_ex->inbuf+smb_vwv7,0);
 		NTSTATUS status;
 
         	SSVAL(outbuf,smb_vwv2,nwritten);
@@ -540,20 +516,16 @@ static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
 			 fsp->fnum, (int)numtowrite, (int)nwritten));
 		status = sync_file(fsp->conn,fsp, write_through);
 		if (!NT_STATUS_IS_OK(status)) {
-			errcode = errno;
-			ERROR_BOTH(map_nt_error_from_unix(errcode),
-				   ERRHRD, ERRdiskfull);
-			srv_set_message(outbuf,0,0,true);
+			UNIXERROR(ERRHRD,ERRdiskfull);
+			ret = errno;
                 	DEBUG(5,("handle_aio_write: sync_file for %s returned %s\n",
 				fsp->fsp_name, nt_errstr(status) ));
 		}
-
-		aio_ex->fsp->fh->pos = aio_ex->acb.aio_offset + nwritten;
 	}
 
 	show_msg(outbuf);
-	if (!srv_send_smb(smbd_server_fd(),outbuf,IS_CONN_ENCRYPTED(fsp->conn))) {
-		exit_server_cleanly("handle_aio_write: srv_send_smb failed.");
+	if (!send_smb(smbd_server_fd(),outbuf)) {
+		exit_server_cleanly("handle_aio_write: send_smb failed.");
 	}
 
 	DEBUG(10,("handle_aio_write_complete: scheduled aio_write completed "
@@ -561,7 +533,7 @@ static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
 		  fsp->fsp_name, (double)aio_ex->acb.aio_offset,
 		  (unsigned int)numtowrite, (unsigned int)nwritten ));
 
-	return errcode;
+	return ret;
 }
 
 /****************************************************************************
@@ -569,36 +541,22 @@ static int handle_aio_write_complete(struct aio_extra *aio_ex, int errcode)
  was non-zero), False if not.
 *****************************************************************************/
 
-static bool handle_aio_completed(struct aio_extra *aio_ex, int *perr)
+static BOOL handle_aio_completed(struct aio_extra *aio_ex, int *perr)
 {
 	int err;
 
-	if(!aio_ex) {
-	        DEBUG(3, ("handle_aio_completed: Non-existing aio_ex passed\n"));
-		return false;
-	}
-
 	/* Ensure the operation has really completed. */
-	err = SMB_VFS_AIO_ERROR(aio_ex->fsp, &aio_ex->acb);
-	if (err == EINPROGRESS) {
+	if (SMB_VFS_AIO_ERROR(aio_ex->fsp, &aio_ex->acb) == EINPROGRESS) {
 		DEBUG(10,( "handle_aio_completed: operation mid %u still in "
 			   "process for file %s\n",
 			   aio_ex->mid, aio_ex->fsp->fsp_name ));
 		return False;
-	} else if (err == ECANCELED) {
-		/* If error is ECANCELED then don't return anything to the
-		 * client. */
-		DEBUG(10,( "handle_aio_completed: operation mid %u"
-			" canceled\n", aio_ex->mid));
-		srv_cancel_sign_response(aio_ex->mid, false);
-		return True;
-        }
-
+	}
 
 	if (aio_ex->read_req) {
-		err = handle_aio_read_complete(aio_ex, err);
+		err = handle_aio_read_complete(aio_ex);
 	} else {
-		err = handle_aio_write_complete(aio_ex, err);
+		err = handle_aio_write_complete(aio_ex);
 	}
 
 	if (err) {
@@ -639,7 +597,7 @@ int process_aio_queue(void)
 		if (!aio_ex) {
 			DEBUG(3,("process_aio_queue: Can't find record to "
 				 "match mid %u.\n", (unsigned int)mid));
-			srv_cancel_sign_response(mid, false);
+			srv_cancel_sign_response(mid);
 			continue;
 		}
 
@@ -649,7 +607,7 @@ int process_aio_queue(void)
 			 * ignore. */
 			DEBUG( 3,( "process_aio_queue: file closed whilst "
 				   "aio outstanding.\n"));
-			srv_cancel_sign_response(mid, false);
+			srv_cancel_sign_response(mid);
 			continue;
 		}
 
@@ -788,7 +746,7 @@ void cancel_aio_by_fsp(files_struct *fsp)
 			/* Don't delete the aio_extra record as we may have
 			   completed and don't yet know it. Just do the
 			   aio_cancel call and return. */
-			SMB_VFS_AIO_CANCEL(fsp, &aio_ex->acb);
+			SMB_VFS_AIO_CANCEL(fsp,fsp->fh->fd, &aio_ex->acb);
 			aio_ex->fsp = NULL; /* fsp will be closed when we
 					     * return. */
 		}
@@ -796,7 +754,7 @@ void cancel_aio_by_fsp(files_struct *fsp)
 }
 
 #else
-bool aio_finished(void)
+BOOL aio_finished(void)
 {
 	return False;
 }
@@ -810,19 +768,21 @@ int process_aio_queue(void)
 	return False;
 }
 
-bool schedule_aio_read_and_X(connection_struct *conn,
-			     struct smb_request *req,
+BOOL schedule_aio_read_and_X(connection_struct *conn,
+			     char *inbuf, char *outbuf,
+			     int length, int len_outbuf,
 			     files_struct *fsp, SMB_OFF_T startpos,
 			     size_t smb_maxcnt)
 {
 	return False;
 }
 
-bool schedule_aio_write_and_X(connection_struct *conn,
-			      struct smb_request *req,
-			      files_struct *fsp, char *data,
-			      SMB_OFF_T startpos,
-			      size_t numtowrite)
+BOOL schedule_aio_write_and_X(connection_struct *conn,
+                                char *inbuf, char *outbuf,
+                                int length, int len_outbuf,
+                                files_struct *fsp, char *data,
+                                SMB_OFF_T startpos,
+                                size_t numtowrite)
 {
 	return False;
 }
@@ -831,8 +791,8 @@ void cancel_aio_by_fsp(files_struct *fsp)
 {
 }
 
-int wait_for_aio_completion(files_struct *fsp)
+BOOL wait_for_aio_completion(files_struct *fsp)
 {
-	return ENOSYS;
+	return True;
 }
 #endif

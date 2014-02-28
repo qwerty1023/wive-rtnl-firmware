@@ -7,7 +7,7 @@
 	<manvolnum>8</manvolnum>
 	<refmiscinfo class="source">Samba</refmiscinfo>
 	<refmiscinfo class="manual">System Administration tools</refmiscinfo>
-	<refmiscinfo class="version">3.3</refmiscinfo>
+	<refmiscinfo class="version">3.0</refmiscinfo>
 </refmeta>
 
 
@@ -58,8 +58,8 @@
 	<title>EXAMPLES</title>
 	<para>
 	The following example shows how to retrieve idmappings from our principal and
-	and trusted AD domains. If trusted domains are present id conflicts must be
-	resolved beforehand, there is no
+	and trusted AD domains. All is needed is to set default to yes. If trusted
+	domains are present id conflicts must be resolved beforehand, there is no
 	guarantee on the order conflicting mappings would be resolved at this point.
 
 	This example also shows how to leave a small non conflicting range for local
@@ -68,12 +68,13 @@
 
 	<programlisting>
 	[global]
-	idmap backend = tdb
-	idmap uid = 1000000-1999999
-	idmap gid = 1000000-1999999
+	idmap domains = ALLDOMAINS
+	idmap config ALLDOMAINS:backend      = ad
+	idmap config ALLDOMAINS:default      = yes
+	idmap config ALLDOMAINS:range        = 10000 - 300000000
 
-	idmap config CORP : backend  = ad
-	idmap config CORP : range = 1000-999999
+	idmap alloc backend = tdb
+	idmap alloc config:range        = 5000 - 9999
 	</programlisting>
 </refsect1>
 

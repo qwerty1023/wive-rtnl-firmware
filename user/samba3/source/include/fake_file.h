@@ -5,7 +5,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,7 +14,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #ifndef _FAKE_FILE_H
@@ -31,9 +32,19 @@ we now get the unix name --metze
 #define FAKE_FILE_NAME_QUOTA_WIN32	"\\$Extend\\$Quota:$Q:$INDEX_ALLOCATION"
 #define FAKE_FILE_NAME_QUOTA_UNIX	"$Extend/$Quota:$Q:$INDEX_ALLOCATION"
 
-struct fake_file_handle {
+typedef struct _FAKE_FILE_HANDLE {
 	enum FAKE_FILE_TYPE type;
-	void *private_data;
-};
+	TALLOC_CTX *mem_ctx;
+	void *pd; /* for private data */
+	void (*free_pd)(void **pd); /* free private_data */
+} FAKE_FILE_HANDLE;
+
+typedef struct _FAKE_FILE {
+	const char *name;
+	enum FAKE_FILE_TYPE type;
+	void *(*init_pd)(TALLOC_CTX *men_ctx);
+	void (*free_pd)(void **pd);
+} FAKE_FILE;
+
 
 #endif /* _FAKE_FILE_H */

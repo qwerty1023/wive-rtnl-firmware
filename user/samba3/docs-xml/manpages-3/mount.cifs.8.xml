@@ -7,7 +7,7 @@
 	<manvolnum>8</manvolnum>
 	<refmiscinfo class="source">Samba</refmiscinfo>
 	<refmiscinfo class="manual">System Administration tools</refmiscinfo>
-	<refmiscinfo class="version">3.3</refmiscinfo>
+	<refmiscinfo class="version">3.0</refmiscinfo>
 </refmeta>
 
 
@@ -116,7 +116,7 @@ below) or entered at the password prompt will be read correctly.
 <programlisting>
 		username=<replaceable>value</replaceable>
 		password=<replaceable>value</replaceable>
-		domain=<replaceable>value</replaceable>
+		workgroup=<replaceable>value</replaceable>
 </programlisting>
 
 		<para>

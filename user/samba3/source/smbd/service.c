@@ -5,7 +5,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,31 +14,36 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
 
 extern userdom_struct current_user_info;
 
-static bool canonicalize_connect_path(connection_struct *conn)
+static BOOL canonicalize_path(connection_struct *conn, pstring path)
 {
 #ifdef REALPATH_TAKES_NULL
-	bool ret;
-	char *resolved_name = SMB_VFS_REALPATH(conn,conn->connectpath,NULL);
+	char *resolved_name = SMB_VFS_REALPATH(conn,path,NULL);
 	if (!resolved_name) {
-		return false;
+		return False;
 	}
-	ret = set_conn_connectpath(conn,resolved_name);
+	pstrcpy(path, resolved_name);
 	SAFE_FREE(resolved_name);
-	return ret;
+	return True;
 #else
+#ifdef PATH_MAX
         char resolved_name_buf[PATH_MAX+1];
-	char *resolved_name = SMB_VFS_REALPATH(conn,conn->connectpath,resolved_name_buf);
+#else
+        pstring resolved_name_buf;
+#endif
+	char *resolved_name = SMB_VFS_REALPATH(conn,path,resolved_name_buf);
 	if (!resolved_name) {
-		return false;
+		return False;
 	}
-	return set_conn_connectpath(conn,resolved_name);
+	pstrcpy(path, resolved_name);
+	return True;
 #endif /* REALPATH_TAKES_NULL */
 }
 
@@ -48,22 +53,12 @@ static bool canonicalize_connect_path(connection_struct *conn)
  Observent people will notice a similarity between this and check_path_syntax :-).
 ****************************************************************************/
 
-bool set_conn_connectpath(connection_struct *conn, const char *connectpath)
+void set_conn_connectpath(connection_struct *conn, const pstring connectpath)
 {
-	char *destname;
-	char *d;
+	pstring destname;
+	char *d = destname;
 	const char *s = connectpath;
-        bool start_of_name_component = true;
-
-	if (connectpath == NULL || connectpath[0] == '\0') {
-		return false;
-	}
-
-	destname = SMB_STRDUP(connectpath);
-	if (!destname) {
-		return false;
-	}
-	d = destname;
+        BOOL start_of_name_component = True;
 
 	*d++ = '/'; /* Always start with root. */
 
@@ -148,7 +143,7 @@ bool set_conn_connectpath(connection_struct *conn, const char *connectpath)
 					break;
 			}
 		}
-		start_of_name_component = false;
+		start_of_name_component = False;
 	}
 	*d = '\0';
 
@@ -161,15 +156,13 @@ bool set_conn_connectpath(connection_struct *conn, const char *connectpath)
 		lp_servicename(SNUM(conn)), destname ));
 
 	string_set(&conn->connectpath, destname);
-	SAFE_FREE(destname);
-	return true;
 }
 
 /****************************************************************************
  Load parameters specific to a connection/service.
 ****************************************************************************/
 
-bool set_current_service(connection_struct *conn, uint16 flags, bool do_chdir)
+BOOL set_current_service(connection_struct *conn, uint16 flags, BOOL do_chdir)
 {
 	static connection_struct *last_conn;
 	static uint16 last_flags;
@@ -187,7 +180,7 @@ bool set_current_service(connection_struct *conn, uint16 flags, bool do_chdir)
 	if (do_chdir &&
 	    vfs_ChDir(conn,conn->connectpath) != 0 &&
 	    vfs_ChDir(conn,conn->origpath) != 0) {
-		DEBUG(0,("chdir (%s) failed\n",
+		DEBUG(1,("chdir (%s) failed\n",
 			 conn->connectpath));
 		return(False);
 	}
@@ -223,110 +216,6 @@ bool set_current_service(connection_struct *conn, uint16 flags, bool do_chdir)
 	return(True);
 }
 
-static int load_registry_service(const char *servicename)
-{
-	struct registry_key *key;
-	char *path;
-	WERROR err;
-
-	uint32 i;
-	char *value_name;
-	struct registry_value *value;
-
-	int res = -1;
-
-	if (!lp_registry_shares()) {
-		return -1;
-	}
-
-	if ((servicename == NULL) || (*servicename == '\0')) {
-		return -1;
-	}
-
-	if (strequal(servicename, GLOBAL_NAME)) {
-		return -2;
-	}
-
-	if (asprintf(&path, "%s\\%s", KEY_SMBCONF, servicename) == -1) {
-		return -1;
-	}
-
-	err = reg_open_path(NULL, path, REG_KEY_READ, get_root_nt_token(),
-			    &key);
-	SAFE_FREE(path);
-
-	if (!W_ERROR_IS_OK(err)) {
-		return -1;
-	}
-
-	res = lp_add_service(servicename, -1);
-	if (res == -1) {
-		goto error;
-	}
-
-	for (i=0;
-	     W_ERROR_IS_OK(reg_enumvalue(key, key, i, &value_name, &value));
-	     i++) {
-		switch (value->type) {
-		case REG_DWORD: { 
-			char *tmp;
-			if (asprintf(&tmp, "%d", value->v.dword) == -1) {
-				continue;
-			}
-			lp_do_parameter(res, value_name, tmp);
-			SAFE_FREE(tmp);
-			break;
-		}
-		case REG_SZ: {
-			lp_do_parameter(res, value_name, value->v.sz.str);
-			break;
-		}
-		default:
-			/* Ignore all the rest */
-			break;
-		}
-
-		TALLOC_FREE(value_name);
-		TALLOC_FREE(value);
-	}
-
-	if (!service_ok(res)) {
-		res = -1;
-	}
-
- error:
-
-	TALLOC_FREE(key);
-	return res;
-}
-
-void load_registry_shares(void)
-{
-	struct registry_key *key;
-	char *name;
-	WERROR err;
-	int i;
-
-	DEBUG(8, ("load_registry_shares()\n"));
-	if (!lp_registry_shares()) {
-		return;
-	}
-
-	err = reg_open_path(NULL, KEY_SMBCONF, REG_KEY_READ,
-			    get_root_nt_token(), &key);
-	if (!(W_ERROR_IS_OK(err))) {
-		return;
-	}
-
-	for (i=0; W_ERROR_IS_OK(reg_enumkey(key, key, i, &name, NULL)); i++) {
-		load_registry_service(name);
-		TALLOC_FREE(name);
-	}
-
-	TALLOC_FREE(key);
-	return;
-}
-
 /****************************************************************************
  Add a home service. Returns the new service number or -1 if fail.
 ****************************************************************************/
@@ -338,11 +227,8 @@ int add_home_service(const char *service, const char *username, const char *home
 	if (!service || !homedir || homedir[0] == '\0')
 		return -1;
 
-	if ((iHomeService = lp_servicenumber(HOMES_NAME)) < 0) {
-		if ((iHomeService = load_registry_service(HOMES_NAME)) < 0) {
-			return -1;
-		}
-	}
+	if ((iHomeService = lp_servicenumber(HOMES_NAME)) < 0)
+		return -1;
 
 	/*
 	 * If this is a winbindd provided username, remove
@@ -368,6 +254,7 @@ int add_home_service(const char *service, const char *username, const char *home
 
 }
 
+
 /**
  * Find a service entry.
  *
@@ -384,7 +271,7 @@ int find_service(fstring service)
 
 	/* now handle the special case of a home directory */
 	if (iService < 0) {
-		char *phome_dir = get_user_home_dir(talloc_tos(), service);
+		char *phome_dir = get_user_home_dir(service);
 
 		if(!phome_dir) {
 			/*
@@ -392,8 +279,7 @@ int find_service(fstring service)
 			 * be a Windows to unix mapped user name.
 			 */
 			if(map_username(service))
-				phome_dir = get_user_home_dir(
-					talloc_tos(), service);
+				phome_dir = get_user_home_dir(service);
 		}
 
 		DEBUG(3,("checking for home directory %s gave %s\n",service,
@@ -402,14 +288,12 @@ int find_service(fstring service)
 		iService = add_home_service(service,service /* 'username' */, phome_dir);
 	}
 
+#ifndef AVM_NO_PRINTING
 	/* If we still don't have a service, attempt to add it as a printer. */
 	if (iService < 0) {
 		int iPrinterService;
 
-		if ((iPrinterService = lp_servicenumber(PRINTERS_NAME)) < 0) {
-			iPrinterService = load_registry_service(PRINTERS_NAME);
-		}
-		if (iPrinterService) {
+		if ((iPrinterService = lp_servicenumber(PRINTERS_NAME)) >= 0) {
 			DEBUG(3,("checking whether %s is a valid printer name...\n", service));
 			if (pcap_printername_ok(service)) {
 				DEBUG(3,("%s is a valid printer name\n", service));
@@ -424,13 +308,10 @@ int find_service(fstring service)
 			}
 		}
 	}
+#endif /* AVM_NO_PRINTING */
 
 	/* Check for default vfs service?  Unsure whether to implement this */
 	if (iService < 0) {
-	}
-
-	if (iService < 0) {
-		iService = load_registry_service(service);
 	}
 
 	/* Is it a usershare service ? */
@@ -450,17 +331,13 @@ int find_service(fstring service)
 			 * could get overwritten by the recursive find_service() call
 			 * below. Fix from Josef Hinteregger <joehtg@joehtg.co.at>.
 			 */
-			char *defservice = SMB_STRDUP(pdefservice);
-
-			if (!defservice) {
-				goto fail;
-			}
+			pstring defservice;
+			pstrcpy(defservice, pdefservice);
 
 			/* Disallow anything except explicit share names. */
 			if (strequal(defservice,HOMES_NAME) ||
 					strequal(defservice, PRINTERS_NAME) ||
 					strequal(defservice, "IPC$")) {
-				SAFE_FREE(defservice);
 				goto fail;
 			}
 
@@ -469,13 +346,12 @@ int find_service(fstring service)
 				all_string_sub(service, "_","/",0);
 				iService = lp_add_service(service, iService);
 			}
-			SAFE_FREE(defservice);
 		}
 	}
 
 	if (iService >= 0) {
 		if (!VALID_SNUM(iService)) {
-			DEBUG(0,("Invalid snum %d for %s\n",iService, service));
+			DEBUG(1,("Invalid snum %d for %s\n",iService, service));
 			iService = -1;
 		}
 	}
@@ -535,6 +411,31 @@ static NTSTATUS share_sanity_checks(int snum, fstring dev)
 	return NT_STATUS_OK;
 }
 
+static NTSTATUS find_forced_user(connection_struct *conn, BOOL vuser_is_guest, fstring username)
+{
+	int snum = conn->params->service;
+	char *fuser, *found_username;
+	NTSTATUS result;
+
+	if (!(fuser = talloc_string_sub(conn->mem_ctx, lp_force_user(snum), "%S",
+					lp_servicename(snum)))) {
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	result = create_token_from_username(conn->mem_ctx, fuser, vuser_is_guest,
+					    &conn->uid, &conn->gid, &found_username,
+					    &conn->nt_user_token);
+	if (!NT_STATUS_IS_OK(result)) {
+		return result;
+	}
+
+	fstrcpy(username, found_username);
+
+	TALLOC_FREE(fuser);
+	TALLOC_FREE(found_username);
+	return NT_STATUS_OK;
+}
+
 /*
  * Go through lookup_name etc to find the force'd group.  
  *
@@ -542,20 +443,29 @@ static NTSTATUS share_sanity_checks(int snum, fstring dev)
  * one found.
  */
 
-static NTSTATUS find_forced_group(bool force_user,
+static NTSTATUS find_forced_group(BOOL force_user,
 				  int snum, const char *username,
 				  DOM_SID *pgroup_sid,
 				  gid_t *pgid)
 {
 	NTSTATUS result = NT_STATUS_NO_SUCH_GROUP;
-	TALLOC_CTX *frame = talloc_stackframe();
+	TALLOC_CTX *mem_ctx;
 	DOM_SID group_sid;
 	enum lsa_SidType type;
 	char *groupname;
-	bool user_must_be_member = False;
+	BOOL user_must_be_member = False;
 	gid_t gid;
 
-	groupname = talloc_strdup(talloc_tos(), lp_force_group(snum));
+	ZERO_STRUCTP(pgroup_sid);
+	*pgid = (gid_t)-1;
+
+	mem_ctx = talloc_new(NULL);
+	if (mem_ctx == NULL) {
+		DEBUG(1, ("talloc_new failed\n"));
+		return NT_STATUS_NO_MEMORY;
+	}
+
+	groupname = talloc_strdup(mem_ctx, lp_force_group(snum));
 	if (groupname == NULL) {
 		DEBUG(1, ("talloc_strdup failed\n"));
 		result = NT_STATUS_NO_MEMORY;
@@ -567,15 +477,10 @@ static NTSTATUS find_forced_group(bool force_user,
 		groupname += 1;
 	}
 
-	groupname = talloc_string_sub(talloc_tos(), groupname,
+	groupname = talloc_string_sub(mem_ctx, groupname,
 				      "%S", lp_servicename(snum));
-	if (groupname == NULL) {
-		DEBUG(1, ("talloc_string_sub failed\n"));
-		result = NT_STATUS_NO_MEMORY;
-		goto done;
-	}
 
-	if (!lookup_name_smbconf(talloc_tos(), groupname,
+	if (!lookup_name_smbconf(mem_ctx, groupname,
 			 LOOKUP_NAME_ALL|LOOKUP_NAME_GROUP,
 			 NULL, NULL, &group_sid, &type)) {
 		DEBUG(10, ("lookup_name_smbconf(%s) failed\n",
@@ -592,7 +497,7 @@ static NTSTATUS find_forced_group(bool force_user,
 
 	if (!sid_to_gid(&group_sid, &gid)) {
 		DEBUG(10, ("sid_to_gid(%s) for %s failed\n",
-			   sid_string_dbg(&group_sid), groupname));
+			   sid_string_static(&group_sid), groupname));
 		goto done;
 	}
 
@@ -610,7 +515,7 @@ static NTSTATUS find_forced_group(bool force_user,
 			DEBUG(3,("Forced group %s for member %s\n",
 				 groupname, username));
 		} else {
-			DEBUG(0,("find_forced_group: forced user %s is not a member "
+			DEBUG(1,("find_forced_group: forced user %s is not a member "
 				"of forced group %s. Disallowing access.\n",
 				username, groupname ));
 			result = NT_STATUS_MEMBER_NOT_IN_GROUP;
@@ -624,86 +529,9 @@ static NTSTATUS find_forced_group(bool force_user,
 
 	result = NT_STATUS_OK;
  done:
-	TALLOC_FREE(frame);
+	TALLOC_FREE(mem_ctx);
 	return result;
 }
-
-/****************************************************************************
-  Create an auth_serversupplied_info structure for a connection_struct
-****************************************************************************/
-
-static NTSTATUS create_connection_server_info(TALLOC_CTX *mem_ctx, int snum,
-                                              struct auth_serversupplied_info *vuid_serverinfo,
-					      DATA_BLOB password,
-                                              struct auth_serversupplied_info **presult)
-{
-        if (lp_guest_only(snum)) {
-                return make_server_info_guest(mem_ctx, presult);
-        }
-
-        if (vuid_serverinfo != NULL) {
-
-		struct auth_serversupplied_info *result;
-
-                /*
-                 * This is the normal security != share case where we have a
-                 * valid vuid from the session setup.                 */
-
-                if (vuid_serverinfo->guest) {
-                        if (!lp_guest_ok(snum)) {
-                                DEBUG(2, ("guest user (from session setup) "
-                                          "not permitted to access this share "
-                                          "(%s)\n", lp_servicename(snum)));
-                                return NT_STATUS_ACCESS_DENIED;
-                        }
-                } else {
-                        if (!user_ok_token(vuid_serverinfo->unix_name,
-					   pdb_get_domain(vuid_serverinfo->sam_account),
-                                           vuid_serverinfo->ptok, snum)) {
-                                DEBUG(2, ("user '%s' (from session setup) not "
-                                          "permitted to access this share "
-                                          "(%s)\n",
-                                          vuid_serverinfo->unix_name,
-                                          lp_servicename(snum)));
-                                return NT_STATUS_ACCESS_DENIED;
-                        }
-                }
-
-                result = copy_serverinfo(mem_ctx, vuid_serverinfo);
-		if (result == NULL) {
-			return NT_STATUS_NO_MEMORY;
-		}
-
-		*presult = result;
-		return NT_STATUS_OK;
-        }
-
-        if (lp_security() == SEC_SHARE) {
-
-                fstring user;
-		bool guest;
-
-                /* add the sharename as a possible user name if we
-                   are in share mode security */
-
-                add_session_user(lp_servicename(snum));
-
-                /* shall we let them in? */
-
-                if (!authorise_login(snum,user,password,&guest)) {
-                        DEBUG( 2, ( "Invalid username/password for [%s]\n",
-                                    lp_servicename(snum)) );
-			return NT_STATUS_WRONG_PASSWORD;
-                }
-
-		return make_serverinfo_from_username(mem_ctx, user, guest,
-						     presult);
-        }
-
-	DEBUG(0, ("invalid VUID (vuser) but not in security=share\n"));
-	return NT_STATUS_ACCESS_DENIED;
-}
-
 
 /****************************************************************************
   Make a connection, given the snum to connect to, and the vuser of the
@@ -713,52 +541,132 @@ static NTSTATUS create_connection_server_info(TALLOC_CTX *mem_ctx, int snum,
 static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 					       DATA_BLOB password, 
 					       const char *pdev,
-					       NTSTATUS *pstatus)
+					       NTSTATUS *status)
 {
+	struct passwd *pass = NULL;
+	BOOL guest = False;
 	connection_struct *conn;
 	SMB_STRUCT_STAT st;
+	fstring user;
 	fstring dev;
 	int ret;
-	char addr[INET6_ADDRSTRLEN];
-	NTSTATUS status;
 
+	*user = 0;
 	fstrcpy(dev, pdev);
 	SET_STAT_INVALID(st);
 
-	if (NT_STATUS_IS_ERR(*pstatus = share_sanity_checks(snum, dev))) {
+	if (NT_STATUS_IS_ERR(*status = share_sanity_checks(snum, dev))) {
 		return NULL;
 	}	
 
 	conn = conn_new();
 	if (!conn) {
-		DEBUG(0,("Couldn't find free connection.\n"));
-		*pstatus = NT_STATUS_INSUFFICIENT_RESOURCES;
+		DEBUG(1,("Couldn't find free connection.\n"));
+		*status = NT_STATUS_INSUFFICIENT_RESOURCES;
 		return NULL;
 	}
 
 	conn->params->service = snum;
+	conn->nt_user_token = NULL;
 
-	status = create_connection_server_info(
-		conn, snum, vuser ? vuser->server_info : NULL, password,
-		&conn->server_info);
+	if (lp_guest_only(snum)) {
+		const char *guestname = lp_guestaccount();
+		NTSTATUS status2;
+		char *found_username = NULL;
 
-	if (!NT_STATUS_IS_OK(status)) {
-		DEBUG(1, ("create_connection_server_info failed: %s\n",
-			  nt_errstr(status)));
-		*pstatus = status;
+		guest = True;
+		pass = getpwnam_alloc(NULL, guestname);
+		if (!pass) {
+			DEBUG(1,("make_connection_snum: Invalid guest "
+				 "account %s??\n",guestname));
+			conn_free(conn);
+			*status = NT_STATUS_NO_SUCH_USER;
+			return NULL;
+		}
+		status2 = create_token_from_username(conn->mem_ctx, pass->pw_name, True,
+						     &conn->uid, &conn->gid,
+						     &found_username,
+						     &conn->nt_user_token);
+		if (!NT_STATUS_IS_OK(status2)) {
+			TALLOC_FREE(pass);
+			conn_free(conn);
+			*status = status2;
+			return NULL;
+		}
+		fstrcpy(user, found_username);
+		string_set(&conn->user,user);
+		conn->force_user = True;
+		TALLOC_FREE(found_username);
+		TALLOC_FREE(pass);
+		DEBUG(3,("Guest only user %s\n",user));
+	} else if (vuser) {
+		if (vuser->guest) {
+			if (!lp_guest_ok(snum)) {
+				DEBUG(2, ("guest user (from session setup) "
+					  "not permitted to access this share "
+					  "(%s)\n", lp_servicename(snum)));
+				      conn_free(conn);
+				      *status = NT_STATUS_ACCESS_DENIED;
+				      return NULL;
+			}
+		} else {
+			if (!user_ok_token(vuser->user.unix_name,
+					   vuser->nt_user_token, snum)) {
+				DEBUG(2, ("user '%s' (from session setup) not "
+					  "permitted to access this share "
+					  "(%s)\n", vuser->user.unix_name,
+					  lp_servicename(snum)));
+				conn_free(conn);
+				*status = NT_STATUS_ACCESS_DENIED;
+				return NULL;
+			}
+		}
+		conn->vuid = vuser->vuid;
+		conn->uid = vuser->uid;
+		conn->gid = vuser->gid;
+		string_set(&conn->user,vuser->user.unix_name);
+		fstrcpy(user,vuser->user.unix_name);
+		guest = vuser->guest; 
+	} else if (lp_security() == SEC_SHARE) {
+		NTSTATUS status2;
+		char *found_username = NULL;
+
+		/* add it as a possible user name if we 
+		   are in share mode security */
+		add_session_user(lp_servicename(snum));
+		/* shall we let them in? */
+		if (!authorise_login(snum,user,password,&guest)) {
+			DEBUG( 2, ( "Invalid username/password for [%s]\n", 
+				    lp_servicename(snum)) );
+			conn_free(conn);
+			*status = NT_STATUS_WRONG_PASSWORD;
+			return NULL;
+		}
+		pass = Get_Pwnam(user);
+		status2 = create_token_from_username(conn->mem_ctx, pass->pw_name, True,
+						     &conn->uid, &conn->gid,
+						     &found_username,
+						     &conn->nt_user_token);
+		if (!NT_STATUS_IS_OK(status2)) {
+			conn_free(conn);
+			*status = status2;
+			return NULL;
+		}
+		fstrcpy(user, found_username);
+		string_set(&conn->user,user);
+		TALLOC_FREE(found_username);
+		conn->force_user = True;
+	} else {
+		DEBUG(1, ("invalid VUID (vuser) but not in security=share\n"));
 		conn_free(conn);
+		*status = NT_STATUS_ACCESS_DENIED;
 		return NULL;
 	}
 
-	if ((lp_guest_only(snum)) || (lp_security() == SEC_SHARE)) {
-		conn->force_user = true;
-	}
+	add_session_user(user);
 
-	add_session_user(conn->server_info->unix_name);
-
-	safe_strcpy(conn->client_address,
-			client_addr(get_client_fd(),addr,sizeof(addr)), 
-			sizeof(conn->client_address)-1);
+	safe_strcpy(conn->client_address, client_addr(), 
+		    sizeof(conn->client_address)-1);
 	conn->num_files_open = 0;
 	conn->lastused = conn->lastused_count = time(NULL);
 	conn->used = True;
@@ -773,110 +681,140 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 		 * insensitive for now. */
 		conn->case_sensitive = False;
 	} else {
-		conn->case_sensitive = (bool)lp_casesensitive(snum);
+		conn->case_sensitive = (BOOL)lp_casesensitive(snum);
 	}
 
 	conn->case_preserve = lp_preservecase(snum);
 	conn->short_case_preserve = lp_shortpreservecase(snum);
-
-	conn->encrypt_level = lp_smb_encrypt(snum);
 
 	conn->veto_list = NULL;
 	conn->hide_list = NULL;
 	conn->veto_oplock_list = NULL;
 	conn->aio_write_behind_list = NULL;
 	string_set(&conn->dirpath,"");
+	string_set(&conn->user,user);
 
 	conn->read_only = lp_readonly(SNUM(conn));
 	conn->admin_user = False;
 
+	/*
+	 * If force user is true, then store the given userid and the gid of
+	 * the user we're forcing.
+	 * For auxiliary groups see below.
+	 */
+	
 	if (*lp_force_user(snum)) {
+		NTSTATUS status2;
 
-		/*
-		 * Replace conn->server_info with a completely faked up one
-		 * from the username we are forced into :-)
-		 */
-
-		char *fuser;
-		struct auth_serversupplied_info *forced_serverinfo;
-
-		fuser = talloc_string_sub(conn, lp_force_user(snum), "%S",
-					  lp_servicename(snum));
-		if (fuser == NULL) {
+		status2 = find_forced_user(conn,
+				(vuser != NULL) && vuser->guest,
+				user);
+		if (!NT_STATUS_IS_OK(status2)) {
 			conn_free(conn);
-			*pstatus = NT_STATUS_NO_MEMORY;
+			*status = status2;
 			return NULL;
 		}
-
-		status = make_serverinfo_from_username(
-			conn, fuser, conn->server_info->guest,
-			&forced_serverinfo);
-		if (!NT_STATUS_IS_OK(status)) {
-			conn_free(conn);
-			*pstatus = status;
-			return NULL;
-		}
-
-		TALLOC_FREE(conn->server_info);
-		conn->server_info = forced_serverinfo;
-
+		string_set(&conn->user,user);
 		conn->force_user = True;
-		DEBUG(3,("Forced user %s\n", fuser));
+		DEBUG(3,("Forced user %s\n",user));	  
 	}
 
 	/*
 	 * If force group is true, then override
 	 * any groupid stored for the connecting user.
 	 */
-
+	
 	if (*lp_force_group(snum)) {
+		NTSTATUS status2;
+		DOM_SID group_sid;
 
-		status = find_forced_group(
-			conn->force_user, snum, conn->server_info->unix_name,
-			&conn->server_info->ptok->user_sids[1],
-			&conn->server_info->utok.gid);
-
-		if (!NT_STATUS_IS_OK(status)) {
+		status2 = find_forced_group(conn->force_user,
+					    snum, user,
+					    &group_sid, &conn->gid);
+		if (!NT_STATUS_IS_OK(status2)) {
 			conn_free(conn);
-			*pstatus = status;
+			*status = status2;
 			return NULL;
 		}
 
-		/*
-		 * We need to cache this gid, to use within
- 		 * change_to_user() separately from the conn->server_info
- 		 * struct. We only use conn->server_info directly if
- 		 * "force_user" was set.
- 		 */
-		conn->force_group_gid = conn->server_info->utok.gid;
+		if ((conn->nt_user_token == NULL) && (vuser != NULL)) {
+
+			/* Not force user and not security=share, but force
+			 * group. vuser has a token to copy */
+			
+			conn->nt_user_token = dup_nt_token(
+				NULL, vuser->nt_user_token);
+			if (conn->nt_user_token == NULL) {
+				DEBUG(1, ("dup_nt_token failed\n"));
+				conn_free(conn);
+				*status = NT_STATUS_NO_MEMORY;
+				return NULL;
+			}
+		}
+
+		/* If conn->nt_user_token is still NULL, we have
+		 * security=share. This means ignore the SID, as we had no
+		 * vuser to copy from */
+
+		if (conn->nt_user_token != NULL) {
+			/* Overwrite the primary group sid */
+			sid_copy(&conn->nt_user_token->user_sids[1],
+				 &group_sid);
+
+		}
+		conn->force_group = True;
 	}
 
-	conn->vuid = (vuser != NULL) ? vuser->vuid : UID_FIELD_INVALID;
+	if (conn->nt_user_token != NULL) {
+		size_t i;
+
+		/* We have a share-specific token from force [user|group].
+		 * This means we have to create the list of unix groups from
+		 * the list of sids. */
+
+		conn->ngroups = 0;
+		conn->groups = NULL;
+
+		for (i=0; i<conn->nt_user_token->num_sids; i++) {
+			gid_t gid;
+			DOM_SID *sid = &conn->nt_user_token->user_sids[i];
+
+			if (!sid_to_gid(sid, &gid)) {
+				DEBUG(10, ("Could not convert SID %s to gid, "
+					   "ignoring it\n",
+					   sid_string_static(sid)));
+				continue;
+			}
+			if (!add_gid_to_array_unique(conn->mem_ctx, gid, &conn->groups,
+						&conn->ngroups)) {
+				DEBUG(0, ("add_gid_to_array_unique failed\n"));
+				conn_free(conn);
+				*status = NT_STATUS_NO_MEMORY;
+				return NULL;
+			}
+		}
+	}
 
 	{
-		char *s = talloc_sub_advanced(talloc_tos(),
-					lp_servicename(SNUM(conn)),
-					conn->server_info->unix_name,
-					conn->connectpath,
-					conn->server_info->utok.gid,
-					conn->server_info->sanitized_username,
-					pdb_get_domain(conn->server_info->sam_account),
-					lp_pathname(snum));
-		if (!s) {
+		pstring s;
+		pstrcpy(s,lp_pathname(snum));
+		standard_sub_advanced(lp_servicename(SNUM(conn)), conn->user,
+				      conn->connectpath, conn->gid,
+				      get_current_username(),
+				      current_user_info.domain,
+				      s, sizeof(s));
+
+		if (s[0] == '\0') {
+			DEBUG(6, ("service [%s] did not resolve to a path\n",
+				lp_servicename(snum)));
 			conn_free(conn);
-			*pstatus = NT_STATUS_NO_MEMORY;
+			*status = NT_STATUS_BAD_NETWORK_NAME;
 			return NULL;
 		}
 
-		if (!set_conn_connectpath(conn,s)) {
-			TALLOC_FREE(s);
-			conn_free(conn);
-			*pstatus = NT_STATUS_NO_MEMORY;
-			return NULL;
-		}
+		set_conn_connectpath(conn,s);
 		DEBUG(3,("Connect path is '%s' for service [%s]\n",s,
 			 lp_servicename(snum)));
-		TALLOC_FREE(s);
 	}
 
 	/*
@@ -887,23 +825,42 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 	 */
 
 	{
-		bool can_write = False;
+		BOOL can_write = False;
+		NT_USER_TOKEN *token = conn->nt_user_token ?
+			conn->nt_user_token :
+			(vuser ? vuser->nt_user_token : NULL);
 
-		can_write = share_access_check(conn->server_info->ptok,
-					       lp_servicename(snum),
-					       FILE_WRITE_DATA);
+		/*
+		 * I don't believe this can happen. But the
+		 * logic above is convoluted enough to confuse
+		 * automated checkers, so be sure. JRA.
+		 */
+
+		if (token == NULL) {
+			DEBUG(0,("make_connection: connection to %s "
+				 "denied due to missing "
+				 "NT token.\n",
+				  lp_servicename(snum)));
+			conn_free(conn);
+			*status = NT_STATUS_ACCESS_DENIED;
+			return NULL;
+		}
+
+		can_write = share_access_check(token,
+						    lp_servicename(snum),
+						    FILE_WRITE_DATA);
 
 		if (!can_write) {
-			if (!share_access_check(conn->server_info->ptok,
+			if (!share_access_check(token,
 						lp_servicename(snum),
 						FILE_READ_DATA)) {
 				/* No access, read or write. */
-				DEBUG(0,("make_connection: connection to %s "
+				DEBUG(1,("make_connection: connection to %s "
 					 "denied due to security "
 					 "descriptor.\n",
 					  lp_servicename(snum)));
 				conn_free(conn);
-				*pstatus = NT_STATUS_ACCESS_DENIED;
+				*status = NT_STATUS_ACCESS_DENIED;
 				return NULL;
 			} else {
 				conn->read_only = True;
@@ -913,96 +870,65 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 	/* Initialise VFS function pointers */
 
 	if (!smbd_vfs_init(conn)) {
-		DEBUG(0, ("vfs_init failed for service %s\n",
+		DEBUG(1, ("vfs_init failed for service %s\n",
 			  lp_servicename(snum)));
 		conn_free(conn);
-		*pstatus = NT_STATUS_BAD_NETWORK_NAME;
+		*status = NT_STATUS_BAD_NETWORK_NAME;
 		return NULL;
 	}
 
+	/*
+	 * If widelinks are disallowed we need to canonicalise the connect
+	 * path here to ensure we don't have any symlinks in the
+	 * connectpath. We will be checking all paths on this connection are
+	 * below this directory. We must do this after the VFS init as we
+	 * depend on the realpath() pointer in the vfs table. JRA.
+	 */
+	if (!lp_widelinks(snum)) {
+		pstring s;
+		pstrcpy(s,conn->connectpath);
+		canonicalize_path(conn, s);
+		set_conn_connectpath(conn,s);
+	}
+
 	if ((!conn->printer) && (!conn->ipc)) {
-		conn->notify_ctx = notify_init(conn, server_id_self(),
+		conn->notify_ctx = notify_init(conn->mem_ctx, server_id_self(),
 					       smbd_messaging_context(),
 					       smbd_event_context(),
 					       conn);
 	}
 
-/* ROOT Activities: */
-	/* explicitly check widelinks here so that we can correctly warn
-	 * in the logs. */
-	widelinks_warning(snum);
-
-	/*
-	 * Enforce the max connections parameter.
-	 */
-
-	if ((lp_max_connections(snum) > 0)
-	    && (count_current_connections(lp_servicename(SNUM(conn)), True) >=
-		lp_max_connections(snum))) {
-
-		DEBUG(1, ("Max connections (%d) exceeded for %s\n",
-			  lp_max_connections(snum), lp_servicename(snum)));
+/* ROOT Activities: */	
+	/* check number of connections */
+	if (!claim_connection(conn,
+			      lp_servicename(snum),
+			      lp_max_connections(snum),
+			      False,0)) {
+		DEBUG(1,("too many connections - rejected\n"));
 		conn_free(conn);
-		*pstatus = NT_STATUS_INSUFFICIENT_RESOURCES;
+		*status = NT_STATUS_INSUFFICIENT_RESOURCES;
 		return NULL;
 	}  
-
-	/*
-	 * Get us an entry in the connections db
-	 */
-	if (!claim_connection(conn, lp_servicename(snum), 0)) {
-		DEBUG(1, ("Could not store connections entry\n"));
-		conn_free(conn);
-		*pstatus = NT_STATUS_INTERNAL_DB_ERROR;
-		return NULL;
-	}  
-
-	/* Invoke VFS make connection hook - must be the first
-	   VFS operation we do. */
-
-	if (SMB_VFS_CONNECT(conn, lp_servicename(snum),
-			    conn->server_info->unix_name) < 0) {
-		DEBUG(0,("make_connection: VFS make connection failed!\n"));
-		yield_connection(conn, lp_servicename(snum));
-		conn_free(conn);
-		*pstatus = NT_STATUS_UNSUCCESSFUL;
-		return NULL;
-	}
-
-	/*
-	 * Fix compatibility issue pointed out by Volker.
-	 * We pass the conn->connectpath to the preexec
-	 * scripts as a parameter, so attempt to canonicalize
-	 * it here before calling the preexec scripts.
-	 * We ignore errors here, as it is possible that
-	 * the conn->connectpath doesn't exist yet and
-	 * the preexec scripts will create them.
-	 */
-
-	(void)canonicalize_connect_path(conn);
 
 	/* Preexecs are done here as they might make the dir we are to ChDir
 	 * to below */
 	/* execute any "root preexec = " line */
 	if (*lp_rootpreexec(snum)) {
-		char *cmd = talloc_sub_advanced(talloc_tos(),
-					lp_servicename(SNUM(conn)),
-					conn->server_info->unix_name,
-					conn->connectpath,
-					conn->server_info->utok.gid,
-					conn->server_info->sanitized_username,
-					pdb_get_domain(conn->server_info->sam_account),
-					lp_rootpreexec(snum));
+		pstring cmd;
+		pstrcpy(cmd,lp_rootpreexec(snum));
+		standard_sub_advanced(lp_servicename(SNUM(conn)), conn->user,
+				      conn->connectpath, conn->gid,
+				      get_current_username(),
+				      current_user_info.domain,
+				      cmd, sizeof(cmd));
 		DEBUG(5,("cmd=%s\n",cmd));
 		ret = smbrun(cmd,NULL);
-		TALLOC_FREE(cmd);
 		if (ret != 0 && lp_rootpreexec_close(snum)) {
 			DEBUG(1,("root preexec gave %d - failing "
 				 "connection\n", ret));
-			SMB_VFS_DISCONNECT(conn);
 			yield_connection(conn, lp_servicename(snum));
 			conn_free(conn);
-			*pstatus = NT_STATUS_ACCESS_DENIED;
+			*status = NT_STATUS_ACCESS_DENIED;
 			return NULL;
 		}
 	}
@@ -1010,11 +936,10 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 /* USER Activites: */
 	if (!change_to_user(conn, conn->vuid)) {
 		/* No point continuing if they fail the basic checks */
-		DEBUG(0,("Can't become connected user!\n"));
-		SMB_VFS_DISCONNECT(conn);
+		DEBUG(1,("Can't become connected user!\n"));
 		yield_connection(conn, lp_servicename(snum));
 		conn_free(conn);
-		*pstatus = NT_STATUS_LOGON_FAILURE;
+		*status = NT_STATUS_LOGON_FAILURE;
 		return NULL;
 	}
 
@@ -1026,39 +951,22 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 
 	/* execute any "preexec = " line */
 	if (*lp_preexec(snum)) {
-		char *cmd = talloc_sub_advanced(talloc_tos(),
-					lp_servicename(SNUM(conn)),
-					conn->server_info->unix_name,
-					conn->connectpath,
-					conn->server_info->utok.gid,
-					conn->server_info->sanitized_username,
-					pdb_get_domain(conn->server_info->sam_account),
-					lp_preexec(snum));
+		pstring cmd;
+		pstrcpy(cmd,lp_preexec(snum));
+		standard_sub_advanced(lp_servicename(SNUM(conn)), conn->user,
+				      conn->connectpath, conn->gid,
+				      get_current_username(),
+				      current_user_info.domain,
+				      cmd, sizeof(cmd));
 		ret = smbrun(cmd,NULL);
-		TALLOC_FREE(cmd);
 		if (ret != 0 && lp_preexec_close(snum)) {
 			DEBUG(1,("preexec gave %d - failing connection\n",
 				 ret));
-			*pstatus = NT_STATUS_ACCESS_DENIED;
-			goto err_root_exit;
-		}
-	}
-
-	/*
-	 * If widelinks are disallowed we need to canonicalise the connect
-	 * path here to ensure we don't have any symlinks in the
-	 * connectpath. We will be checking all paths on this connection are
-	 * below this directory. We must do this after the VFS init as we
-	 * depend on the realpath() pointer in the vfs table. JRA.
-	 */
-	if (!lp_widelinks(snum)) {
-		if (!canonicalize_connect_path(conn)) {
-			DEBUG(0, ("canonicalize_connect_path failed "
-			"for service %s, path %s\n",
-				lp_servicename(snum),
-				conn->connectpath));
-			*pstatus = NT_STATUS_BAD_NETWORK_NAME;
-			goto err_root_exit;
+			change_to_root_user();
+			yield_connection(conn, lp_servicename(snum));
+			conn_free(conn);
+			*status = NT_STATUS_ACCESS_DENIED;
+			return NULL;
 		}
 	}
 
@@ -1073,10 +981,20 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 		set_namearray( &conn->veto_list, lp_veto_files(snum));
 		set_namearray( &conn->hide_list, lp_hide_files(snum));
 		set_namearray( &conn->veto_oplock_list, lp_veto_oplocks(snum));
-		set_namearray( &conn->aio_write_behind_list,
-				lp_aio_write_behind(snum));
 	}
 	
+	/* Invoke VFS make connection hook - do this before the VFS_STAT call
+	   to allow any filesystems needing user credentials to initialize
+	   themselves. */
+
+	if (SMB_VFS_CONNECT(conn, lp_servicename(snum), user) < 0) {
+		DEBUG(1,("make_connection: VFS make connection failed!\n"));
+		change_to_root_user();
+		yield_connection(conn, lp_servicename(snum));
+		conn_free(conn);
+		*status = NT_STATUS_UNSUCCESSFUL;
+		return NULL;
+	}
 
 	/* win2000 does not check the permissions on the directory
 	   during the tree connect, instead relying on permission
@@ -1086,45 +1004,37 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 	if ((ret = SMB_VFS_STAT(conn, conn->connectpath, &st)) != 0 ||
 	    !S_ISDIR(st.st_mode)) {
 		if (ret == 0 && !S_ISDIR(st.st_mode)) {
-			DEBUG(0,("'%s' is not a directory, when connecting to "
+			DEBUG(1,("'%s' is not a directory, when connecting to "
 				 "[%s]\n", conn->connectpath,
 				 lp_servicename(snum)));
 		} else {
-			DEBUG(0,("'%s' does not exist or permission denied "
+			DEBUG(1,("'%s' does not exist or permission denied "
 				 "when connecting to [%s] Error was %s\n",
 				 conn->connectpath, lp_servicename(snum),
 				 strerror(errno) ));
 		}
-		*pstatus = NT_STATUS_BAD_NETWORK_NAME;
-		goto err_root_exit;
+		change_to_root_user();
+		/* Call VFS disconnect hook */    
+		SMB_VFS_DISCONNECT(conn);
+		yield_connection(conn, lp_servicename(snum));
+		conn_free(conn);
+		*status = NT_STATUS_BAD_NETWORK_NAME;
+		return NULL;
 	}
-
+	
 	string_set(&conn->origpath,conn->connectpath);
-
+	
 #if SOFTLINK_OPTIMISATION
 	/* resolve any soft links early if possible */
 	if (vfs_ChDir(conn,conn->connectpath) == 0) {
-		TALLOC_CTX *ctx = talloc_tos();
-		char *s = vfs_GetWd(ctx,s);
-		if (!s) {
-			*status = map_nt_error_from_unix(errno);
-			goto err_root_exit;
-		}
-		if (!set_conn_connectpath(conn,s)) {
-			*status = NT_STATUS_NO_MEMORY;
-			goto err_root_exit;
-		}
+		pstring s;
+		pstrcpy(s,conn->connectpath);
+		vfs_GetWd(conn,s);
+		set_conn_connectpath(conn,s);
 		vfs_ChDir(conn,conn->connectpath);
 	}
 #endif
-
-	/* Figure out the characteristics of the underlying filesystem. This
-	 * assumes that all the filesystem mounted withing a share path have
-	 * the same characteristics, which is likely but not guaranteed.
-	 */
-
-	conn->fs_capabilities = SMB_VFS_FS_CAPABILITIES(conn);
-
+	
 	/*
 	 * Print out the 'connected as' stuff here as we need
 	 * to know the effective uid and gid we will be using
@@ -1136,24 +1046,14 @@ static connection_struct *make_connection_snum(int snum, user_struct *vuser,
 			 conn->client_address );
 		dbgtext( "%s", srv_is_signing_active() ? "signed " : "");
 		dbgtext( "connect to service %s ", lp_servicename(snum) );
-		dbgtext( "initially as user %s ",
-			 conn->server_info->unix_name );
+		dbgtext( "initially as user %s ", user );
 		dbgtext( "(uid=%d, gid=%d) ", (int)geteuid(), (int)getegid() );
 		dbgtext( "(pid %d)\n", (int)sys_getpid() );
 	}
-
+	
 	/* we've finished with the user stuff - go back to root */
 	change_to_root_user();
 	return(conn);
-
-  err_root_exit:
-
-	change_to_root_user();
-	/* Call VFS disconnect hook */
-	SMB_VFS_DISCONNECT(conn);
-	yield_connection(conn, lp_servicename(snum));
-	conn_free(conn);
-	return NULL;
 }
 
 /***************************************************************************************
@@ -1176,7 +1076,7 @@ connection_struct *make_connection_with_chdir(const char *service_in,
 	 */
 	 
 	if ( conn && vfs_ChDir(conn,conn->connectpath) != 0 ) {
-		DEBUG(0,("make_connection_with_chdir: Can't change "
+		DEBUG(1,("move_driver_to_download_area: Can't change "
 			 "directory to %s for [print$] (%s)\n",
 			 conn->connectpath,strerror(errno)));
 		yield_connection(conn, lp_servicename(SNUM(conn)));
@@ -1203,14 +1103,13 @@ connection_struct *make_connection(const char *service_in, DATA_BLOB password,
 	fstring service;
 	fstring dev;
 	int snum = -1;
-	char addr[INET6_ADDRSTRLEN];
 
 	fstrcpy(dev, pdev);
 
 	/* This must ONLY BE CALLED AS ROOT. As it exits this function as
 	 * root. */
 	if (!non_root_mode() && (euid = geteuid()) != 0) {
-		DEBUG(0,("make_connection: PANIC ERROR. Called as nonroot "
+		DEBUG(1,("make_connection: PANIC ERROR. Called as nonroot "
 			 "(%u)\n", (unsigned int)euid ));
 		smb_panic("make_connection: PANIC ERROR. Called as nonroot\n");
 	}
@@ -1241,7 +1140,7 @@ connection_struct *make_connection(const char *service_in, DATA_BLOB password,
 
 	if (strequal(service_in,HOMES_NAME)) {
 		if(lp_security() != SEC_SHARE) {
-			DATA_BLOB no_pw = data_blob_null;
+			DATA_BLOB no_pw = data_blob(NULL, 0);
 			if (vuser->homes_snum == -1) {
 				DEBUG(2, ("[homes] share not available for "
 					  "this user because it was not found "
@@ -1277,7 +1176,7 @@ connection_struct *make_connection(const char *service_in, DATA_BLOB password,
 	} else if ((lp_security() != SEC_SHARE) && (vuser->homes_snum != -1)
 		   && strequal(service_in,
 			       lp_servicename(vuser->homes_snum))) {
-		DATA_BLOB no_pw = data_blob_null;
+		DATA_BLOB no_pw = data_blob(NULL, 0);
 		DEBUG(5, ("making a connection to 'homes' service [%s] "
 			  "created at session setup time\n", service_in));
 		return make_connection_snum(vuser->homes_snum,
@@ -1299,10 +1198,8 @@ connection_struct *make_connection(const char *service_in, DATA_BLOB password,
 			return NULL;
 		}
 
-		DEBUG(0,("%s (%s) couldn't find service %s\n",
-			get_remote_machine_name(),
-			client_addr(get_client_fd(),addr,sizeof(addr)),
-			service));
+		DEBUG(1,("%s (%s) couldn't find service %s\n",
+			 get_remote_machine_name(), client_addr(), service));
 		*status = NT_STATUS_BAD_NETWORK_NAME;
 		return NULL;
 	}
@@ -1354,32 +1251,28 @@ void close_cnum(connection_struct *conn, uint16 vuid)
 	/* execute any "postexec = " line */
 	if (*lp_postexec(SNUM(conn)) && 
 	    change_to_user(conn, vuid))  {
-		char *cmd = talloc_sub_advanced(talloc_tos(),
-					lp_servicename(SNUM(conn)),
-					conn->server_info->unix_name,
-					conn->connectpath,
-					conn->server_info->utok.gid,
-					conn->server_info->sanitized_username,
-					pdb_get_domain(conn->server_info->sam_account),
-					lp_postexec(SNUM(conn)));
+		pstring cmd;
+		pstrcpy(cmd,lp_postexec(SNUM(conn)));
+		standard_sub_advanced(lp_servicename(SNUM(conn)), conn->user,
+				      conn->connectpath, conn->gid,
+				      get_current_username(),
+				      current_user_info.domain,
+				      cmd, sizeof(cmd));
 		smbrun(cmd,NULL);
-		TALLOC_FREE(cmd);
 		change_to_root_user();
 	}
 
 	change_to_root_user();
 	/* execute any "root postexec = " line */
 	if (*lp_rootpostexec(SNUM(conn)))  {
-		char *cmd = talloc_sub_advanced(talloc_tos(),
-					lp_servicename(SNUM(conn)),
-					conn->server_info->unix_name,
-					conn->connectpath,
-					conn->server_info->utok.gid,
-					conn->server_info->sanitized_username,
-					pdb_get_domain(conn->server_info->sam_account),
-					lp_rootpostexec(SNUM(conn)));
+		pstring cmd;
+		pstrcpy(cmd,lp_rootpostexec(SNUM(conn)));
+		standard_sub_advanced(lp_servicename(SNUM(conn)), conn->user,
+				      conn->connectpath, conn->gid,
+				      get_current_username(),
+				      current_user_info.domain,
+				      cmd, sizeof(cmd));
 		smbrun(cmd,NULL);
-		TALLOC_FREE(cmd);
 	}
 
 	conn_free(conn);

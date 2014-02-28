@@ -526,7 +526,7 @@ static int dopr(char *buffer, size_t maxlen, const char *format, va_list args_in
 		}
 	}
 
-	/* retrieve the format arguments */
+	/* retieve the format arguments */
 	for (pnum = 0; pnum < max_pos; pnum++) {
 		int i;
 
@@ -1264,7 +1264,7 @@ static int add_cnk_list_entry(struct pr_chunk_x **list,
 	VA_COPY(ap2, ap);
 	ret = vsnprintf(NULL, 0, format, ap2);
 	va_end(ap2);
-	if (ret < 0) return ret;
+	if (ret <= 0) return ret;
 
 	(*ptr) = (char *)malloc(ret+1);
 	if (!*ptr) return -1;

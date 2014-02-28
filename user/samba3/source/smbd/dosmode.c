@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,24 +15,11 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
-
-extern enum protocol_types Protocol;
-
-static uint32_t filter_mode_by_protocol(uint32_t mode)
-{
-	if (Protocol <= PROTOCOL_LANMAN2) {
-		DEBUG(10,("filter_mode_by_protocol: "
-			"filtering result 0x%x to 0x%x\n",
-			(unsigned int)mode,
-			(unsigned int)(mode & 0x3f) ));
-		mode &= 0x3f;
-	}
-	return mode;
-}
 
 static int set_sparse_flag(const SMB_STRUCT_STAT * const sbuf)
 {
@@ -42,6 +29,26 @@ static int set_sparse_flag(const SMB_STRUCT_STAT * const sbuf)
 	}
 #endif
 	return 0;
+}
+
+/****************************************************************************
+ Work out whether this file is offline
+****************************************************************************/
+
+static uint32 set_offline_flag(connection_struct *conn, const char *const path)
+{
+	if (ISDOT(path) || ISDOTDOT(path)) {
+		return 0;
+	}
+#ifdef AVM_SMALLER
+	return 0;
+#else
+	if (!lp_dmapi_support(SNUM(conn)) || !dmapi_have_session()) {
+		return 0;
+	}
+
+	return dmapi_file_flags(path);
+#endif
 }
 
 /****************************************************************************
@@ -197,7 +204,7 @@ static uint32 dos_mode_from_sbuf(connection_struct *conn, const char *path, SMB_
  Get DOS attributes from an EA.
 ****************************************************************************/
 
-static bool get_ea_dos_attribute(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf, uint32 *pattr)
+static BOOL get_ea_dos_attribute(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf, uint32 *pattr)
 {
 	ssize_t sizeret;
 	fstring attrstr;
@@ -212,16 +219,13 @@ static bool get_ea_dos_attribute(connection_struct *conn, const char *path,SMB_S
 
 	sizeret = SMB_VFS_GETXATTR(conn, path, SAMBA_XATTR_DOS_ATTRIB, attrstr, sizeof(attrstr));
 	if (sizeret == -1) {
-		if (errno == ENOSYS
-#if defined(ENOTSUP)
-			|| errno == ENOTSUP) {
-#else
-				) {
-#endif
+#if defined(ENOTSUP) && defined(ENOATTR)
+		if ((errno != ENOTSUP) && (errno != ENOATTR) && (errno != EACCES) && (errno != EPERM)) {
 			DEBUG(1,("get_ea_dos_attributes: Cannot get attribute from EA on file %s: Error = %s\n",
 				path, strerror(errno) ));
 			set_store_dos_attributes(SNUM(conn), False);
 		}
+#endif
 		return False;
 	}
 	/* Null terminate string. */
@@ -256,11 +260,11 @@ static bool get_ea_dos_attribute(connection_struct *conn, const char *path,SMB_S
  Set DOS attributes in an EA.
 ****************************************************************************/
 
-static bool set_ea_dos_attribute(connection_struct *conn, const char *path, SMB_STRUCT_STAT *sbuf, uint32 dosmode)
+static BOOL set_ea_dos_attribute(connection_struct *conn, const char *path, SMB_STRUCT_STAT *sbuf, uint32 dosmode)
 {
 	fstring attrstr;
 	files_struct *fsp = NULL;
-	bool ret = False;
+	BOOL ret = False;
 
 	if (!lp_store_dos_attributes(SNUM(conn))) {
 		return False;
@@ -275,8 +279,6 @@ static bool set_ea_dos_attribute(connection_struct *conn, const char *path, SMB_
 #else
 				) {
 #endif
-				DEBUG(1,("set_ea_dos_attributes: Cannot set attribute EA on file %s: Error = %s\n",
-					path, strerror(errno) ));
 				set_store_dos_attributes(SNUM(conn), False);
 			}
 			return False;
@@ -333,10 +335,8 @@ uint32 dos_mode_msdfs(connection_struct *conn, const char *path,SMB_STRUCT_STAT 
 		} else {
 			p = path;
 		}
-
-		/* Only . and .. are not hidden. */
-		if (p[0] == '.' && !((p[1] == '\0') ||
-				(p[1] == '.' && p[2] == '\0'))) {
+		
+		if (p[0] == '.' && p[1] != '.' && p[1] != 0) {
 			result |= aHIDDEN;
 		}
 	}
@@ -348,12 +348,6 @@ uint32 dos_mode_msdfs(connection_struct *conn, const char *path,SMB_STRUCT_STAT 
 	if (!(result & aHIDDEN) && IS_HIDDEN_PATH(conn,path)) {
 		result |= aHIDDEN;
 	}
-
-	if (result == 0) {
-		result = FILE_ATTRIBUTE_NORMAL;
-	}
-
-	result = filter_mode_by_protocol(result);
 
 	DEBUG(8,("dos_mode_msdfs returning "));
 
@@ -376,7 +370,6 @@ uint32 dos_mode_msdfs(connection_struct *conn, const char *path,SMB_STRUCT_STAT 
 uint32 dos_mode(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf)
 {
 	uint32 result = 0;
-	bool offline;
 
 	DEBUG(8,("dos_mode: %s\n", path));
 
@@ -393,10 +386,8 @@ uint32 dos_mode(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf)
 		} else {
 			p = path;
 		}
-
-		/* Only . and .. are not hidden. */
-		if (p[0] == '.' && !((p[1] == '\0') ||
-				(p[1] == '.' && p[2] == '\0'))) {
+		
+		if (p[0] == '.' && p[1] != '.' && p[1] != 0) {
 			result |= aHIDDEN;
 		}
 	}
@@ -408,10 +399,8 @@ uint32 dos_mode(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf)
 		result |= dos_mode_from_sbuf(conn, path, sbuf);
 	}
 
-	
-	offline = SMB_VFS_IS_OFFLINE(conn, path, sbuf);
-	if (S_ISREG(sbuf->st_mode) && offline) {
-		result |= FILE_ATTRIBUTE_OFFLINE;
+	if (S_ISREG(sbuf->st_mode)) {
+		result |= set_offline_flag(conn, path);
 	}
 
 	/* Optimization : Only call is_hidden_path if it's not already
@@ -419,12 +408,6 @@ uint32 dos_mode(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf)
 	if (!(result & aHIDDEN) && IS_HIDDEN_PATH(conn,path)) {
 		result |= aHIDDEN;
 	}
-
-	if (result == 0) {
-		result = FILE_ATTRIBUTE_NORMAL;
-	}
-
-	result = filter_mode_by_protocol(result);
 
 	DEBUG(8,("dos_mode returning "));
 
@@ -446,18 +429,16 @@ uint32 dos_mode(connection_struct *conn, const char *path,SMB_STRUCT_STAT *sbuf)
 
 int file_set_dosmode(connection_struct *conn, const char *fname,
 		     uint32 dosmode, SMB_STRUCT_STAT *st,
-		     const char *parent_dir,
-		     bool newfile)
+		     const char *parent_dir)
 {
 	SMB_STRUCT_STAT st1;
 	int mask=0;
 	mode_t tmp;
 	mode_t unixmode;
-	int ret = -1, lret = -1;
-	uint32_t old_mode;
+	int ret = -1;
 
 	/* We only allow READONLY|HIDDEN|SYSTEM|DIRECTORY|ARCHIVE here. */
-	dosmode &= (SAMBA_ATTRIBUTES_MASK | FILE_ATTRIBUTE_OFFLINE);
+	dosmode &= SAMBA_ATTRIBUTES_MASK;
 
 	DEBUG(10,("file_set_dosmode: setting dos mode 0x%x on file %s\n", dosmode, fname));
 
@@ -480,34 +461,13 @@ int file_set_dosmode(connection_struct *conn, const char *fname,
 	else
 		dosmode &= ~aDIR;
 
-	old_mode = dos_mode(conn,fname,st);
-	
-	if (dosmode & FILE_ATTRIBUTE_OFFLINE) {
-		if (!(old_mode & FILE_ATTRIBUTE_OFFLINE)) {
-			lret = SMB_VFS_SET_OFFLINE(conn, fname);
-			if (lret == -1) {
-				DEBUG(0, ("set_dos_mode: client has asked to set "
-					  "FILE_ATTRIBUTE_OFFLINE to %s/%s but there was "
-					  "an error while setting it or it is not supported.\n",
-					  parent_dir, fname));
-			}
-		}
-	}
-
-	dosmode  &= ~FILE_ATTRIBUTE_OFFLINE;
-	old_mode &= ~FILE_ATTRIBUTE_OFFLINE;
-
-	if (old_mode == dosmode) {
+	if (dos_mode(conn,fname,st) == dosmode) {
 		st->st_mode = unixmode;
 		return(0);
 	}
 
 	/* Store the DOS attributes in an EA by preference. */
 	if (set_ea_dos_attribute(conn, fname, st, dosmode)) {
-		if (!newfile) {
-			notify_fname(conn, NOTIFY_ACTION_MODIFIED,
-				FILE_NOTIFY_CHANGE_ATTRIBUTES, fname);
-		}
 		st->st_mode = unixmode;
 		return 0;
 	}
@@ -544,12 +504,9 @@ int file_set_dosmode(connection_struct *conn, const char *fname,
 		unixmode |= (st->st_mode & (S_IWUSR|S_IWGRP|S_IWOTH));
 	}
 
-	ret = SMB_VFS_CHMOD(conn, fname, unixmode);
-	if (ret == 0) {
-		if(!newfile || (lret != -1)) {
-			notify_fname(conn, NOTIFY_ACTION_MODIFIED,
-				     FILE_NOTIFY_CHANGE_ATTRIBUTES, fname);
-		}
+	if ((ret = SMB_VFS_CHMOD(conn,fname,unixmode)) == 0) {
+		notify_fname(conn, NOTIFY_ACTION_MODIFIED,
+			     FILE_NOTIFY_CHANGE_ATTRIBUTES, fname);
 		st->st_mode = unixmode;
 		return 0;
 	}
@@ -578,13 +535,11 @@ int file_set_dosmode(connection_struct *conn, const char *fname,
 		if (!NT_STATUS_IS_OK(open_file_fchmod(conn,fname,st,&fsp)))
 			return -1;
 		become_root();
-		ret = SMB_VFS_FCHMOD(fsp, unixmode);
+		ret = SMB_VFS_FCHMOD(fsp, fsp->fh->fd, unixmode);
 		unbecome_root();
 		close_file_fchmod(fsp);
-		if (!newfile) {
-			notify_fname(conn, NOTIFY_ACTION_MODIFIED,
-				FILE_NOTIFY_CHANGE_ATTRIBUTES, fname);
-		}
+		notify_fname(conn, NOTIFY_ACTION_MODIFIED,
+			     FILE_NOTIFY_CHANGE_ATTRIBUTES, fname);
 		if (ret == 0) {
 			st->st_mode = unixmode;
 		}
@@ -605,11 +560,6 @@ int file_ntimes(connection_struct *conn, const char *fname, const struct timespe
 
 	errno = 0;
 	ZERO_STRUCT(sbuf);
-
-	DEBUG(6, ("file_ntime: actime: %s",
-		  time_to_asc(convert_timespec_to_time_t(ts[0]))));
-	DEBUG(6, ("file_ntime: modtime: %s",
-		  time_to_asc(convert_timespec_to_time_t(ts[1]))));
 
 	/* Don't update the time on read-only shares */
 	/* We need this as set_filetime (which can be called on
@@ -650,52 +600,30 @@ int file_ntimes(connection_struct *conn, const char *fname, const struct timespe
 
 	return ret;
 }
+  
+/*******************************************************************
+ Change a filetime - possibly allowing DOS semantics.
+*******************************************************************/
 
-/******************************************************************
- Force a "sticky" write time on a pathname. This will always be
- returned on all future write time queries and set on close.
-******************************************************************/
-
-bool set_sticky_write_time_path(connection_struct *conn, const char *fname,
-			 struct file_id fileid, const struct timespec mtime)
+BOOL set_filetime(connection_struct *conn, const char *fname,
+		const struct timespec mtime)
 {
+	struct timespec ts[2];
+
 	if (null_timespec(mtime)) {
-		return true;
+		return(True);
 	}
 
-	if (!set_sticky_write_time(fileid, mtime)) {
-		return false;
+	ts[1] = mtime; /* mtime. */
+	ts[0] = ts[1]; /* atime. */
+
+	if (file_ntimes(conn, fname, ts)) {
+		DEBUG(4,("set_filetime(%s) failed: %s\n",fname,strerror(errno)));
+		return False;
 	}
 
-	return true;
-}
-
-/******************************************************************
- Force a "sticky" write time on an fsp. This will always be
- returned on all future write time queries and set on close.
-******************************************************************/
-
-bool set_sticky_write_time_fsp(struct files_struct *fsp, const struct timespec mtime)
-{
-	fsp->write_time_forced = true;
-	TALLOC_FREE(fsp->update_write_time_event);
-
-	return set_sticky_write_time_path(fsp->conn, fsp->fsp_name,
-			fsp->file_id, mtime);
-}
-
-/******************************************************************
- Update a write time immediately, without the 2 second delay.
-******************************************************************/
-
-bool update_write_time(struct files_struct *fsp)
-{
-	if (!set_write_time(fsp->file_id, timespec_current())) {
-		return false;
-	}
-
-	notify_fname(fsp->conn, NOTIFY_ACTION_MODIFIED,
-			FILE_NOTIFY_CHANGE_LAST_WRITE, fsp->fsp_name);
-
-	return true;
+	notify_fname(conn, NOTIFY_ACTION_MODIFIED,
+		     FILE_NOTIFY_CHANGE_LAST_WRITE, fname);
+  
+	return True;
 }

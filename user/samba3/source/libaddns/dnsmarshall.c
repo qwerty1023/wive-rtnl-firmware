@@ -17,7 +17,9 @@
   Lesser General Public License for more details.
 
   You should have received a copy of the GNU Lesser General Public
-  License along with this library; if not, see <http://www.gnu.org/licenses/>.
+  License along with this library; if not, write to the Free Software
+  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  
+  02110-1301  USA
 */
 
 #include "dns.h"
@@ -252,7 +254,6 @@ void dns_unmarshall_domain_name(TALLOC_CTX *mem_ctx,
 
 	if (!(name = talloc(mem_ctx, struct dns_domain_name))) {
 		buf->error = ERROR_DNS_NO_MEMORY;
-		return;
 	}
 
 	dns_unmarshall_label(name, 0, buf, &name->pLabelList);

@@ -7,7 +7,7 @@
 	<manvolnum>8</manvolnum>
 	<refmiscinfo class="source">Samba</refmiscinfo>
 	<refmiscinfo class="manual">System Administration tools</refmiscinfo>
-	<refmiscinfo class="version">3.3</refmiscinfo>
+	<refmiscinfo class="version">3.0</refmiscinfo>
 </refmeta>
 
 
@@ -120,7 +120,7 @@
 		<listitem><para>If this parameter is specified it causes the
 		server to run "interactively", not as a daemon, even if the
 		server is executed on the command line of a shell. Setting this
-		parameter negates the implicit daemon mode when run from the
+		parameter negates the implicit deamon mode when run from the
 		command line. <command>smbd</command> also logs to standard
 		output, as if the <command>-S</command> parameter had been
 		given.
@@ -261,7 +261,7 @@
 <refsect1>
 	<title>VERSION</title>
 
-	<para>This man page is correct for version 3 of 
+	<para>This man page is correct for version 3.0 of 
 	the Samba suite.</para>
 </refsect1>
 

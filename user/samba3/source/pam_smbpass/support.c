@@ -1,130 +1,135 @@
-/* Unix NT password database implementation, version 0.6.
- *
- * This program is free software; you can redistribute it and/or modify it under
- * the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 3 of the License, or (at your option)
- * any later version.
- *
- * This program is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
- * more details.
- *
- * You should have received a copy of the GNU General Public License along with
- * this program; if not, see <http://www.gnu.org/licenses/>.
- */
+	/* Unix NT password database implementation, version 0.6.
+	 *
+	 * This program is free software; you can redistribute it and/or modify it under
+	 * the terms of the GNU General Public License as published by the Free
+	 * Software Foundation; either version 2 of the License, or (at your option)
+	 * any later version.
+	 *
+	 * This program is distributed in the hope that it will be useful, but WITHOUT
+	 * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+	 * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+	 * more details.
+	 *
+	 * You should have received a copy of the GNU General Public License along with
+	 * this program; if not, write to the Free Software Foundation, Inc., 675
+	 * Mass Ave, Cambridge, MA 02139, USA.
+	 */
 
-#include "includes.h"
-#include "general.h"
+	#include "includes.h"
+	#include "general.h"
 
-#include "support.h"
-
-
-#define _pam_overwrite(x)        \
-do {                             \
-     register char *__xx__;      \
-     if ((__xx__=(x)))           \
-	  while (*__xx__)        \
-	       *__xx__++ = '\0'; \
-} while (0)
-
-/*
- * Don't just free it, forget it too.
- */
-
-#define _pam_drop(X) \
-do {                 \
-    if (X) {         \
-	free(X);     \
-	X=NULL;      \
-    }                \
-} while (0)
-
-#define _pam_drop_reply(/* struct pam_response * */ reply, /* int */ replies) \
-do {                                              \
-    int reply_i;                                  \
-						  \
-    for (reply_i=0; reply_i<replies; ++reply_i) { \
-	if (reply[reply_i].resp) {                \
-	    _pam_overwrite(reply[reply_i].resp);  \
-	    free(reply[reply_i].resp);            \
-	}                                         \
-    }                                             \
-    if (reply)                                    \
-	free(reply);                              \
-} while (0)
+	#include "support.h"
 
 
-int converse(pam_handle_t *, int, int, struct pam_message **,
-			 struct pam_response **);
-int make_remark(pam_handle_t *, unsigned int, int, const char *);
-void _cleanup(pam_handle_t *, void *, int);
-char *_pam_delete(register char *);
+	#define _pam_overwrite(x)        \
+	do {                             \
+	     register char *__xx__;      \
+	     if ((__xx__=(x)))           \
+		  while (*__xx__)        \
+		       *__xx__++ = '\0'; \
+	} while (0)
 
-/* syslogging function for errors and other information */
+	/*
+	 * Don't just free it, forget it too.
+	 */
 
-void _log_err( int err, const char *format, ... )
-{
-    va_list args;
+	#define _pam_drop(X) \
+	do {                 \
+	    if (X) {         \
+		free(X);     \
+		X=NULL;      \
+	    }                \
+	} while (0)
 
-    va_start( args, format );
-    openlog( "PAM_smbpass", LOG_CONS | LOG_PID, LOG_AUTH );
-    vsyslog( err, format, args );
-    va_end( args );
-    closelog();
-}
+	#define _pam_drop_reply(/* struct pam_response * */ reply, /* int */ replies) \
+	do {                                              \
+	    int reply_i;                                  \
+							  \
+	    for (reply_i=0; reply_i<replies; ++reply_i) { \
+		if (reply[reply_i].resp) {                \
+		    _pam_overwrite(reply[reply_i].resp);  \
+		    free(reply[reply_i].resp);            \
+		}                                         \
+	    }                                             \
+	    if (reply)                                    \
+		free(reply);                              \
+	} while (0)
 
-/* this is a front-end for module-application conversations */
 
-int converse( pam_handle_t * pamh, int ctrl, int nargs
-	      , struct pam_message **message
-	      , struct pam_response **response )
-{
-	int retval;
-	struct pam_conv *conv;
+	int converse(pam_handle_t *, int, int, struct pam_message **,
+				 struct pam_response **);
+	int make_remark(pam_handle_t *, unsigned int, int, const char *);
+	void _cleanup(pam_handle_t *, void *, int);
+	char *_pam_delete(register char *);
 
-	retval = _pam_get_item(pamh, PAM_CONV, &conv);
-	if (retval == PAM_SUCCESS) {
+	/* default configuration file location */
 
-		retval = conv->conv(nargs, (const struct pam_message **) message
-							,response, conv->appdata_ptr);
+	char *servicesf = dyn_CONFIGFILE;
 
-		if (retval != PAM_SUCCESS && on(SMB_DEBUG, ctrl)) {
-			_log_err(LOG_DEBUG, "conversation failure [%s]"
+	/* syslogging function for errors and other information */
+
+	void _log_err( int err, const char *format, ... )
+	{
+	    va_list args;
+
+	    va_start( args, format );
+	    openlog( "PAM_smbpass", LOG_CONS | LOG_PID, LOG_AUTH );
+	    vsyslog( err, format, args );
+	    va_end( args );
+	    closelog();
+	}
+
+	/* this is a front-end for module-application conversations */
+
+	int converse( pam_handle_t * pamh, int ctrl, int nargs
+		      , struct pam_message **message
+		      , struct pam_response **response )
+	{
+		int retval;
+		struct pam_conv *conv;
+
+		retval = pam_get_item(pamh, PAM_CONV, (const void **) &conv);
+		if (retval == PAM_SUCCESS) {
+
+			retval = conv->conv(nargs, (const struct pam_message **) message
+								,response, conv->appdata_ptr);
+
+			if (retval != PAM_SUCCESS && on(SMB_DEBUG, ctrl)) {
+				_log_err(LOG_DEBUG, "conversation failure [%s]"
+						 ,pam_strerror(pamh, retval));
+			}
+		} else {
+			_log_err(LOG_ERR, "couldn't obtain coversation function [%s]"
 					 ,pam_strerror(pamh, retval));
 		}
-	} else {
-		_log_err(LOG_ERR, "couldn't obtain coversation function [%s]"
-				 ,pam_strerror(pamh, retval));
+
+		return retval;				/* propagate error status */
 	}
 
-	return retval;				/* propagate error status */
-}
+	int make_remark( pam_handle_t * pamh, unsigned int ctrl
+			 , int type, const char *text )
+	{
+		if (off(SMB__QUIET, ctrl)) {
+			struct pam_message *pmsg[1], msg[1];
+			struct pam_response *resp;
 
-int make_remark( pam_handle_t * pamh, unsigned int ctrl
-		 , int type, const char *text )
-{
-	if (off(SMB__QUIET, ctrl)) {
-		struct pam_message *pmsg[1], msg[1];
-		struct pam_response *resp;
+			pmsg[0] = &msg[0];
+			msg[0].msg = CONST_DISCARD(char *, text);
+			msg[0].msg_style = type;
+			resp = NULL;
 
-		pmsg[0] = &msg[0];
-		msg[0].msg = CONST_DISCARD(char *, text);
-		msg[0].msg_style = type;
-		resp = NULL;
-
-		return converse(pamh, ctrl, 1, pmsg, &resp);
+			return converse(pamh, ctrl, 1, pmsg, &resp);
+		}
+		return PAM_SUCCESS;
 	}
-	return PAM_SUCCESS;
-}
 
 
-/* set the control flags for the SMB module. */
+	/* set the control flags for the SMB module. */
 
 int set_ctrl( int flags, int argc, const char **argv )
 {
     int i = 0;
-    const char *service_file = NULL;
+    const char *service_file = dyn_CONFIGFILE;
     unsigned int ctrl;
 
     ctrl = SMB_DEFAULTS;	/* the default selection of options */
@@ -135,7 +140,7 @@ int set_ctrl( int flags, int argc, const char **argv )
     set( SMB__NONULL, ctrl );
 
     /* initialize service file location */
-    service_file=get_dyn_CONFIGFILE();
+    service_file=servicesf;
 
     if (flags & PAM_SILENT) {
         set( SMB__QUIET, ctrl );
@@ -276,7 +281,7 @@ void _cleanup_failures( pam_handle_t * pamh, void *fl, int err )
 
             /* log the number of authentication failures */
             if (failure->count != 0) {
-                _pam_get_item( pamh, PAM_SERVICE, &service );
+                pam_get_item( pamh, PAM_SERVICE, (const void **) &service );
                 _log_err( LOG_NOTICE
                           , "%d authentication %s "
                             "from %s for service %s as %s(%d)"
@@ -332,7 +337,7 @@ int _smb_verify_password( pam_handle_t * pamh, struct samu *sampass,
         } else {
             const char *service;
 
-            _pam_get_item( pamh, PAM_SERVICE, &service );
+            pam_get_item( pamh, PAM_SERVICE, (const void **)&service );
             _log_err( LOG_NOTICE, "failed auth request by %s for service %s as %s",
                       uidtoname(getuid()), service ? service : "**unknown**", name);
             return PAM_AUTH_ERR;
@@ -367,7 +372,7 @@ int _smb_verify_password( pam_handle_t * pamh, struct samu *sampass,
 
         const char *service;
 
-        _pam_get_item( pamh, PAM_SERVICE, &service );
+        pam_get_item( pamh, PAM_SERVICE, (const void **)&service );
 
         if (data_name != NULL) {
             struct _pam_failed_auth *newauth = NULL;
@@ -380,7 +385,7 @@ int _smb_verify_password( pam_handle_t * pamh, struct samu *sampass,
             if (newauth != NULL) {
 
                 /* any previous failures for this user ? */
-                _pam_get_data(pamh, data_name, &old);
+                pam_get_data(pamh, data_name, (const void **) &old);
 
                 if (old != NULL) {
                     newauth->count = old->count + 1;
@@ -485,7 +490,7 @@ int _smb_read_password( pam_handle_t * pamh, unsigned int ctrl,
     /* should we obtain the password from a PAM item ? */
 
     if (on(SMB_TRY_FIRST_PASS, ctrl) || on(SMB_USE_FIRST_PASS, ctrl)) {
-        retval = _pam_get_item( pamh, authtok_flag, &item );
+        retval = pam_get_item( pamh, authtok_flag, (const void **) &item );
         if (retval != PAM_SUCCESS) {
             /* very strange. */
             _log_err( LOG_ALERT
@@ -578,8 +583,8 @@ int _smb_read_password( pam_handle_t * pamh, unsigned int ctrl,
         retval = pam_set_item( pamh, authtok_flag, (const void *)token );
         _pam_delete( token );		/* clean it up */
         if (retval != PAM_SUCCESS
-            || (retval = _pam_get_item( pamh, authtok_flag
-                            ,&item )) != PAM_SUCCESS)
+            || (retval = pam_get_item( pamh, authtok_flag
+                            ,(const void **)&item )) != PAM_SUCCESS)
         {
             _log_err( LOG_CRIT, "error manipulating password" );
             return retval;
@@ -592,7 +597,7 @@ int _smb_read_password( pam_handle_t * pamh, unsigned int ctrl,
 
         retval = pam_set_data( pamh, data_name, (void *) token, _cleanup );
         if (retval != PAM_SUCCESS
-            || (retval = _pam_get_data( pamh, data_name, &item ))
+            || (retval = pam_get_data( pamh, data_name, (const void **)&item ))
                              != PAM_SUCCESS)
         {
             _log_err( LOG_CRIT, "error manipulating password data [%s]"
@@ -629,24 +634,4 @@ int _pam_smb_approve_pass(pam_handle_t * pamh,
     }
 
     return PAM_SUCCESS;
-}
-
-/*
- * Work around the pam API that has functions with void ** as parameters
- * These lead to strict aliasing warnings with gcc.
- */
-int _pam_get_item(const pam_handle_t *pamh,
-		  int item_type,
-		  const void *_item)
-{
-	const void **item = (const void **)_item;
-	return pam_get_item(pamh, item_type, item);
-}
-
-int _pam_get_data(const pam_handle_t *pamh,
-		  const char *module_data_name,
-		  const void *_data)
-{
-	const void **data = (const void **)_data;
-	return pam_get_data(pamh, module_data_name, data);
 }

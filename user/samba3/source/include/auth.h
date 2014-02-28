@@ -7,7 +7,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -16,7 +16,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 typedef struct auth_usersupplied_info {
@@ -26,9 +27,9 @@ typedef struct auth_usersupplied_info {
 	DATA_BLOB nt_interactive_pwd;
  	DATA_BLOB plaintext_password;
 	
-	bool encrypted;
+	BOOL encrypted;
 	
-	bool was_mapped;	      /* Did the username map actually match? */
+	BOOL was_mapped;	      /* Did the username map actually match? */
 	char *client_domain;          /* domain name string */
 	char *domain;                 /* domain name after mapping */
 	char *internal_username;      /* username after mapping */
@@ -41,14 +42,19 @@ typedef struct auth_usersupplied_info {
 } auth_usersupplied_info;
 
 typedef struct auth_serversupplied_info {
-	bool guest;
+	BOOL guest;
 
 	DOM_SID *sids; 	/* These SIDs are preliminary between
 			   check_ntlm_password and the token creation. */
 	size_t num_sids;
 
-	struct unix_user_token utok;
-
+	uid_t uid;
+	gid_t gid;
+	
+	/* This groups info is needed for when we become_user() for this uid */
+	size_t n_groups;
+	gid_t *groups;
+	
 	/* NT group information taken from the info3 structure */
 	
 	NT_USER_TOKEN *ptok;
@@ -62,21 +68,9 @@ typedef struct auth_serversupplied_info {
 	
 	void *pam_handle;
 
-	/*
-	 * This is a token from /etc/passwd and /etc/group
-	 */
-	bool nss_token;
-
+	BOOL was_mapped;	/* Did the username map match? */
 	char *unix_name;
-
-	/*
-	 * For performance reasons we keep an alpha_strcpy-sanitized version
-	 * of the username around as long as the global variable current_user
-	 * still exists. If we did not do keep this, we'd have to call
-	 * alpha_strcpy whenever we do a become_user(), potentially on every
-	 * smb request. See set_current_user_info.
-	 */
-	char *sanitized_username;
+	
 } auth_serversupplied_info;
 
 struct auth_context {
@@ -85,7 +79,7 @@ struct auth_context {
 	/* Who set this up in the first place? */ 
 	const char *challenge_set_by; 
 
-	bool challenge_may_be_modified;
+	BOOL challenge_may_be_modified;
 
 	struct auth_methods *challenge_set_method; 
 	/* What order are the various methods in?   Try to stop it changing under us */ 
@@ -121,6 +115,12 @@ typedef struct auth_methods
 	
 	/* Used to keep tabs on things like the cli for SMB server authentication */
 	void *private_data;
+	
+	/* Function to clean up the above arbitary structure */
+	void (*free_private_data)(void **private_data);
+
+	/* Function to send a keepalive message on the above structure */
+	void (*send_keepalive)(void **private_data);
 
 } auth_methods;
 

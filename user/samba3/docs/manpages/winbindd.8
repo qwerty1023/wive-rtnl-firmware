@@ -1,12 +1,12 @@
 .\"     Title: winbindd
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
-.\"      Date: 02/22/2010
+.\"      Date: 09/30/2009
 .\"    Manual: System Administration tools
-.\"    Source: Samba 3.3
+.\"    Source: Samba 3.2
 .\"  Language: English
 .\"
-.TH "WINBINDD" "8" "02/22/2010" "Samba 3\&.3" "System Administration tools"
+.TH "WINBINDD" "8" "09/30/2009" "Samba 3\&.2" "System Administration tools"
 .\" -----------------------------------------------------------------
 .\" * (re)Define some macros
 .\" -----------------------------------------------------------------
@@ -189,7 +189,7 @@ Even if winbind is not used for nsswitch, it still provides a service to
 \FCntlm_auth\F[]
 and the
 \FCpam_winbind\&.so\F[]
-PAM module, by managing connections to domain controllers\&. In this configuraiton the
+PAM module, by managing connections to domain controllers\&. In this configuration the
 \m[blue]\fBidmap uid\fR\m[]
 and
 \m[blue]\fBidmap gid\fR\m[]
@@ -353,18 +353,18 @@ The higher this value, the more detail will be logged to the log files about the
 Levels above 1 will generate considerable amounts of log data, and should only be used when investigating a problem\&. Levels above 3 are designed for use only by developers and generate HUGE amounts of log data, most of which is extremely cryptic\&.
 .sp
 Note that specifying this parameter here will override the
-\m[blue]\fB\%smb.conf.5.html#\fR\m[]
+\m[blue]\fBlog level\fR\m[]
 parameter in the
 \FCsmb\&.conf\F[]
 file\&.
 .RE
 .PP
-\-V|\-\-version
+\-V
 .RS 4
 Prints the program version number\&.
 .RE
 .PP
-\-s|\-\-configfile <configuration file>
+\-s <configuration file>
 .RS 4
 The file specified contains the configuration details required by the server\&. The information in this file includes server\-specific information such as what printcap file to use, as well as descriptions of all the services that the server is to provide\&. See
 \FCsmb\&.conf\F[]
@@ -414,6 +414,14 @@ performs\&.
 As winbindd users and groups are resolved from a server, user and group ids are allocated from a specified range\&. This is done on a first come, first served basis, although all existing users and groups will be mapped as soon as a client performs a user or group enumeration command\&. The allocated unix ids are stored in a database and will be remembered\&.
 .PP
 WARNING: The SID to unix id database is the only location where the user and group mappings are stored by winbindd\&. If this store is deleted or corrupted, there is no way for winbindd to determine which user and group ids correspond to Windows NT user and group rids\&.
+.PP
+See the
+\m[blue]\fBidmap domains\fR\m[]
+or the old
+\m[blue]\fBidmap backend\fR\m[]
+parameters in
+\FCsmb\&.conf\F[]
+for options for sharing this database, such as via LDAP\&.
 .SH "CONFIGURATION"
 .PP
 Configuration of the

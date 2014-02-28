@@ -7,7 +7,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -16,7 +16,8 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -27,7 +28,7 @@
 ********************************************************/
 
 struct con_struct {
-	bool failed_connect;
+	BOOL failed_connect;
 	NTSTATUS err;
 	struct cli_state *cli;
 	struct rpc_pipe_client *lsapipe;
@@ -53,18 +54,12 @@ static int cs_destructor(struct con_struct *p)
  Create the connection to localhost.
 ********************************************************/
 
-static struct con_struct *create_cs(struct net_context *c,
-				    TALLOC_CTX *ctx, NTSTATUS *perr)
+static struct con_struct *create_cs(TALLOC_CTX *ctx, NTSTATUS *perr)
 {
 	NTSTATUS nt_status;
-	struct sockaddr_storage loopback_ss;
+	struct in_addr loopback_ip = *interpret_addr2("127.0.0.1");
 
 	*perr = NT_STATUS_OK;
-
-	if (!interpret_string_addr(&loopback_ss, "127.0.0.1", AI_NUMERICHOST)) {
-		*perr = NT_STATUS_INVALID_PARAMETER;
-		return NULL;
-	}
 
 	if (cs) {
 		if (cs->failed_connect) {
@@ -95,15 +90,15 @@ static struct con_struct *create_cs(struct net_context *c,
 #endif
 
 	nt_status = cli_full_connection(&cs->cli, global_myname(), global_myname(),
-					&loopback_ss, 0,
+					&loopback_ip, 0,
 					"IPC$", "IPC",
 #if 0
-					c->opt_user_name,
-					c->opt_workgroup,
-					c->opt_password,
+					opt_user_name,
+					opt_workgroup,
+					opt_password,
 #else
 					"",
-					c->opt_workgroup,
+					opt_workgroup,
 					"",
 #endif
 					0,
@@ -112,31 +107,31 @@ static struct con_struct *create_cs(struct net_context *c,
 
 	if (!NT_STATUS_IS_OK(nt_status)) {
 		DEBUG(2,("create_cs: Connect failed. Error was %s\n", nt_errstr(nt_status)));
-		cs->failed_connect = true;
+		cs->failed_connect = True;
 		cs->err = nt_status;
 		*perr = nt_status;
 		return NULL;
 	}
 
-	nt_status = cli_rpc_pipe_open_noauth(cs->cli,
-					&ndr_table_lsarpc.syntax_id,
-					&cs->lsapipe);
+	cs->lsapipe = cli_rpc_pipe_open_noauth(cs->cli,
+					PI_LSARPC,
+					&nt_status);
 
-	if (!NT_STATUS_IS_OK(nt_status)) {
+	if (cs->lsapipe == NULL) {
 		DEBUG(2,("create_cs: open LSA pipe failed. Error was %s\n", nt_errstr(nt_status)));
-		cs->failed_connect = true;
+		cs->failed_connect = True;
 		cs->err = nt_status;
 		*perr = nt_status;
 		return NULL;
 	}
 
-	nt_status = rpccli_lsa_open_policy(cs->lsapipe, ctx, true,
+	nt_status = rpccli_lsa_open_policy(cs->lsapipe, ctx, True,
 				SEC_RIGHTS_MAXIMUM_ALLOWED,
 				&cs->pol);
 
 	if (!NT_STATUS_IS_OK(nt_status)) {
 		DEBUG(2,("create_cs: rpccli_lsa_open_policy failed. Error was %s\n", nt_errstr(nt_status)));
-		cs->failed_connect = true;
+		cs->failed_connect = True;
 		cs->err = nt_status;
 		*perr = nt_status;
 		return NULL;
@@ -153,8 +148,7 @@ static struct con_struct *create_cs(struct net_context *c,
  The local smbd will also ask winbindd for us, so we don't have to.
 ********************************************************/
 
-NTSTATUS net_lookup_name_from_sid(struct net_context *c,
-				TALLOC_CTX *ctx,
+NTSTATUS net_lookup_name_from_sid(TALLOC_CTX *ctx,
 				DOM_SID *psid,
 				const char **ppdomain,
 				const char **ppname)
@@ -168,7 +162,7 @@ NTSTATUS net_lookup_name_from_sid(struct net_context *c,
 	*ppdomain = NULL;
 	*ppname = NULL;
 
-	csp = create_cs(c, ctx, &nt_status);
+	csp = create_cs(ctx, &nt_status);
 	if (csp == NULL) {
 		return nt_status;
 	}
@@ -196,15 +190,14 @@ NTSTATUS net_lookup_name_from_sid(struct net_context *c,
  Do a lookup_names call to localhost.
 ********************************************************/
 
-NTSTATUS net_lookup_sid_from_name(struct net_context *c, TALLOC_CTX *ctx,
-				  const char *full_name, DOM_SID *pret_sid)
+NTSTATUS net_lookup_sid_from_name(TALLOC_CTX *ctx, const char *full_name, DOM_SID *pret_sid)
 {
 	NTSTATUS nt_status;
 	struct con_struct *csp = NULL;
 	DOM_SID *sids = NULL;
 	enum lsa_SidType *types = NULL;
 
-	csp = create_cs(c, ctx, &nt_status);
+	csp = create_cs(ctx, &nt_status);
 	if (csp == NULL) {
 		return nt_status;
 	}
@@ -213,8 +206,8 @@ NTSTATUS net_lookup_sid_from_name(struct net_context *c, TALLOC_CTX *ctx,
 						&csp->pol,
 						1,
 						&full_name,
-					        NULL, 1,
-						&sids, &types);
+					        NULL, &sids,
+						&types);
 
 	if (!NT_STATUS_IS_OK(nt_status)) {
 		return nt_status;

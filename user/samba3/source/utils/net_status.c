@@ -1,82 +1,66 @@
-/*
-   Samba Unix/Linux SMB client library
+/* 
+   Samba Unix/Linux SMB client library 
    net status command -- possible replacement for smbstatus
    Copyright (C) 2003 Volker Lendecke (vl@samba.org)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
 
 #include "includes.h"
 #include "utils/net.h"
 
-int net_status_usage(struct net_context *c, int argc, const char **argv)
+static int show_session(TDB_CONTEXT *tdb, TDB_DATA kbuf, TDB_DATA dbuf,
+			void *state)
 {
-	d_printf("  net status sessions [parseable] "
-		 "Show list of open sessions\n");
-	d_printf("  net status shares [parseable]   "
-		 "Show list of open shares\n");
-	return -1;
-}
-
-static int show_session(struct db_record *rec, void *private_data)
-{
-	bool *parseable = (bool *)private_data;
+	BOOL *parseable = (BOOL *)state;
 	struct sessionid sessionid;
 
-	if (rec->value.dsize != sizeof(sessionid))
+	if (dbuf.dsize != sizeof(sessionid))
 		return 0;
 
-	memcpy(&sessionid, rec->value.dptr, sizeof(sessionid));
+	memcpy(&sessionid, dbuf.dptr, sizeof(sessionid));
 
-	if (!process_exists(sessionid.pid)) {
+	if (!process_exists_by_pid(sessionid.pid)) {
 		return 0;
 	}
 
 	if (*parseable) {
-		d_printf("%s\\%s\\%s\\%s\\%s\n",
-			 procid_str_static(&sessionid.pid), uidtoname(sessionid.uid),
-			 gidtoname(sessionid.gid),
+		d_printf("%d\\%s\\%s\\%s\\%s\n",
+			 (int)sessionid.pid, uidtoname(sessionid.uid),
+			 gidtoname(sessionid.gid), 
 			 sessionid.remote_machine, sessionid.hostname);
 	} else {
-		d_printf("%7s   %-12s  %-12s  %-12s (%s)\n",
-			 procid_str_static(&sessionid.pid), uidtoname(sessionid.uid),
-			 gidtoname(sessionid.gid),
+		d_printf("%5d   %-12s  %-12s  %-12s (%s)\n",
+			 (int)sessionid.pid, uidtoname(sessionid.uid),
+			 gidtoname(sessionid.gid), 
 			 sessionid.remote_machine, sessionid.hostname);
 	}
 
 	return 0;
 }
 
-static int net_status_sessions(struct net_context *c, int argc, const char **argv)
+static int net_status_sessions(int argc, const char **argv)
 {
-	struct db_context *db;
-	bool parseable;
-
-	if (c->display_usage) {
-		d_printf("Usage:\n"
-			 "net status sessions [parseable]\n"
-			 "    Display open user sessions.\n"
-			 "    If parseable is specified, output is machine-"
-			 "readable.\n");
-		return 0;
-	}
+	TDB_CONTEXT *tdb;
+	BOOL parseable;
 
 	if (argc == 0) {
-		parseable = false;
+		parseable = False;
 	} else if ((argc == 1) && strequal(argv[0], "parseable")) {
-		parseable = true;
+		parseable = True;
 	} else {
-		return net_status_usage(c, argc, argv);
+		return net_help_status(argc, argv);
 	}
 
 	if (!parseable) {
@@ -86,35 +70,41 @@ static int net_status_sessions(struct net_context *c, int argc, const char **arg
 			 "------------------------\n");
 	}
 
-	db = db_open(NULL, lock_path("sessionid.tdb"), 0,
-		     TDB_CLEAR_IF_FIRST, O_RDONLY, 0644);
-	if (db == NULL) {
+	tdb = tdb_open_log(lock_path("sessionid.tdb"), 0,
+			   TDB_DEFAULT, O_RDONLY, 0);
+
+	if (tdb == NULL) {
 		d_fprintf(stderr, "%s not initialised\n", lock_path("sessionid.tdb"));
 		return -1;
 	}
 
-	db->traverse_read(db, show_session, &parseable);
-	TALLOC_FREE(db);
+	tdb_traverse(tdb, show_session, &parseable);
+	tdb_close(tdb);
 
 	return 0;
 }
 
-static int show_share(struct db_record *rec,
-		      const struct connections_key *key,
-		      const struct connections_data *crec,
+static int show_share(TDB_CONTEXT *tdb, TDB_DATA kbuf, TDB_DATA dbuf,
 		      void *state)
 {
-	if (crec->cnum == -1)
+	struct connections_data crec;
+
+	if (dbuf.dsize != sizeof(crec))
 		return 0;
 
-	if (!process_exists(crec->pid)) {
+	memcpy(&crec, dbuf.dptr, sizeof(crec));
+
+	if (crec.cnum == -1)
+		return 0;
+
+	if (!process_exists(crec.pid)) {
 		return 0;
 	}
 
 	d_printf("%-10.10s   %s   %-12s  %s",
-	       crec->servicename, procid_str_static(&crec->pid),
-	       crec->machine,
-	       time_to_asc(crec->start));
+	       crec.servicename,procid_str_static(&crec.pid),
+	       crec.machine,
+	       time_to_asc(crec.start));
 
 	return 0;
 }
@@ -124,17 +114,18 @@ struct sessionids {
 	struct sessionid *entries;
 };
 
-static int collect_pid(struct db_record *rec, void *private_data)
+static int collect_pid(TDB_CONTEXT *tdb, TDB_DATA kbuf, TDB_DATA dbuf,
+		       void *state)
 {
-	struct sessionids *ids = (struct sessionids *)private_data;
+	struct sessionids *ids = (struct sessionids *)state;
 	struct sessionid sessionid;
 
-	if (rec->value.dsize != sizeof(sessionid))
+	if (dbuf.dsize != sizeof(sessionid))
 		return 0;
 
-	memcpy(&sessionid, rec->value.dptr, sizeof(sessionid));
+	memcpy(&sessionid, dbuf.dptr, sizeof(sessionid));
 
-	if (!process_exists(sessionid.pid))
+	if (!process_exists_by_pid(sessionid.pid)) 
 		return 0;
 
 	ids->num_entries += 1;
@@ -148,76 +139,85 @@ static int collect_pid(struct db_record *rec, void *private_data)
 	return 0;
 }
 
-static int show_share_parseable(struct db_record *rec,
-				const struct connections_key *key,
-				const struct connections_data *crec,
+static int show_share_parseable(TDB_CONTEXT *tdb, TDB_DATA kbuf, TDB_DATA dbuf,
 				void *state)
 {
 	struct sessionids *ids = (struct sessionids *)state;
+	struct connections_data crec;
 	int i;
-	bool guest = true;
+	BOOL guest = True;
 
-	if (crec->cnum == -1)
+	if (dbuf.dsize != sizeof(crec))
 		return 0;
 
-	if (!process_exists(crec->pid)) {
+	memcpy(&crec, dbuf.dptr, sizeof(crec));
+
+	if (crec.cnum == -1)
+		return 0;
+
+	if (!process_exists(crec.pid)) {
 		return 0;
 	}
 
 	for (i=0; i<ids->num_entries; i++) {
-		struct server_id id = ids->entries[i].pid;
-		if (procid_equal(&id, &crec->pid)) {
-			guest = false;
+		struct process_id id = pid_to_procid(ids->entries[i].pid);
+		if (procid_equal(&id, &crec.pid)) {
+			guest = False;
 			break;
 		}
 	}
 
 	d_printf("%s\\%s\\%s\\%s\\%s\\%s\\%s",
-		 crec->servicename,procid_str_static(&crec->pid),
+		 crec.servicename,procid_str_static(&crec.pid),
 		 guest ? "" : uidtoname(ids->entries[i].uid),
 		 guest ? "" : gidtoname(ids->entries[i].gid),
-		 crec->machine,
+		 crec.machine, 
 		 guest ? "" : ids->entries[i].hostname,
-		 time_to_asc(crec->start));
+		 time_to_asc(crec.start));
 
 	return 0;
 }
 
-static int net_status_shares_parseable(struct net_context *c, int argc, const char **argv)
+static int net_status_shares_parseable(int argc, const char **argv)
 {
 	struct sessionids ids;
-	struct db_context *db;
+	TDB_CONTEXT *tdb;
 
 	ids.num_entries = 0;
 	ids.entries = NULL;
 
-	db = db_open(NULL, lock_path("sessionid.tdb"), 0,
-		     TDB_CLEAR_IF_FIRST, O_RDONLY, 0644);
-	if (db == NULL) {
+	tdb = tdb_open_log(lock_path("sessionid.tdb"), 0,
+			   TDB_DEFAULT, O_RDONLY, 0);
+
+	if (tdb == NULL) {
 		d_fprintf(stderr, "%s not initialised\n", lock_path("sessionid.tdb"));
 		return -1;
 	}
 
-	db->traverse_read(db, collect_pid, &ids);
-	TALLOC_FREE(db);
+	tdb_traverse(tdb, collect_pid, &ids);
+	tdb_close(tdb);
 
-	connections_forall(show_share_parseable, &ids);
+	tdb = tdb_open_log(lock_path("connections.tdb"), 0,
+			   TDB_DEFAULT, O_RDONLY, 0);
+
+	if (tdb == NULL) {
+		d_fprintf(stderr, "%s not initialised\n", lock_path("connections.tdb"));
+		d_fprintf(stderr, "This is normal if no SMB client has ever "
+			 "connected to your server.\n");
+		return -1;
+	}
+
+	tdb_traverse(tdb, show_share_parseable, &ids);
+	tdb_close(tdb);
 
 	SAFE_FREE(ids.entries);
 
 	return 0;
 }
 
-static int net_status_shares(struct net_context *c, int argc, const char **argv)
+static int net_status_shares(int argc, const char **argv)
 {
-	if (c->display_usage) {
-		d_printf("Usage:\n"
-			 "net status shares [parseable]\n"
-			 "    Display open user shares.\n"
-			 "    If parseable is specified, output is machine-"
-			 "readable.\n");
-		return 0;
-	}
+	TDB_CONTEXT *tdb;
 
 	if (argc == 0) {
 
@@ -226,40 +226,36 @@ static int net_status_shares(struct net_context *c, int argc, const char **argv)
 		d_printf("-------------------------------------"
 			 "------------------\n");
 
-		connections_forall(show_share, NULL);
+		tdb = tdb_open_log(lock_path("connections.tdb"), 0,
+				   TDB_DEFAULT, O_RDONLY, 0);
+
+		if (tdb == NULL) {
+			d_fprintf(stderr, "%s not initialised\n",
+				 lock_path("connections.tdb"));
+			d_fprintf(stderr, "This is normal if no SMB client has "
+				 "ever connected to your server.\n");
+			return -1;
+		}
+
+		tdb_traverse(tdb, show_share, NULL);
+		tdb_close(tdb);
 
 		return 0;
 	}
 
 	if ((argc != 1) || !strequal(argv[0], "parseable")) {
-		return net_status_usage(c, argc, argv);
+		return net_help_status(argc, argv);
 	}
 
-	return net_status_shares_parseable(c, argc, argv);
+	return net_status_shares_parseable(argc, argv);
 }
 
-int net_status(struct net_context *c, int argc, const char **argv)
+int net_status(int argc, const char **argv)
 {
 	struct functable func[] = {
-		{
-			"sessions",
-			net_status_sessions,
-			NET_TRANSPORT_LOCAL,
-			"Show list of open sessions",
-			"net status sessions [parseable]\n"
-			"    If parseable is specified, output is presented "
-			"in a machine-parseable fashion."
-		},
-		{
-			"shares",
-			net_status_shares,
-			NET_TRANSPORT_LOCAL,
-			"Show list of open shares",
-			"net status shares [parseable]\n"
-			"    If parseable is specified, output is presented "
-			"in a machine-parseable fashion."
-		},
-		{NULL, NULL, 0, NULL, NULL}
+		{"sessions", net_status_sessions},
+		{"shares", net_status_shares},
+		{NULL, NULL}
 	};
-	return net_run_function(c, argc, argv, "net status", func);
+	return net_run_function(argc, argv, func, net_help_status);
 }

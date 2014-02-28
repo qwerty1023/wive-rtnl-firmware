@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #ifndef _RPC_SECDES_H /* _RPC_SECDES_H */
@@ -70,8 +71,26 @@
 					PROTECTED_SACL_SECURITY_INFORMATION|\
 					PROTECTED_DACL_SECURITY_INFORMATION)
 
+/* SEC_ACCESS */
+typedef uint32 SEC_ACCESS;
+
 /* SEC_ACE */
-typedef struct security_ace SEC_ACE;
+typedef struct security_ace_info {
+	uint8 type;  /* xxxx_xxxx_ACE_TYPE - e.g allowed / denied etc */
+	uint8 flags; /* xxxx_INHERIT_xxxx - e.g OBJECT_INHERIT_ACE */
+	uint16 size;
+
+	SEC_ACCESS access_mask;
+
+	/* this stuff may be present when type is XXXX_TYPE_XXXX_OBJECT */
+	uint32  obj_flags; /* xxxx_ACE_OBJECT_xxxx e.g present/inherited present etc */
+	struct GUID obj_guid;  /* object GUID */
+	struct GUID inh_guid;  /* inherited object GUID */		
+        /* eof object stuff */
+
+	DOM_SID trustee;
+
+} SEC_ACE;
 #define  SEC_ACE_HEADER_SIZE (2 * sizeof(uint8) + sizeof(uint16) + sizeof(uint32))
 
 #ifndef ACL_REVISION
@@ -80,7 +99,14 @@ typedef struct security_ace SEC_ACE;
 
 #ifndef _SEC_ACL
 /* SEC_ACL */
-typedef struct security_acl SEC_ACL;
+typedef struct security_acl_info {
+	uint16 revision; /* 0x0003 */
+	uint16 size; /* size in bytes of the entire ACL structure */
+	uint32 num_aces; /* number of Access Control Entries */
+
+	SEC_ACE *aces;
+
+} SEC_ACL;
 #define  SEC_ACL_HEADER_SIZE (2 * sizeof(uint16) + sizeof(uint32))
 #define _SEC_ACL
 #endif
@@ -91,33 +117,54 @@ typedef struct security_acl SEC_ACL;
 
 #ifndef _SEC_DESC
 /* SEC_DESC */
-typedef struct security_descriptor SEC_DESC;
+typedef struct security_descriptor_info {
+	uint16 revision; /* 0x0001 */
+	uint16 type;     /* SEC_DESC_xxxx flags */
+
+	uint32 off_owner_sid; /* offset to owner sid */
+	uint32 off_grp_sid  ; /* offset to group sid */
+	uint32 off_sacl     ; /* offset to system list of permissions */
+	uint32 off_dacl     ; /* offset to list of permissions */
+
+	SEC_ACL *dacl; /* user ACL */
+	SEC_ACL *sacl; /* system ACL */
+	DOM_SID *owner_sid; 
+	DOM_SID *group_sid;
+
+} SEC_DESC;
 #define  SEC_DESC_HEADER_SIZE (2 * sizeof(uint16) + 4 * sizeof(uint32))
 #define _SEC_DESC
 #endif
 
 #ifndef _SEC_DESC_BUF
 /* SEC_DESC_BUF */
-typedef struct sec_desc_buf SEC_DESC_BUF;
+typedef struct sec_desc_buf_info {
+	uint32 max_len;
+	uint32 ptr;
+	uint32 len;
+
+	SEC_DESC *sec;
+
+} SEC_DESC_BUF;
 #define _SEC_DESC_BUF
 #endif
 
 /* A type to describe the mapping of generic access rights to object
    specific access rights. */
 
-struct generic_mapping {
+typedef struct generic_mapping {
 	uint32 generic_read;
 	uint32 generic_write;
 	uint32 generic_execute;
 	uint32 generic_all;
-};
+} GENERIC_MAPPING;
 
-struct standard_mapping {
+typedef struct standard_mapping {
 	uint32 std_read;
 	uint32 std_write;
 	uint32 std_execute;
 	uint32 std_all;
-};
+} STANDARD_MAPPING;
 
 
 /* Security Access Masks Rights */
@@ -145,6 +192,21 @@ struct standard_mapping {
 #define STD_RIGHT_SYNCHRONIZE_ACCESS	0x00100000
 
 #define STD_RIGHT_ALL_ACCESS		0x001F0000
+
+/* Combinations of standard masks. */
+#define STANDARD_RIGHTS_ALL_ACCESS	STD_RIGHT_ALL_ACCESS /* 0x001f0000 */
+#define STANDARD_RIGHTS_MODIFY_ACCESS	STD_RIGHT_READ_CONTROL_ACCESS /* 0x00020000 */
+#define STANDARD_RIGHTS_EXECUTE_ACCESS	STD_RIGHT_READ_CONTROL_ACCESS /* 0x00020000 */
+#define STANDARD_RIGHTS_READ_ACCESS	STD_RIGHT_READ_CONTROL_ACCESS /* 0x00020000 */
+#define STANDARD_RIGHTS_WRITE_ACCESS \
+		(STD_RIGHT_WRITE_OWNER_ACCESS	| \
+		 STD_RIGHT_WRITE_DAC_ACCESS	| \
+		 STD_RIGHT_DELETE_ACCESS)	/* 0x000d0000 */
+#define STANDARD_RIGHTS_REQUIRED_ACCESS \
+		(STD_RIGHT_DELETE_ACCESS	| \
+		STD_RIGHT_READ_CONTROL_ACCESS	| \
+		STD_RIGHT_WRITE_DAC_ACCESS	| \
+		STD_RIGHT_WRITE_OWNER_ACCESS)	/* 0x000f0000 */
 
 /* File Object specific access rights */
 
@@ -199,21 +261,189 @@ struct standard_mapping {
 		SA_RIGHT_FILE_WRITE_DATA	| \
 		SA_RIGHT_FILE_READ_DATA)
 
+/* SAM server specific access rights */
+
+#define SA_RIGHT_SAM_CONNECT_SERVER	0x00000001
+#define SA_RIGHT_SAM_SHUTDOWN_SERVER	0x00000002
+#define SA_RIGHT_SAM_INITIALISE_SERVER	0x00000004
+#define SA_RIGHT_SAM_CREATE_DOMAIN	0x00000008
+#define SA_RIGHT_SAM_ENUM_DOMAINS	0x00000010
+#define SA_RIGHT_SAM_OPEN_DOMAIN	0x00000020
+
+#define SA_RIGHT_SAM_ALL_ACCESS		0x0000003F
+
+#define GENERIC_RIGHTS_SAM_ALL_ACCESS \
+		(STANDARD_RIGHTS_REQUIRED_ACCESS| \
+		SA_RIGHT_SAM_ALL_ACCESS)
+
+#define GENERIC_RIGHTS_SAM_READ	\
+		(STANDARD_RIGHTS_READ_ACCESS	| \
+		SA_RIGHT_SAM_ENUM_DOMAINS)
+
+#define GENERIC_RIGHTS_SAM_WRITE \
+		(STANDARD_RIGHTS_WRITE_ACCESS	| \
+		SA_RIGHT_SAM_CREATE_DOMAIN	| \
+		SA_RIGHT_SAM_INITIALISE_SERVER	| \
+		SA_RIGHT_SAM_SHUTDOWN_SERVER)
+
+#define GENERIC_RIGHTS_SAM_EXECUTE \
+		(STANDARD_RIGHTS_EXECUTE_ACCESS	| \
+		SA_RIGHT_SAM_OPEN_DOMAIN	| \
+		SA_RIGHT_SAM_CONNECT_SERVER)            
+
+
+/* Domain Object specific access rights */
+
+#define SA_RIGHT_DOMAIN_LOOKUP_INFO_1		0x00000001
+#define SA_RIGHT_DOMAIN_SET_INFO_1		0x00000002
+#define SA_RIGHT_DOMAIN_LOOKUP_INFO_2		0x00000004
+#define SA_RIGHT_DOMAIN_SET_INFO_2		0x00000008
+#define SA_RIGHT_DOMAIN_CREATE_USER		0x00000010
+#define SA_RIGHT_DOMAIN_CREATE_GROUP		0x00000020
+#define SA_RIGHT_DOMAIN_CREATE_ALIAS		0x00000040
+#define SA_RIGHT_DOMAIN_LOOKUP_ALIAS_BY_MEM	0x00000080
+#define SA_RIGHT_DOMAIN_ENUM_ACCOUNTS		0x00000100
+#define SA_RIGHT_DOMAIN_OPEN_ACCOUNT		0x00000200
+#define SA_RIGHT_DOMAIN_SET_INFO_3		0x00000400
+
+#define SA_RIGHT_DOMAIN_ALL_ACCESS		0x000007FF
+
+#define GENERIC_RIGHTS_DOMAIN_ALL_ACCESS \
+		(STANDARD_RIGHTS_REQUIRED_ACCESS| \
+		SA_RIGHT_DOMAIN_ALL_ACCESS)
+
+#define GENERIC_RIGHTS_DOMAIN_READ \
+		(STANDARD_RIGHTS_READ_ACCESS		| \
+		SA_RIGHT_DOMAIN_LOOKUP_ALIAS_BY_MEM	| \
+		SA_RIGHT_DOMAIN_LOOKUP_INFO_2)
+
+#define GENERIC_RIGHTS_DOMAIN_WRITE \
+		(STANDARD_RIGHTS_WRITE_ACCESS	| \
+		SA_RIGHT_DOMAIN_SET_INFO_3	| \
+		SA_RIGHT_DOMAIN_CREATE_ALIAS	| \
+		SA_RIGHT_DOMAIN_CREATE_GROUP	| \
+		SA_RIGHT_DOMAIN_CREATE_USER	| \
+		SA_RIGHT_DOMAIN_SET_INFO_2	| \
+		SA_RIGHT_DOMAIN_SET_INFO_1)
+
+#define GENERIC_RIGHTS_DOMAIN_EXECUTE \
+		(STANDARD_RIGHTS_EXECUTE_ACCESS	| \
+		SA_RIGHT_DOMAIN_OPEN_ACCOUNT	| \
+		SA_RIGHT_DOMAIN_ENUM_ACCOUNTS	| \
+		SA_RIGHT_DOMAIN_LOOKUP_INFO_1)            
+
+
+/* User Object specific access rights */
+
+#define SA_RIGHT_USER_GET_NAME_ETC	0x00000001
+#define SA_RIGHT_USER_GET_LOCALE	0x00000002
+#define SA_RIGHT_USER_SET_LOC_COM	0x00000004
+#define SA_RIGHT_USER_GET_LOGONINFO	0x00000008
+#define SA_RIGHT_USER_ACCT_FLAGS_EXPIRY	0x00000010
+#define SA_RIGHT_USER_SET_ATTRIBUTES	0x00000020
+#define SA_RIGHT_USER_CHANGE_PASSWORD	0x00000040
+#define SA_RIGHT_USER_SET_PASSWORD	0x00000080
+#define SA_RIGHT_USER_GET_GROUPS	0x00000100
+#define SA_RIGHT_USER_READ_GROUP_MEM	0x00000200
+#define SA_RIGHT_USER_CHANGE_GROUP_MEM	0x00000400
+
+#define SA_RIGHT_USER_ALL_ACCESS	0x000007FF
+
+#define GENERIC_RIGHTS_USER_ALL_ACCESS \
+		(STANDARD_RIGHTS_REQUIRED_ACCESS| \
+		SA_RIGHT_USER_ALL_ACCESS)	/* 0x000f07ff */
+
+#define GENERIC_RIGHTS_USER_READ \
+		(STANDARD_RIGHTS_READ_ACCESS	| \
+		SA_RIGHT_USER_READ_GROUP_MEM	| \
+		SA_RIGHT_USER_GET_GROUPS	| \
+		SA_RIGHT_USER_ACCT_FLAGS_EXPIRY	| \
+		SA_RIGHT_USER_GET_LOGONINFO	| \
+		SA_RIGHT_USER_GET_LOCALE)	/* 0x0002031a */
+
+#define GENERIC_RIGHTS_USER_WRITE \
+		(STANDARD_RIGHTS_WRITE_ACCESS	| \
+		SA_RIGHT_USER_CHANGE_PASSWORD	| \
+		SA_RIGHT_USER_SET_LOC_COM	| \
+		SA_RIGHT_USER_SET_ATTRIBUTES	| \
+		SA_RIGHT_USER_SET_PASSWORD	| \
+		SA_RIGHT_USER_CHANGE_GROUP_MEM)	/* 0x000204e4 */
+
+#define GENERIC_RIGHTS_USER_EXECUTE \
+		(STANDARD_RIGHTS_EXECUTE_ACCESS	| \
+		SA_RIGHT_USER_CHANGE_PASSWORD	| \
+		SA_RIGHT_USER_GET_NAME_ETC )	/* 0x00020041 */
+
+
+/* Group Object specific access rights */
+
+#define SA_RIGHT_GROUP_LOOKUP_INFO	0x00000001
+#define SA_RIGHT_GROUP_SET_INFO		0x00000002
+#define SA_RIGHT_GROUP_ADD_MEMBER	0x00000004
+#define SA_RIGHT_GROUP_REMOVE_MEMBER	0x00000008
+#define SA_RIGHT_GROUP_GET_MEMBERS	0x00000010
+
+#define SA_RIGHT_GROUP_ALL_ACCESS	0x0000001F
+
+#define GENERIC_RIGHTS_GROUP_ALL_ACCESS \
+		(STANDARD_RIGHTS_REQUIRED_ACCESS| \
+		SA_RIGHT_GROUP_ALL_ACCESS)	/* 0x000f001f */
+
+#define GENERIC_RIGHTS_GROUP_READ \
+		(STANDARD_RIGHTS_READ_ACCESS	| \
+		SA_RIGHT_GROUP_GET_MEMBERS)	/* 0x00020010 */
+
+#define GENERIC_RIGHTS_GROUP_WRITE \
+		(STANDARD_RIGHTS_WRITE_ACCESS	| \
+		SA_RIGHT_GROUP_REMOVE_MEMBER	| \
+		SA_RIGHT_GROUP_ADD_MEMBER	| \
+		SA_RIGHT_GROUP_SET_INFO )	/* 0x0002000e */
+
+#define GENERIC_RIGHTS_GROUP_EXECUTE \
+		(STANDARD_RIGHTS_EXECUTE_ACCESS	| \
+		SA_RIGHT_GROUP_LOOKUP_INFO)	/* 0x00020001 */
+
+
+/* Alias Object specific access rights */
+
+#define SA_RIGHT_ALIAS_ADD_MEMBER	0x00000001
+#define SA_RIGHT_ALIAS_REMOVE_MEMBER	0x00000002
+#define SA_RIGHT_ALIAS_GET_MEMBERS	0x00000004
+#define SA_RIGHT_ALIAS_LOOKUP_INFO	0x00000008
+#define SA_RIGHT_ALIAS_SET_INFO		0x00000010
+
+#define SA_RIGHT_ALIAS_ALL_ACCESS 	0x0000001F
+
+#define GENERIC_RIGHTS_ALIAS_ALL_ACCESS \
+		(STANDARD_RIGHTS_REQUIRED_ACCESS| \
+		SA_RIGHT_ALIAS_ALL_ACCESS)	/* 0x000f001f */
+
+#define GENERIC_RIGHTS_ALIAS_READ \
+		(STANDARD_RIGHTS_READ_ACCESS	| \
+		SA_RIGHT_ALIAS_GET_MEMBERS )	/* 0x00020004 */
+
+#define GENERIC_RIGHTS_ALIAS_WRITE \
+		(STANDARD_RIGHTS_WRITE_ACCESS	| \
+		SA_RIGHT_ALIAS_REMOVE_MEMBER	| \
+		SA_RIGHT_ALIAS_ADD_MEMBER	| \
+		SA_RIGHT_ALIAS_SET_INFO )	/* 0x00020013 */
+
+#define GENERIC_RIGHTS_ALIAS_EXECUTE \
+		(STANDARD_RIGHTS_EXECUTE_ACCESS	| \
+		SA_RIGHT_ALIAS_LOOKUP_INFO )	/* 0x00020008 */
+
 /*
  * Acces bits for the svcctl objects
  */
 
 /* Service Control Manager Bits */ 
 
-#if 0
 #define SC_RIGHT_MGR_CONNECT			0x0001
 #define SC_RIGHT_MGR_CREATE_SERVICE		0x0002
 #define SC_RIGHT_MGR_ENUMERATE_SERVICE		0x0004
 #define SC_RIGHT_MGR_LOCK			0x0008
 #define SC_RIGHT_MGR_QUERY_LOCK_STATUS		0x0010
 #define SC_RIGHT_MGR_MODIFY_BOOT_CONFIG		0x0020
-
-#endif
 
 #define SC_MANAGER_READ_ACCESS \
 	( STANDARD_RIGHTS_READ_ACCESS		| \
@@ -232,9 +462,8 @@ struct standard_mapping {
 
 #define SC_MANAGER_ALL_ACCESS SC_MANAGER_WRITE_ACCESS
 
-/* Service Object Bits */
+/* Service Object Bits */ 
 
-#if 0
 #define SC_RIGHT_SVC_QUERY_CONFIG		0x0001
 #define SC_RIGHT_SVC_CHANGE_CONFIG		0x0002
 #define SC_RIGHT_SVC_QUERY_STATUS		0x0004
@@ -244,8 +473,6 @@ struct standard_mapping {
 #define SC_RIGHT_SVC_PAUSE_CONTINUE		0x0040
 #define SC_RIGHT_SVC_INTERROGATE		0x0080
 #define SC_RIGHT_SVC_USER_DEFINED_CONTROL	0x0100
-
-#endif
 
 #define SERVICE_READ_ACCESS \
 	( STANDARD_RIGHTS_READ_ACCESS		| \
@@ -268,6 +495,8 @@ struct standard_mapping {
 	  SC_RIGHT_SVC_CHANGE_CONFIG )
 
 #define SERVICE_ALL_ACCESS SERVICE_WRITE_ACCESS
+
+	   
 
 /*
  * Access Bits for registry ACLS

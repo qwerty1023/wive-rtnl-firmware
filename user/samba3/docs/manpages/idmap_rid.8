@@ -1,12 +1,12 @@
 .\"     Title: idmap_rid
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
-.\"      Date: 02/22/2010
+.\"      Date: 09/30/2009
 .\"    Manual: System Administration tools
-.\"    Source: Samba 3.3
+.\"    Source: Samba 3.0
 .\"  Language: English
 .\"
-.TH "IDMAP_RID" "8" "02/22/2010" "Samba 3\&.3" "System Administration tools"
+.TH "IDMAP_RID" "8" "09/30/2009" "Samba 3\&.0" "System Administration tools"
 .\" -----------------------------------------------------------------
 .\" * (re)Define some macros
 .\" -----------------------------------------------------------------
@@ -181,12 +181,10 @@ Defines the available matching uid and gid range for which the backend is author
 base_rid = INTEGER
 .RS 4
 Defines the base integer used to build SIDs out of an UID or a GID, and to rebase the UID or GID to be obtained from a SID\&. User RIDs by default start at 1000 (512 hexadecimal), this means a good value for base_rid can be 1000 as the resulting ID is calculated this way: ID = RID \- BASE_RID + LOW RANGE ID\&.
-.sp
-Use of this parameter is deprecated\&.
 .RE
 .SH "EXAMPLES"
 .PP
-This example shows how to configure a domain with idmap_rid
+This example shows how to configure 2 domains with idmap_rid
 .sp
 .if n \{\
 .RS 4
@@ -201,12 +199,15 @@ This example shows how to configure a domain with idmap_rid
 .sp -1
 
 	[global]
-	idmap backend = tdb
-	idmap uid = 1000000\-1999999
-	idmap gid = 1000000\-1999999
+	    idmap domains = MAIN TRUSTED1
 
-	idmap config TRUSTED : backend  = rid
-	idmap config TRUSTED : range    = 50000 \- 99999
+	    idmap config MAIN:backend      = rid
+	    idmap config MAIN:base_rid     = 0
+	    idmap config MAIN:range        = 10000 \- 49999
+
+	    idmap config TRUSTED1:backend  = rid
+	    idmap config TRUSTED1:base_rid = 1000
+	    idmap config TRUSTED1:range    = 50000 \- 99999
 	
 .EB lightgray adjust-for-leading-newline
 .if t \{\

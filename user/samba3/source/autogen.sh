@@ -1,9 +1,9 @@
 #!/bin/sh
 
-# Run this script to build samba from GIT.
+# Run this script to build samba from SVN.
 
 ## insert all possible names (only works with 
-## autoconf 2.x)
+## autoconf 2.x
 TESTAUTOHEADER="autoheader autoheader-2.53 autoheader2.50 autoheader259 autoheader253"
 TESTAUTOCONF="autoconf autoconf-2.53 autoconf2.50 autoconf259 autoconf253"
 
@@ -16,7 +16,7 @@ AUTOCONFFOUND="0"
 ##
 for i in $TESTAUTOHEADER; do
 	if which $i > /dev/null 2>&1; then
-		if test `$i --version | head -n 1 | cut -d.  -f 2 | sed "s/[^0-9]//g"` -ge 53; then
+		if test `$i --version | head -n 1 | cut -d.  -f 2 | tr -d [:alpha:]` -ge 53; then
 			AUTOHEADER=$i
 			AUTOHEADERFOUND="1"
 			break
@@ -30,7 +30,7 @@ done
 
 for i in $TESTAUTOCONF; do
 	if which $i > /dev/null 2>&1; then
-		if test `$i --version | head -n 1 | cut -d.  -f 2 | sed "s/[^0-9]//g"` -ge 53; then
+		if test `$i --version | head -n 1 | cut -d.  -f 2 | tr -d [:alpha:]` -ge 53; then
 			AUTOCONF=$i
 			AUTOCONFFOUND="1"
 			break
@@ -43,7 +43,7 @@ done
 ## do we have it?
 ##
 if test "$AUTOCONFFOUND" = "0" -o "$AUTOHEADERFOUND" = "0"; then
-	echo "$0: need autoconf 2.53 or later to build samba from GIT" >&2
+	echo "$0: need autoconf 2.53 or later to build samba from SVN" >&2
 	exit 1
 fi
 
@@ -53,7 +53,7 @@ echo "$0: running script/mkversion.sh"
 rm -rf autom4te*.cache
 rm -f configure include/config.h*
 
-IPATHS="-Im4 -Ilib/replace"
+IPATHS="-I. -Ilib/replace"
 
 echo "$0: running $AUTOHEADER $IPATHS"
 $AUTOHEADER $IPATHS || exit 1

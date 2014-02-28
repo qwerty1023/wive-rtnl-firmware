@@ -7,7 +7,7 @@
  *  
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 3 of the License, or
+ *  the Free Software Foundation; either version 2 of the License, or
  *  (at your option) any later version.
  *  
  *  This program is distributed in the hope that it will be useful,
@@ -16,7 +16,8 @@
  *  GNU General Public License for more details.
  *  
  *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, see <http://www.gnu.org/licenses/>.
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #include "includes.h"
@@ -34,7 +35,7 @@
  pipe is open. JRA.
 ****************************************************************************/
 
-static bool is_samr_lsa_pipe(const char *pipe_name)
+static BOOL is_samr_lsa_pipe(const char *pipe_name)
 {
 	return (strstr(pipe_name, "samr") || strstr(pipe_name, "lsa"));
 }
@@ -44,7 +45,7 @@ static bool is_samr_lsa_pipe(const char *pipe_name)
  pipes of the same name.
 ****************************************************************************/
 
-bool init_pipe_handle_list(pipes_struct *p, const char *pipe_name)
+BOOL init_pipe_handle_list(pipes_struct *p, char *pipe_name)
 {
 	pipes_struct *plist = get_first_internal_pipe();
 	struct handle_list *hl = NULL;
@@ -53,14 +54,10 @@ bool init_pipe_handle_list(pipes_struct *p, const char *pipe_name)
 		if (strequal( plist->name, pipe_name) ||
 				(is_samr_lsa_pipe(plist->name) && is_samr_lsa_pipe(pipe_name))) {
 			if (!plist->pipe_handles) {
-				char *msg;
-				if (asprintf(&msg, "init_pipe_handles: NULL "
-						 "pipe_handle pointer in pipe %s",
-						 pipe_name) != -1) {
-					smb_panic(msg);
-				} else {
-					smb_panic("init_pipe_handle_list");
-				}
+				pstring msg;
+				slprintf(msg, sizeof(msg)-1, "init_pipe_handles: NULL pipe_handle pointer in pipe %s",
+						pipe_name );
+				smb_panic(msg);
 			}
 			hl = plist->pipe_handles;
 			break;
@@ -102,7 +99,7 @@ bool init_pipe_handle_list(pipes_struct *p, const char *pipe_name)
   find first available policy slot.  creates a policy handle for you.
 ****************************************************************************/
 
-bool create_policy_hnd(pipes_struct *p, POLICY_HND *hnd, void (*free_fn)(void *), void *data_ptr)
+BOOL create_policy_hnd(pipes_struct *p, POLICY_HND *hnd, void (*free_fn)(void *), void *data_ptr)
 {
 	static uint32 pol_hnd_low  = 0;
 	static uint32 pol_hnd_high = 0;
@@ -149,7 +146,7 @@ bool create_policy_hnd(pipes_struct *p, POLICY_HND *hnd, void (*free_fn)(void *)
 	*hnd = pol->pol_hnd;
 	
 	DEBUG(4,("Opened policy hnd[%d] ", (int)p->pipe_handles->count));
-	dump_data(4, (uint8 *)hnd, sizeof(*hnd));
+	dump_data(4, (char *)hnd, sizeof(*hnd));
 
 	return True;
 }
@@ -169,7 +166,7 @@ static struct policy *find_policy_by_hnd_internal(pipes_struct *p, POLICY_HND *h
 	for (i = 0, pol=p->pipe_handles->Policy;pol;pol=pol->next, i++) {
 		if (memcmp(&pol->pol_hnd, hnd, sizeof(*hnd)) == 0) {
 			DEBUG(4,("Found policy hnd[%d] ", (int)i));
-			dump_data(4, (uint8 *)hnd, sizeof(*hnd));
+			dump_data(4, (char *)hnd, sizeof(*hnd));
 			if (data_p)
 				*data_p = pol->data_ptr;
 			return pol;
@@ -177,7 +174,7 @@ static struct policy *find_policy_by_hnd_internal(pipes_struct *p, POLICY_HND *h
 	}
 
 	DEBUG(4,("Policy not found: "));
-	dump_data(4, (uint8 *)hnd, sizeof(*hnd));
+	dump_data(4, (char *)hnd, sizeof(*hnd));
 
 	p->bad_handle_fault_state = True;
 
@@ -188,7 +185,7 @@ static struct policy *find_policy_by_hnd_internal(pipes_struct *p, POLICY_HND *h
   find policy by handle
 ****************************************************************************/
 
-bool find_policy_by_hnd(pipes_struct *p, POLICY_HND *hnd, void **data_p)
+BOOL find_policy_by_hnd(pipes_struct *p, POLICY_HND *hnd, void **data_p)
 {
 	return find_policy_by_hnd_internal(p, hnd, data_p) == NULL ? False : True;
 }
@@ -197,7 +194,7 @@ bool find_policy_by_hnd(pipes_struct *p, POLICY_HND *hnd, void **data_p)
   Close a policy.
 ****************************************************************************/
 
-bool close_policy_hnd(pipes_struct *p, POLICY_HND *hnd)
+BOOL close_policy_hnd(pipes_struct *p, POLICY_HND *hnd)
 {
 	struct policy *pol = find_policy_by_hnd_internal(p, hnd, NULL);
 
@@ -253,19 +250,25 @@ will be checking a security descriptor to determine whether a user
 token has enough access to access the pipe.
 ********************************************************************/
 
-bool pipe_access_check(pipes_struct *p)
+BOOL pipe_access_check(pipes_struct *p)
 {
 	/* Don't let anonymous users access this RPC if restrict
 	   anonymous > 0 */
 
 	if (lp_restrict_anonymous() > 0) {
+		user_struct *user = get_valid_user_struct(p->vuid);
 
 		/* schannel, so we must be ok */
 		if (p->pipe_bound && (p->auth.auth_type == PIPE_AUTH_TYPE_SCHANNEL)) {
 			return True;
 		}
 
-		if (p->server_info->guest) {
+		if (!user) {
+			DEBUG(3, ("invalid vuid %d\n", p->vuid));
+			return False;
+		}
+
+		if (user->guest) {
 			return False;
 		}
 	}

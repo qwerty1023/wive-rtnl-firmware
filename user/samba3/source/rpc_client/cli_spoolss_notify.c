@@ -10,7 +10,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -19,7 +19,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -50,7 +51,7 @@ WERROR rpccli_spoolss_reply_open_printer(struct rpc_pipe_client *cli, TALLOC_CTX
 
 	/* Marshall data and send request */
 
-	CLI_DO_RPC_WERR( cli, mem_ctx, &syntax_spoolss, SPOOLSS_REPLYOPENPRINTER,
+	CLI_DO_RPC_WERR( cli, mem_ctx, PI_SPOOLSS, SPOOLSS_REPLYOPENPRINTER,
 		q, r,
 		qbuf, rbuf,
 		spoolss_io_q_replyopenprinter,
@@ -81,7 +82,7 @@ WERROR rpccli_spoolss_reply_close_printer(struct rpc_pipe_client *cli, TALLOC_CT
 
 	/* Marshall data and send request */
 
-	CLI_DO_RPC_WERR( cli, mem_ctx, &syntax_spoolss, SPOOLSS_REPLYCLOSEPRINTER,
+	CLI_DO_RPC_WERR( cli, mem_ctx, PI_SPOOLSS, SPOOLSS_REPLYCLOSEPRINTER,
 		q, r,
 		qbuf, rbuf,
 		spoolss_io_q_replycloseprinter,
@@ -115,7 +116,7 @@ WERROR rpccli_spoolss_routerreplyprinter(struct rpc_pipe_client *cli, TALLOC_CTX
 
 	/* Marshall data and send request */
 
-	CLI_DO_RPC_WERR( cli, mem_ctx, &syntax_spoolss, SPOOLSS_ROUTERREPLYPRINTER,
+	CLI_DO_RPC_WERR( cli, mem_ctx, PI_SPOOLSS, SPOOLSS_ROUTERREPLYPRINTER,
 		q, r,
 		qbuf, rbuf,
 		spoolss_io_q_routerreplyprinter,
@@ -166,7 +167,7 @@ WERROR rpccli_spoolss_rrpcn(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
 
 	/* Marshall data and send request */
 
-	CLI_DO_RPC_WERR( cli, mem_ctx, &syntax_spoolss, SPOOLSS_RRPCN,
+	CLI_DO_RPC_WERR( cli, mem_ctx, PI_SPOOLSS, SPOOLSS_RRPCN,
 		q, r,
 		qbuf, rbuf,
 		spoolss_io_q_reply_rrpcn,
@@ -206,7 +207,7 @@ WERROR rpccli_spoolss_rffpcnex(struct rpc_pipe_client *cli, TALLOC_CTX *mem_ctx,
 
 	/* Marshall data and send request */
 
-	CLI_DO_RPC_WERR( cli, mem_ctx, &syntax_spoolss, SPOOLSS_RFFPCNEX,
+	CLI_DO_RPC_WERR( cli, mem_ctx, PI_SPOOLSS, SPOOLSS_RFFPCNEX,
 		q, r,
 		qbuf, rbuf,
 		spoolss_io_q_rffpcnex,

@@ -5,10 +5,10 @@ Summary: Samba SMB client and server
 Vendor: Samba Team
 Packager: Samba Team <samba@samba.org>
 Name:         samba
-Version:      3.3.16
+Version:      3.0.37
 Release:      1
 Epoch:        0
-License: GNU GPL version 3
+License: GNU GPL version 2
 Group: System Environment/Daemons
 URL: http://www.samba.org/
 
@@ -28,19 +28,10 @@ Provides: samba = %{version}
 
 Prefix: /usr
 BuildRoot: %{_tmppath}/%{name}-%{version}-root
-BuildRequires: pam-devel, readline-devel, fileutils, libacl-devel, openldap-devel, krb5-devel, cups-devel, keyutils-devel
+BuildRequires: pam-devel, readline-devel, fileutils, libacl-devel, openldap-devel, krb5-devel, cups-devel
 
 # Working around perl dependency problem from docs
 %define __perl_requires %{SOURCE998}
-
-# rpm screws up the arch lib dir when using --target on RHEL5
-%ifarch i386 i486 i586 i686 ppc s390
-%define _libarch lib
-%else
-%define _libarch %_lib
-%endif
-
-%define _libarchdir /usr/%{_libarch}
 
 
 %description
@@ -122,22 +113,21 @@ cd source
 # RPM_OPT_FLAGS="$RPM_OPT_FLAGS -D_FILE_OFFSET_BITS=64"
 
 ## check for ccache
-if [ "$(which ccache 2> /dev/null)" != "" ]; then
-	CC="ccache gcc"
-else
+# ccache -h 2>&1 > /dev/null
+#if [ $? -eq 0 ]; then
+#	CC="ccache gcc"
+#else
 	CC="gcc"
-fi 
+#fi 
 
 ## always run autogen.sh
 ./autogen.sh
 
-CC="$CC" CFLAGS="$RPM_OPT_FLAGS $EXTRA -D_GNU_SOURCE" ./configure \
+CFLAGS="$RPM_OPT_FLAGS $EXTRA -D_GNU_SOURCE" ./configure \
 	--prefix=%{_prefix} \
 	--localstatedir=/var \
         --with-configdir=%{_sysconfdir}/samba \
-        --libdir=%{_libarchdir} \
-	--with-modulesdir=%{_libarchdir}/samba \
-	--with-pammodulesdir=%{_libarch}/security \
+        --with-libdir=%{_libdir}/samba \
         --with-lockdir=/var/lib/samba \
         --with-logfilebase=/var/log/samba \
         --with-mandir=%{_mandir} \
@@ -156,12 +146,15 @@ CC="$CC" CFLAGS="$RPM_OPT_FLAGS $EXTRA -D_GNU_SOURCE" ./configure \
         --without-smbwrapper \
 	--with-pam \
 	--with-quotas \
-	--with-shared-modules=idmap_rid,idmap_ad,idmap_hash,idmap_adex \
+	--with-shared-modules=idmap_rid,idmap_ad \
+	--with-smbmount \
 	--with-syslog \
 	--with-utmp \
 	--with-dnsupdate
 
 make showlayout
+
+make CFLAGS="$RPM_OPT_FLAGS -D_GNU_SOURCE"  proto 
 
 ## check for gcc 3.4 or later
 CC_VERSION=`${CC} --version | head -1 | awk '{print $3}'`
@@ -177,6 +170,12 @@ fi
 make CFLAGS="$RPM_OPT_FLAGS -D_GNU_SOURCE" %{?_smp_mflags} \
 	all modules pam_smbpass
 
+## build the cifs fs mount helper
+cd client
+gcc  -o mount.cifs $RPM_OPT_FLAGS  -D_GNU_SOURCE -Wall -D_GNU_SOURCE -D_LARGEFILE64_SOURCE mount.cifs.c
+gcc  -o umount.cifs $RPM_OPT_FLAGS  -D_GNU_SOURCE -Wall -D_GNU_SOURCE -D_LARGEFILE64_SOURCE umount.cifs.c
+cd ..
+
 # Remove some permission bits to avoid to many dependencies
 cd ..
 find examples docs -type f | xargs -r chmod -x
@@ -189,9 +188,9 @@ rm -rf $RPM_BUILD_ROOT
 mkdir -p $RPM_BUILD_ROOT%{_datadir}/swat/{help,include,using_samba/{figs,gifsa}}
 mkdir -p $RPM_BUILD_ROOT%{_includedir}
 mkdir -p $RPM_BUILD_ROOT%{_initrddir}
-mkdir -p $RPM_BUILD_ROOT{%{_libarchdir},%{_includedir}}
-mkdir -p $RPM_BUILD_ROOT%{_libarchdir}/samba/{auth,charset,idmap,vfs,pdb}
-mkdir -p $RPM_BUILD_ROOT/%{_libarch}/security
+mkdir -p $RPM_BUILD_ROOT{%{_libdir},%{_includedir}}
+mkdir -p $RPM_BUILD_ROOT%{_libdir}/samba/{auth,charset,idmap,vfs,pdb}
+mkdir -p $RPM_BUILD_ROOT/%{_lib}/security
 mkdir -p $RPM_BUILD_ROOT%{_mandir}
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/{bin,sbin}
 mkdir -p $RPM_BUILD_ROOT%{_prefix}/lib
@@ -209,15 +208,50 @@ make DESTDIR=$RPM_BUILD_ROOT \
         install
 cd ..
 
-# NSS winbind support
-install -m 755 source/nsswitch/libnss_winbind.so $RPM_BUILD_ROOT/%{_libarch}/libnss_winbind.so.2
-install -m 755 source/nsswitch/libnss_wins.so $RPM_BUILD_ROOT/%{_libarch}/libnss_wins.so.2
-( cd $RPM_BUILD_ROOT/%{_libarch};
-  ln -sf libnss_winbind.so.2  libnss_winbind.so;
-  ln -sf libnss_wins.so.2  libnss_wins.so )
+# pam_smbpass
+cp source/bin/pam_smbpass.so $RPM_BUILD_ROOT/%{_lib}/security/pam_smbpass.so
+
+# NSS & PAM winbind support
+install -m 755 source/bin/pam_winbind.so $RPM_BUILD_ROOT/%{_lib}/security/pam_winbind.so
+install -m 755 source/nsswitch/libnss_winbind.so $RPM_BUILD_ROOT/%{_lib}/libnss_winbind.so
+install -m 755 source/nsswitch/libnss_wins.so $RPM_BUILD_ROOT/%{_lib}/libnss_wins.so
+( cd $RPM_BUILD_ROOT/%{_lib};
+  ln -sf libnss_winbind.so  libnss_winbind.so.2;
+  ln -sf libnss_wins.so  libnss_wins.so.2 )
+
+# make install puts libsmbclient.so in the wrong place on x86_64
+rm -f $RPM_BUILD_ROOT/usr/lib*/samba/libsmbclient.so $RPM_BUILD_ROOT/usr/lib*/samba/libsmbclient.a || true
+install -m 755 source/bin/libsmbclient.so $RPM_BUILD_ROOT%{_libdir}/libsmbclient.so
+install -m 755 source/bin/libsmbclient.a $RPM_BUILD_ROOT%{_libdir}/libsmbclient.a
+install -m 644 source/include/libsmbclient.h $RPM_BUILD_ROOT%{_includedir}
+ln -s %{_libdir}/libsmbclient.so $RPM_BUILD_ROOT%{_libdir}/libsmbclient.so.0
+
+# make install puts libmsrpc.so in the wrong place on x86_64
+rm -f $RPM_BUILD_ROOT/usr/lib*/samba/libmsrpc.so $RPM_BUILD_ROOT/usr/lib*/samba/libmsrpc.a || true
+install -m 755 source/bin/libmsrpc.so $RPM_BUILD_ROOT%{_libdir}/libmsrpc.so
+install -m 755 source/bin/libmsrpc.a $RPM_BUILD_ROOT%{_libdir}/libmsrpc.a
+install -m 644 source/include/libmsrpc.h $RPM_BUILD_ROOT%{_includedir}
+rm -f $RPM_BUILD_ROOT%{_libdir}/samba/libmsrpc.*
+ln -s /%{_libdir}/libmsrpc.so $RPM_BUILD_ROOT%{_libdir}/libmsrpc.so.0
+
+# make install puts libsmbsharemodes.so in the wrong place on x86_64
+rm -f $RPM_BUILD_ROOT/usr/lib*/samba/libsmbsharemodes.so $RPM_BUILD_ROOT/usr/lib*/samba/libsmbsharemodes.a || true
+install -m 755 source/bin/libsmbsharemodes.so $RPM_BUILD_ROOT%{_libdir}/libsmbsharemodes.so
+install -m 755 source/bin/libsmbsharemodes.a $RPM_BUILD_ROOT%{_libdir}/libsmbsharemodes.a
+install -m 644 source/include/smb_share_modes.h $RPM_BUILD_ROOT%{_includedir}
+rm -f $RPM_BUILD_ROOT%{_libdir}/samba/libsmbsharemodes.*
+ln -s /%{_libdir}/libsmbsharemodes.so $RPM_BUILD_ROOT%{_libdir}/libsmbsharemodes.so.0
+
+# Install pam_smbpass.so
+install -m755 source/bin/pam_smbpass.so $RPM_BUILD_ROOT/%{_lib}/security/pam_smbpass.so
 
 ## cleanup
 /bin/rm -rf $RPM_BUILD_ROOT/usr/lib*/samba/security
+
+# we need a symlink for mount to recognise the smb and smbfs filesystem types
+ln -sf %{_prefix}/bin/smbmount $RPM_BUILD_ROOT/sbin/mount.smbfs
+ln -sf %{_prefix}/bin/smbmount $RPM_BUILD_ROOT/sbin/mount.smb
+/bin/rm -f $RPM_BUILD_ROOT/mount.smbfs
 
 # Install the miscellany
 echo 127.0.0.1 localhost > $RPM_BUILD_ROOT%{_sysconfdir}/samba/lmhosts
@@ -231,8 +265,8 @@ install -m644 setup/samba.pamd $RPM_BUILD_ROOT%{_sysconfdir}/pam.d/samba
 install -m755 setup/smbprint $RPM_BUILD_ROOT%{_bindir}
 install -m644 setup/smbusers $RPM_BUILD_ROOT%{_sysconfdir}/samba/smbusers
 install -m644 setup/smb.conf $RPM_BUILD_ROOT%{_sysconfdir}/samba/smb.conf
-install -m755 source/bin/mount.cifs $RPM_BUILD_ROOT/sbin/mount.cifs
-install -m755 source/bin/umount.cifs $RPM_BUILD_ROOT/sbin/umount.cifs
+install -m755 source/client/mount.cifs $RPM_BUILD_ROOT/sbin/mount.cifs
+install -m755 source/client/umount.cifs $RPM_BUILD_ROOT/sbin/umount.cifs
 install -m755 source/script/mksmbpasswd.sh $RPM_BUILD_ROOT%{_bindir}
 
 /bin/rm $RPM_BUILD_ROOT%{_sbindir}/*mount.cifs
@@ -337,17 +371,16 @@ fi
 %{_bindir}/pdbedit
 %{_bindir}/eventlogadm
 
-%{_libarchdir}/samba/idmap/*.so
-%{_libarchdir}/samba/nss_info/*.so
-%{_libarchdir}/samba/vfs/*.so
-%{_libarchdir}/samba/auth/*.so
+%{_libdir}/samba/idmap/*.so
+%{_libdir}/samba/nss_info/*.so
+%{_libdir}/samba/vfs/*.so
+%{_libdir}/samba/auth/*.so
 
 %{_mandir}/man1/smbcontrol.1*
 %{_mandir}/man1/smbstatus.1*
 %{_mandir}/man1/vfstest.1*
 %{_mandir}/man5/smbpasswd.5*
 %{_mandir}/man7/samba.7*
-%{_mandir}/man7/winbind_krb5_locator.7*
 %{_mandir}/man8/nmbd.8*
 %{_mandir}/man8/pdbedit.8*
 %{_mandir}/man8/smbd.8*
@@ -390,13 +423,16 @@ fi
 
 %files client
 %defattr(-,root,root)
+/sbin/mount.smb
+/sbin/mount.smbfs
 /sbin/mount.cifs
 /sbin/umount.cifs
-%{_sbindir}/cifs.upcall
 
 %{_bindir}/rpcclient
 %{_bindir}/smbcacls
-%{_bindir}/sharesec
+%{_bindir}/smbmount
+%{_bindir}/smbmnt
+%{_bindir}/smbumount
 %{_bindir}/findsmb
 %{_bindir}/smbcquotas
 %{_bindir}/nmblookup
@@ -408,9 +444,11 @@ fi
 %{_bindir}/net
 %{_bindir}/smbtree
 
+%{_mandir}/man8/smbmnt.8*
+%{_mandir}/man8/smbmount.8*
+%{_mandir}/man8/smbumount.8*
 %{_mandir}/man8/mount.cifs.8.*
 %{_mandir}/man8/umount.cifs.8.*
-%{_mandir}/man8/cifs.upcall.8.*
 %{_mandir}/man8/smbspool.8*
 %{_mandir}/man1/smbget.1*
 %{_mandir}/man5/smbgetrc.5*
@@ -418,7 +456,6 @@ fi
 %{_mandir}/man1/nmblookup.1*
 %{_mandir}/man1/rpcclient.1*
 %{_mandir}/man1/smbcacls.1*
-%{_mandir}/man1/sharesec.1*
 %{_mandir}/man1/smbclient.1*
 %{_mandir}/man1/smbtar.1*
 %{_mandir}/man1/smbtree.1*
@@ -430,45 +467,28 @@ fi
 %files common
 %defattr(-,root,root)
 %dir %{_sysconfdir}/samba
-%dir %{_libarchdir}/samba
-%dir %{_libarchdir}/samba/charset
 %config(noreplace) %{_sysconfdir}/samba/smb.conf
 %config(noreplace) %{_sysconfdir}/samba/lmhosts
 
-%attr(755,root,root) /%{_libarch}/libnss_wins.so*
-%attr(755,root,root) /%{_libarch}/libnss_winbind.so*
-%attr(755,root,root) /%{_libarch}/security/pam_winbind.so
-%attr(755,root,root) /%{_libarch}/security/pam_smbpass.so
-/usr/share/locale/de/LC_MESSAGES/pam_winbind.mo
+%attr(755,root,root) /%{_lib}/libnss_wins.so*
+%attr(755,root,root) /%{_lib}/libnss_winbind.so*
+%attr(755,root,root) /%{_lib}/security/pam_winbind.so
+%attr(755,root,root) /%{_lib}/security/pam_smbpass.so
 
 %{_includedir}/libsmbclient.h
-%{_libarchdir}/libsmbclient.*
+%{_libdir}/libsmbclient.*
+%{_includedir}/libmsrpc.h
+%{_libdir}/libmsrpc.*
 %{_includedir}/smb_share_modes.h
-%{_libarchdir}/libsmbsharemodes.*
+%{_libdir}/libsmbsharemodes.*
 
-%{_libarchdir}/samba/*.dat
-%{_libarchdir}/samba/*.msg
-%{_libarchdir}/samba/charset/*.so
-
-%{_includedir}/netapi.h
-%{_includedir}/wbclient.h
-%{_includedir}/talloc.h
-%{_includedir}/tdb.h
-%{_libarchdir}/libnetapi.so*
-%{_libarchdir}/libtalloc.so*
-%{_libarchdir}/libtdb.so*
-%{_libarchdir}/libwbclient.so*
+%{_libdir}/samba/*.dat
+%{_libdir}/samba/*.msg
+%{_libdir}/samba/charset/*.so
 
 %{_bindir}/testparm
 %{_bindir}/smbpasswd
 %{_bindir}/profiles
-
-%{_bindir}/ldbadd
-%{_bindir}/ldbdel
-%{_bindir}/ldbedit
-%{_bindir}/ldbmodify
-%{_bindir}/ldbrename
-%{_bindir}/ldbsearch
 
 %{_mandir}/man1/profiles.1*
 %{_mandir}/man1/testparm.1*
@@ -476,14 +496,7 @@ fi
 %{_mandir}/man5/lmhosts.5*
 %{_mandir}/man8/smbpasswd.8*
 %{_mandir}/man7/libsmbclient.7*
-%{_mandir}/man8/pam_winbind.8*
-
-%{_mandir}/man1/ldbadd.1*
-%{_mandir}/man1/ldbdel.1*
-%{_mandir}/man1/ldbedit.1*
-%{_mandir}/man1/ldbmodify.1*
-%{_mandir}/man1/ldbrename.1*
-%{_mandir}/man1/ldbsearch.1*
+%{_mandir}/man7/pam_winbind.7*
 
 %changelog
 * Fri Jan 16 2004 Gerald (Jerry) Carter <jerry@samba,org>

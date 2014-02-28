@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,10 +15,13 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
+
+extern struct current_user current_user;
 
 /***************************************************************************
 open a print file and setup a fsp for it. This is a wrapper around
@@ -26,12 +29,18 @@ print_job_start().
 ***************************************************************************/
 
 NTSTATUS print_fsp_open(connection_struct *conn, const char *fname,
-			uint16_t current_vuid, files_struct *fsp,
-			SMB_STRUCT_STAT *psbuf)
+			files_struct **result)
 {
 	int jobid;
+	SMB_STRUCT_STAT sbuf;
+	files_struct *fsp;
 	fstring name;
 	NTSTATUS status;
+
+	status = file_new(conn, &fsp);
+	if(!NT_STATUS_IS_OK(status)) {
+		return status;
+	}
 
 	fstrcpy( name, "Remote Downlevel Document");
 	if (fname) {
@@ -43,9 +52,10 @@ NTSTATUS print_fsp_open(connection_struct *conn, const char *fname,
 		fstrcat(name, p);
 	}
 
-	jobid = print_job_start(conn->server_info, SNUM(conn), name, NULL);
+	jobid = print_job_start(&current_user, SNUM(conn), name, NULL);
 	if (jobid == -1) {
 		status = map_nt_error_from_unix(errno);
+		file_free(fsp);
 		return status;
 	}
 
@@ -54,13 +64,14 @@ NTSTATUS print_fsp_open(connection_struct *conn, const char *fname,
 	if (fsp->rap_print_jobid == 0) {
 		/* We need to delete the entry in the tdb. */
 		pjob_delete(lp_const_servicename(SNUM(conn)), jobid);
+		file_free(fsp);
 		return NT_STATUS_ACCESS_DENIED;	/* No errno around here */
 	}
 
 	/* setup a full fsp */
 	fsp->fh->fd = print_job_fd(lp_const_servicename(SNUM(conn)),jobid);
 	GetTimeOfDay(&fsp->open_time);
-	fsp->vuid = current_vuid;
+	fsp->vuid = current_user.vuid;
 	fsp->fh->pos = -1;
 	fsp->can_lock = True;
 	fsp->can_read = False;
@@ -72,11 +83,16 @@ NTSTATUS print_fsp_open(connection_struct *conn, const char *fname,
 	fsp->sent_oplock_break = NO_BREAK_SENT;
 	fsp->is_directory = False;
 	string_set(&fsp->fsp_name,print_job_fname(lp_const_servicename(SNUM(conn)),jobid));
-	fsp->wcp = NULL;
-	SMB_VFS_FSTAT(fsp, psbuf);
-	fsp->mode = psbuf->st_mode;
-	fsp->file_id = vfs_file_id_from_sbuf(conn, psbuf);
+	fsp->wbmpx_ptr = NULL;      
+	fsp->wcp = NULL; 
+	SMB_VFS_FSTAT(fsp,fsp->fh->fd, &sbuf);
+	fsp->mode = sbuf.st_mode;
+	fsp->inode = sbuf.st_ino;
+	fsp->dev = sbuf.st_dev;
 
+	conn->num_files_open++;
+
+	*result = fsp;
 	return NT_STATUS_OK;
 }
 

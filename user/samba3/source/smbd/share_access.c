@@ -5,7 +5,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,7 +14,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -27,7 +28,9 @@
  * + and & may be combined
  */
 
-static bool do_group_checks(const char **name, const char **pattern)
+extern userdom_struct current_user_info;
+
+static BOOL do_group_checks(const char **name, const char **pattern)
 {
 	if ((*name)[0] == '@') {
 		*pattern = "&+";
@@ -62,9 +65,8 @@ static bool do_group_checks(const char **name, const char **pattern)
 	return False;
 }
 
-static bool token_contains_name(TALLOC_CTX *mem_ctx,
+static BOOL token_contains_name(TALLOC_CTX *mem_ctx,
 				const char *username,
-				const char *domain,
 				const char *sharename,
 				const struct nt_user_token *token,
 				const char *name)
@@ -74,7 +76,8 @@ static bool token_contains_name(TALLOC_CTX *mem_ctx,
 	enum lsa_SidType type;
 
 	if (username != NULL) {
-		name = talloc_sub_basic(mem_ctx, username, domain, name);
+		name = talloc_sub_basic(mem_ctx, username,
+					current_user_info.domain, name);
 	}
 	if (sharename != NULL) {
 		name = talloc_string_sub(mem_ctx, name, "%S", sharename);
@@ -83,7 +86,7 @@ static bool token_contains_name(TALLOC_CTX *mem_ctx,
 	if (name == NULL) {
 		/* This is too security sensitive, better panic than return a
 		 * result that might be interpreted in a wrong way. */
-		smb_panic("substitutions failed");
+		smb_panic("substitutions failed\n");
 	}
 	
 	/* check to see is we already have a SID */
@@ -133,7 +136,7 @@ static bool token_contains_name(TALLOC_CTX *mem_ctx,
 			}
 			continue;
 		}
-		smb_panic("got invalid prefix from do_groups_check");
+		smb_panic("got invalid prefix from do_groups_check\n");
 	}
 	return False;
 }
@@ -149,8 +152,7 @@ static bool token_contains_name(TALLOC_CTX *mem_ctx,
  * The other use is the netgroup check when using @group or &group.
  */
 
-bool token_contains_name_in_list(const char *username,
-				 const char *domain,
+BOOL token_contains_name_in_list(const char *username,
 				 const char *sharename,
 				 const struct nt_user_token *token,
 				 const char **list)
@@ -162,12 +164,11 @@ bool token_contains_name_in_list(const char *username,
 	}
 
 	if ( (mem_ctx = talloc_new(NULL)) == NULL ) {
-		smb_panic("talloc_new failed");
+		smb_panic("talloc_new failed\n");
 	}
 
 	while (*list != NULL) {
-		if (token_contains_name(mem_ctx, username, domain, sharename,
-					token, *list)) {
+		if (token_contains_name(mem_ctx, username, sharename,token, *list)) {
 			TALLOC_FREE(mem_ctx);
 			return True;
 		}
@@ -191,12 +192,10 @@ bool token_contains_name_in_list(const char *username,
  * The other use is the netgroup check when using @group or &group.
  */
 
-bool user_ok_token(const char *username, const char *domain,
-		   const struct nt_user_token *token, int snum)
+BOOL user_ok_token(const char *username, const struct nt_user_token *token, int snum)
 {
 	if (lp_invalid_users(snum) != NULL) {
-		if (token_contains_name_in_list(username, domain,
-						lp_servicename(snum),
+		if (token_contains_name_in_list(username, lp_servicename(snum),
 						token,
 						lp_invalid_users(snum))) {
 			DEBUG(10, ("User %s in 'invalid users'\n", username));
@@ -205,7 +204,7 @@ bool user_ok_token(const char *username, const char *domain,
 	}
 
 	if (lp_valid_users(snum) != NULL) {
-		if (!token_contains_name_in_list(username, domain,
+		if (!token_contains_name_in_list(username,
 						 lp_servicename(snum), token,
 						 lp_valid_users(snum))) {
 			DEBUG(10, ("User %s not in 'valid users'\n",
@@ -222,8 +221,7 @@ bool user_ok_token(const char *username, const char *domain,
 			DEBUG(0, ("'only user = yes' and no 'username ='\n"));
 			return False;
 		}
-		if (!token_contains_name_in_list(NULL, domain,
-						 lp_servicename(snum),
+		if (!token_contains_name_in_list(NULL, lp_servicename(snum),
 						 token, list)) {
 			DEBUG(10, ("%s != 'username'\n", username));
 			return False;
@@ -250,16 +248,13 @@ bool user_ok_token(const char *username, const char *domain,
  * The other use is the netgroup check when using @group or &group.
  */
 
-bool is_share_read_only_for_token(const char *username,
-				  const char *domain,
-				  const struct nt_user_token *token,
-				  connection_struct *conn)
+BOOL is_share_read_only_for_token(const char *username,
+				  const struct nt_user_token *token, int snum)
 {
-	int snum = SNUM(conn);
-	bool result = conn->read_only;
+	BOOL result = lp_readonly(snum);
 
 	if (lp_readlist(snum) != NULL) {
-		if (token_contains_name_in_list(username, domain,
+		if (token_contains_name_in_list(username,
 						lp_servicename(snum), token,
 						lp_readlist(snum))) {
 			result = True;
@@ -267,7 +262,7 @@ bool is_share_read_only_for_token(const char *username,
 	}
 
 	if (lp_writelist(snum) != NULL) {
-		if (token_contains_name_in_list(username, domain,
+		if (token_contains_name_in_list(username,
 						lp_servicename(snum), token,
 						lp_writelist(snum))) {
 			result = False;

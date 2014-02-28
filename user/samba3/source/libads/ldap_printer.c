@@ -5,7 +5,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,7 +14,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -31,7 +32,7 @@
 				       const char *servername)
 {
 	ADS_STATUS status;
-	char *srv_dn, **srv_cn, *s = NULL;
+	char *srv_dn, **srv_cn, *s;
 	const char *attrs[] = {"*", "nTSecurityDescriptor", NULL};
 
 	status = ads_find_machine_acct(ads, res, servername);
@@ -41,43 +42,25 @@
 		return status;
 	}
 	if (ads_count_replies(ads, *res) != 1) {
-		if (res) {
-			ads_msgfree(ads, *res);
-			*res = NULL;
-		}
 		return ADS_ERROR(LDAP_NO_SUCH_OBJECT);
 	}
-	srv_dn = ldap_get_dn(ads->ldap.ld, *res);
+	srv_dn = ldap_get_dn(ads->ld, *res);
 	if (srv_dn == NULL) {
-		if (res) {
-			ads_msgfree(ads, *res);
-			*res = NULL;
-		}
 		return ADS_ERROR(LDAP_NO_MEMORY);
 	}
 	srv_cn = ldap_explode_dn(srv_dn, 1);
 	if (srv_cn == NULL) {
 		ldap_memfree(srv_dn);
-		if (res) {
-			ads_msgfree(ads, *res);
-			*res = NULL;
-		}
 		return ADS_ERROR(LDAP_INVALID_DN_SYNTAX);
 	}
-	if (res) {
-		ads_msgfree(ads, *res);
-		*res = NULL;
-	}
+	ads_msgfree(ads, *res);
 
-	if (asprintf(&s, "(cn=%s-%s)", srv_cn[0], printer) == -1) {
-		ldap_memfree(srv_dn);
-		return ADS_ERROR(LDAP_NO_MEMORY);
-	}
+	asprintf(&s, "(cn=%s-%s)", srv_cn[0], printer);
 	status = ads_search(ads, res, s, attrs);
 
 	ldap_memfree(srv_dn);
 	ldap_value_free(srv_cn);
-	SAFE_FREE(s);
+	free(s);
 	return status;	
 }
 
@@ -117,34 +100,28 @@ ADS_STATUS ads_add_printer_entry(ADS_STRUCT *ads, char *prt_dn,
 /*
   map a REG_SZ to an ldap mod
 */
-static bool map_sz(TALLOC_CTX *ctx, ADS_MODLIST *mods, 
+static BOOL map_sz(TALLOC_CTX *ctx, ADS_MODLIST *mods, 
 			    const REGISTRY_VALUE *value)
 {
 	char *str_value = NULL;
-	size_t converted_size;
 	ADS_STATUS status;
 
 	if (value->type != REG_SZ)
-		return false;
+		return False;
 
 	if (value->size && *((smb_ucs2_t *) value->data_p)) {
-		if (!pull_ucs2_talloc(ctx, &str_value,
-				      (const smb_ucs2_t *) value->data_p,
-				      &converted_size))
-		{
-			return false;
-		}
+		pull_ucs2_talloc(ctx, &str_value, (const smb_ucs2_t *) value->data_p);
 		status = ads_mod_str(ctx, mods, value->valuename, str_value);
 		return ADS_ERR_OK(status);
 	}
-	return true;
+	return True;
 		
 }
 
 /*
   map a REG_DWORD to an ldap mod
 */
-static bool map_dword(TALLOC_CTX *ctx, ADS_MODLIST *mods, 
+static BOOL map_dword(TALLOC_CTX *ctx, ADS_MODLIST *mods, 
 		      const REGISTRY_VALUE *value)
 {
 	char *str_value = NULL;
@@ -163,7 +140,7 @@ static bool map_dword(TALLOC_CTX *ctx, ADS_MODLIST *mods,
 /*
   map a boolean REG_BINARY to an ldap mod
 */
-static bool map_bool(TALLOC_CTX *ctx, ADS_MODLIST *mods,
+static BOOL map_bool(TALLOC_CTX *ctx, ADS_MODLIST *mods,
 		     const REGISTRY_VALUE *value)
 {
 	char *str_value;
@@ -183,11 +160,10 @@ static bool map_bool(TALLOC_CTX *ctx, ADS_MODLIST *mods,
 /*
   map a REG_MULTI_SZ to an ldap mod
 */
-static bool map_multi_sz(TALLOC_CTX *ctx, ADS_MODLIST *mods,
+static BOOL map_multi_sz(TALLOC_CTX *ctx, ADS_MODLIST *mods,
 			 const REGISTRY_VALUE *value)
 {
 	char **str_values = NULL;
-	size_t converted_size;
 	smb_ucs2_t *cur_str = (smb_ucs2_t *) value->data_p;
         uint32 size = 0, num_vals = 0, i=0;
 	ADS_STATUS status;
@@ -210,11 +186,9 @@ static bool map_multi_sz(TALLOC_CTX *ctx, ADS_MODLIST *mods,
 		       (num_vals + 1) * sizeof(char *));
 
 		cur_str = (smb_ucs2_t *) value->data_p;
-		for (i=0; i < num_vals; i++) {
+		for (i=0; i < num_vals; i++)
 			cur_str += pull_ucs2_talloc(ctx, &str_values[i],
-						    cur_str, &converted_size) ?
-			    converted_size : (size_t)-1;
-		}
+			                            cur_str);
 
 		status = ads_mod_strlist(ctx, mods, value->valuename, 
 					 (const char **) str_values);
@@ -225,7 +199,7 @@ static bool map_multi_sz(TALLOC_CTX *ctx, ADS_MODLIST *mods,
 
 struct valmap_to_ads {
 	const char *valname;
-	bool (*fn)(TALLOC_CTX *, ADS_MODLIST *, const REGISTRY_VALUE *);
+	BOOL (*fn)(TALLOC_CTX *, ADS_MODLIST *, const REGISTRY_VALUE *);
 };
 
 /*
@@ -315,27 +289,24 @@ WERROR get_remote_printer_publishing_data(struct rpc_pipe_client *cli,
 	uint32 i;
 	POLICY_HND pol;
 
-	if ((asprintf(&servername, "\\\\%s", cli->desthost) == -1)
-	    || (asprintf(&printername, "%s\\%s", servername, printer) == -1)) {
+	asprintf(&servername, "\\\\%s", cli->cli->desthost);
+	asprintf(&printername, "%s\\%s", servername, printer);
+	if (!servername || !printername) {
 		DEBUG(3, ("Insufficient memory\n"));
 		return WERR_NOMEM;
 	}
 	
 	result = rpccli_spoolss_open_printer_ex(cli, mem_ctx, printername, 
 					     "", MAXIMUM_ALLOWED_ACCESS, 
-					     servername, cli->auth->user_name,
-					     &pol);
+					     servername, cli->cli->user_name, &pol);
 	if (!W_ERROR_IS_OK(result)) {
 		DEBUG(3, ("Unable to open printer %s, error is %s.\n",
 			  printername, dos_errstr(result)));
-		SAFE_FREE(printername);
 		return result;
 	}
 	
-	if ( !(dsdriver_ctr = TALLOC_ZERO_P( mem_ctx, REGVAL_CTR )) ) {
-		SAFE_FREE(printername);
+	if ( !(dsdriver_ctr = TALLOC_ZERO_P( mem_ctx, REGVAL_CTR )) ) 
 		return WERR_NOMEM;
-	}
 
 	result = rpccli_spoolss_enumprinterdataex(cli, mem_ctx, &pol, SPOOL_DSDRIVER_KEY, dsdriver_ctr);
 
@@ -351,10 +322,8 @@ WERROR get_remote_printer_publishing_data(struct rpc_pipe_client *cli,
 		}
 	}
 	
-	if ( !(dsspooler_ctr = TALLOC_ZERO_P( mem_ctx, REGVAL_CTR )) ) {
-		SAFE_FREE(printername);
+	if ( !(dsspooler_ctr = TALLOC_ZERO_P( mem_ctx, REGVAL_CTR )) )
 		return WERR_NOMEM;
-	}
 
 	result = rpccli_spoolss_enumprinterdataex(cli, mem_ctx, &pol, SPOOL_DSSPOOLER_KEY, dsspooler_ctr);
 
@@ -375,12 +344,11 @@ WERROR get_remote_printer_publishing_data(struct rpc_pipe_client *cli,
 	TALLOC_FREE( dsspooler_ctr );
 
 	rpccli_spoolss_close_printer(cli, mem_ctx, &pol);
-	SAFE_FREE(printername);
 
 	return result;
 }
 
-bool get_local_printer_publishing_data(TALLOC_CTX *mem_ctx,
+BOOL get_local_printer_publishing_data(TALLOC_CTX *mem_ctx,
 				       ADS_MODLIST *mods,
 				       NT_PRINTER_DATA *data)
 {

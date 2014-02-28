@@ -5,7 +5,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -14,7 +14,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -24,7 +25,7 @@
 #endif
 
 static void (*cont_fn)(void *);
-static char *corepath;
+static pstring corepath;
 
 /*******************************************************************
 report a fault
@@ -93,13 +94,11 @@ make all the preparations to safely dump a core file
 
 void dump_core_setup(const char *progname)
 {
-	char *logbase = NULL;
-	char *end = NULL;
+	pstring logbase;
+	char * end;
 
 	if (lp_logfile() && *lp_logfile()) {
-		if (asprintf(&logbase, "%s", lp_logfile()) < 0) {
-			return;
-		}
+		snprintf(logbase, sizeof(logbase), "%s", lp_logfile());
 		if ((end = strrchr_m(logbase, '/'))) {
 			*end = '\0';
 		}
@@ -108,56 +107,20 @@ void dump_core_setup(const char *progname)
 		 * line by the -l option but the "log file" option is not set
 		 * in smb.conf.
 		 */
-		if (asprintf(&logbase, "%s", get_dyn_LOGFILEBASE()) < 0) {
-			return;
-		}
+		snprintf(logbase, sizeof(logbase), "%s", dyn_LOGFILEBASE);
 	}
 
 	SMB_ASSERT(progname != NULL);
 
-	if (asprintf(&corepath, "%s/cores", logbase) < 0) {
-		SAFE_FREE(logbase);
-		return;
-	}
-	if (mkdir(corepath,0700) == -1) {
-		if (errno != EEXIST) {
-			SAFE_FREE(corepath);
-			SAFE_FREE(logbase);
-			return;
-		}
-	}
-	if (chmod(corepath,0700) == -1) {
-		SAFE_FREE(corepath);
-		SAFE_FREE(logbase);
-		return;
-	}
+	snprintf(corepath, sizeof(corepath), "%s/cores", logbase);
+	mkdir(corepath,0700);
 
-	SAFE_FREE(corepath);
-	if (asprintf(&corepath, "%s/cores/%s",
-			logbase, progname) < 0) {
-		SAFE_FREE(logbase);
-		return;
-	}
-	if (mkdir(corepath,0700) == -1) {
-		if (errno != EEXIST) {
-			SAFE_FREE(corepath);
-			SAFE_FREE(logbase);
-			return;
-		}
-	}
+	snprintf(corepath, sizeof(corepath), "%s/cores/%s",
+		logbase, progname);
+	mkdir(corepath,0700);
 
-	if (sys_chown(corepath,getuid(),getgid()) == -1) {
-		SAFE_FREE(corepath);
-		SAFE_FREE(logbase);
-		return;
-	}
-	if (chmod(corepath,0700) == -1) {
-		SAFE_FREE(corepath);
-		SAFE_FREE(logbase);
-		return;
-	}
-
-	SAFE_FREE(logbase);
+	sys_chown(corepath,getuid(),getgid());
+	chmod(corepath,0700);
 
 #ifdef HAVE_GETRLIMIT
 #ifdef RLIMIT_CORE
@@ -188,14 +151,6 @@ void dump_core_setup(const char *progname)
 
  void dump_core(void)
 {
-	static bool called;
-
-	if (called) {
-		DEBUG(0, ("dump_core() called recursive\n"));
-		exit(1);
-	}
-	called = true;
-
 	/* Note that even if core dumping has been disabled, we still set up
 	 * the core path. This is to handle the case where core dumping is
 	 * turned on in smb.conf and the relevant daemon is not restarted.
@@ -211,11 +166,6 @@ void dump_core_setup(const char *progname)
 	 * we call abort(). */
 	if (geteuid() != 0) {
 		become_root();
-	}
-
-	if (corepath == NULL) {
-		DEBUG(0, ("Can not dump core: corepath not set up\n"));
-		exit(1);
 	}
 
 	if (*corepath != '\0') {

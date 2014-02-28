@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,11 +15,13 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
-#include "smb_krb5.h"
+
+extern pstring user_socket_options;
 
 static const struct {
 	int prot;
@@ -61,8 +63,8 @@ static NTSTATUS cli_session_setup_lanman2(struct cli_state *cli,
 					  const char *pass, size_t passlen,
 					  const char *workgroup)
 {
-	DATA_BLOB session_key = data_blob_null;
-	DATA_BLOB lm_response = data_blob_null;
+	DATA_BLOB session_key = data_blob(NULL, 0);
+	DATA_BLOB lm_response = data_blob(NULL, 0);
 	fstring pword;
 	char *p;
 
@@ -99,7 +101,7 @@ static NTSTATUS cli_session_setup_lanman2(struct cli_state *cli,
 
 	/* send a session setup command */
 	memset(cli->outbuf,'\0',smb_size);
-	cli_set_message(cli->outbuf,10, 0, True);
+	set_message(cli->outbuf,10, 0, True);
 	SCVAL(cli->outbuf,smb_com,SMBsesssetupX);
 	cli_setup_packet(cli);
 	
@@ -169,7 +171,7 @@ static NTSTATUS cli_session_setup_guest(struct cli_state *cli)
 	uint32 capabilities = cli_session_setup_capabilities(cli);
 
 	memset(cli->outbuf, '\0', smb_size);
-	cli_set_message(cli->outbuf,13,0,True);
+	set_message(cli->outbuf,13,0,True);
 	SCVAL(cli->outbuf,smb_com,SMBsesssetupX);
 	cli_setup_packet(cli);
 			
@@ -229,7 +231,7 @@ static NTSTATUS cli_session_setup_plaintext(struct cli_state *cli,
 	fstr_sprintf( lanman, "Samba %s", SAMBA_VERSION_STRING);
 
 	memset(cli->outbuf, '\0', smb_size);
-	cli_set_message(cli->outbuf,13,0,True);
+	set_message(cli->outbuf,13,0,True);
 	SCVAL(cli->outbuf,smb_com,SMBsesssetupX);
 	cli_setup_packet(cli);
 			
@@ -247,8 +249,7 @@ static NTSTATUS cli_session_setup_plaintext(struct cli_state *cli,
 	if ( (capabilities & CAP_UNICODE) == 0 ) {
 		p += clistr_push(cli, p, pass, -1, STR_TERMINATE); /* password */
 		SSVAL(cli->outbuf,smb_vwv7,PTR_DIFF(p, smb_buf(cli->outbuf)));
-	}
-	else {
+	} else {
 		/* For ucs2 passwords clistr_push calls ucs2_align, which causes
 		 * the space taken by the unicode password to be one byte too
 		 * long (as we're on an odd byte boundary here). Reduce the
@@ -306,9 +307,9 @@ static NTSTATUS cli_session_setup_nt1(struct cli_state *cli, const char *user,
 				      const char *workgroup)
 {
 	uint32 capabilities = cli_session_setup_capabilities(cli);
-	DATA_BLOB lm_response = data_blob_null;
-	DATA_BLOB nt_response = data_blob_null;
-	DATA_BLOB session_key = data_blob_null;
+	DATA_BLOB lm_response = data_blob(NULL, 0);
+	DATA_BLOB nt_response = data_blob(NULL, 0);
+	DATA_BLOB session_key = data_blob(NULL, 0);
 	NTSTATUS result;
 	char *p;
 
@@ -341,7 +342,7 @@ static NTSTATUS cli_session_setup_nt1(struct cli_state *cli, const char *user,
 			E_md4hash(pass, nt_hash);
 
 #ifdef LANMAN_ONLY
-			nt_response = data_blob_null;
+			nt_response = data_blob(NULL, 0);
 #else
 			nt_response = data_blob(NULL, 24);
 			SMBNTencrypt(pass,cli->secblob.data,nt_response.data);
@@ -385,7 +386,7 @@ static NTSTATUS cli_session_setup_nt1(struct cli_state *cli, const char *user,
 	/* send a session setup command */
 	memset(cli->outbuf,'\0',smb_size);
 
-	cli_set_message(cli->outbuf,13,0,True);
+	set_message(cli->outbuf,13,0,True);
 	SCVAL(cli->outbuf,smb_com,SMBsesssetupX);
 	cli_setup_packet(cli);
 			
@@ -455,7 +456,7 @@ end:
  Send a extended security session setup blob
 ****************************************************************************/
 
-static bool cli_session_setup_blob_send(struct cli_state *cli, DATA_BLOB blob)
+static BOOL cli_session_setup_blob_send(struct cli_state *cli, DATA_BLOB blob)
 {
 	uint32 capabilities = cli_session_setup_capabilities(cli);
 	char *p;
@@ -465,7 +466,7 @@ static bool cli_session_setup_blob_send(struct cli_state *cli, DATA_BLOB blob)
 	/* send a session setup command */
 	memset(cli->outbuf,'\0',smb_size);
 
-	cli_set_message(cli->outbuf,12,0,True);
+	set_message(cli->outbuf,12,0,True);
 	SCVAL(cli->outbuf,smb_com,SMBsesssetupX);
 
 	cli_setup_packet(cli);
@@ -492,7 +493,7 @@ static bool cli_session_setup_blob_send(struct cli_state *cli, DATA_BLOB blob)
 
 static DATA_BLOB cli_session_setup_blob_receive(struct cli_state *cli)
 {
-	DATA_BLOB blob2 = data_blob_null;
+	DATA_BLOB blob2 = data_blob(NULL, 0);
 	char *p;
 	size_t len;
 
@@ -537,13 +538,13 @@ static DATA_BLOB cli_session_setup_blob_receive(struct cli_state *cli)
 
 #define BASE_SESSSETUP_BLOB_PACKET_SIZE (35 + 24 + 22)
 
-static bool cli_session_setup_blob(struct cli_state *cli, DATA_BLOB blob)
+static BOOL cli_session_setup_blob(struct cli_state *cli, DATA_BLOB blob)
 {
 	int32 remaining = blob.length;
 	int32 cur = 0;
-	DATA_BLOB send_blob = data_blob_null;
+	DATA_BLOB send_blob = data_blob(NULL, 0);
 	int32 max_blob_size = 0;
-	DATA_BLOB receive_blob = data_blob_null;
+	DATA_BLOB receive_blob = data_blob(NULL, 0);
 
 	if (cli->max_xmit < BASE_SESSSETUP_BLOB_PACKET_SIZE + 1) {
 		DEBUG(0,("cli_session_setup_blob: cli->max_xmit too small "
@@ -584,8 +585,8 @@ static bool cli_session_setup_blob(struct cli_state *cli, DATA_BLOB blob)
 		if (cli_is_error(cli) &&
 				!NT_STATUS_EQUAL( cli_get_nt_error(cli), 
 					NT_STATUS_MORE_PROCESSING_REQUIRED)) {
-			DEBUG(0, ("cli_session_setup_blob: receive failed "
-				  "(%s)\n", nt_errstr(cli_get_nt_error(cli))));
+			DEBUG(0, ("cli_session_setup_blob: recieve failed (%s)\n",
+				nt_errstr(cli_get_nt_error(cli)) ));
 			cli->vuid = 0;
 			return False;
 		}
@@ -610,7 +611,9 @@ static ADS_STATUS cli_session_setup_kerberos(struct cli_state *cli, const char *
 {
 	DATA_BLOB negTokenTarg;
 	DATA_BLOB session_key_krb5;
+	DATA_BLOB null_blob = data_blob(NULL, 0);
 	NTSTATUS nt_status;
+	BOOL res;
 	int rc;
 
 	cli_temp_set_signing(cli);
@@ -645,14 +648,13 @@ static ADS_STATUS cli_session_setup_kerberos(struct cli_state *cli, const char *
 
 	cli_set_session_key(cli, session_key_krb5);
 
-	if (cli_simple_set_signing(
-		    cli, session_key_krb5, data_blob_null)) {
-
+	res = cli_simple_set_signing(cli, session_key_krb5, null_blob);
+	if (res) {
 		/* 'resign' the last message, so we get the right sequence numbers
 		   for checking the first reply from the server */
-		cli_calculate_sign_mac(cli, cli->outbuf);
+		cli_calculate_sign_mac(cli);
 
-		if (!cli_check_sign_mac(cli, cli->inbuf)) {
+		if (!cli_check_sign_mac(cli)) {
 			nt_status = NT_STATUS_ACCESS_DENIED;
 			goto nt_error;
 		}
@@ -683,9 +685,9 @@ static NTSTATUS cli_session_setup_ntlmssp(struct cli_state *cli, const char *use
 	NTSTATUS nt_status;
 	int turn = 1;
 	DATA_BLOB msg1;
-	DATA_BLOB blob = data_blob_null;
-	DATA_BLOB blob_in = data_blob_null;
-	DATA_BLOB blob_out = data_blob_null;
+	DATA_BLOB blob = data_blob(NULL, 0);
+	DATA_BLOB blob_in = data_blob(NULL, 0);
+	DATA_BLOB blob_out = data_blob(NULL, 0);
 
 	cli_temp_set_signing(cli);
 
@@ -726,7 +728,7 @@ static NTSTATUS cli_session_setup_ntlmssp(struct cli_state *cli, const char *use
 				
 				nt_status = cli_nt_error(cli);
 				if (cli_is_error(cli) && NT_STATUS_IS_OK(nt_status)) {
-					if (cli->smb_rw_error == SMB_READ_BAD_SIG) {
+					if (cli->smb_rw_error == READ_BAD_SIG) {
 						nt_status = NT_STATUS_ACCESS_DENIED;
 					} else {
 						nt_status = NT_STATUS_UNSUCCESSFUL;
@@ -742,7 +744,7 @@ static NTSTATUS cli_session_setup_ntlmssp(struct cli_state *cli, const char *use
 			}
 		} else if ((turn == 1) && 
 			   NT_STATUS_EQUAL(nt_status, NT_STATUS_MORE_PROCESSING_REQUIRED)) {
-			DATA_BLOB tmp_blob = data_blob_null;
+			DATA_BLOB tmp_blob = data_blob(NULL, 0);
 			/* the server might give us back two challenges */
 			if (!spnego_parse_challenge(blob, &blob_in, 
 						    &tmp_blob)) {
@@ -751,7 +753,7 @@ static NTSTATUS cli_session_setup_ntlmssp(struct cli_state *cli, const char *use
 			}
 			data_blob_free(&tmp_blob);
 		} else {
-			if (!spnego_parse_auth_response(blob, nt_status, OID_NTLMSSP, 
+			if (!spnego_parse_auth_response(blob, nt_status, 
 							&blob_in)) {
 				DEBUG(3,("Failed to parse auth response\n"));
 				if (NT_STATUS_IS_OK(nt_status) 
@@ -770,8 +772,8 @@ static NTSTATUS cli_session_setup_ntlmssp(struct cli_state *cli, const char *use
 
 		DATA_BLOB key = data_blob(ntlmssp_state->session_key.data,
 					  ntlmssp_state->session_key.length);
-		DATA_BLOB null_blob = data_blob_null;
-		bool res;
+		DATA_BLOB null_blob = data_blob(NULL, 0);
+		BOOL res;
 
 		fstrcpy(cli->server_domain, ntlmssp_state->server_domain);
 		cli_set_session_key(cli, ntlmssp_state->session_key);
@@ -784,9 +786,9 @@ static NTSTATUS cli_session_setup_ntlmssp(struct cli_state *cli, const char *use
 			
 			/* 'resign' the last message, so we get the right sequence numbers
 			   for checking the first reply from the server */
-			cli_calculate_sign_mac(cli, cli->outbuf);
+			cli_calculate_sign_mac(cli);
 			
-			if (!cli_check_sign_mac(cli, cli->inbuf)) {
+			if (!cli_check_sign_mac(cli)) {
 				nt_status = NT_STATUS_ACCESS_DENIED;
 			}
 		}
@@ -817,9 +819,8 @@ ADS_STATUS cli_session_setup_spnego(struct cli_state *cli, const char *user,
 	char *principal = NULL;
 	char *OIDs[ASN1_MAX_OIDS];
 	int i;
+	BOOL got_kerberos_mechanism = False;
 	DATA_BLOB blob;
-	const char *p = NULL;
-	char *account = NULL;
 
 	DEBUG(3,("Doing spnego session setup (blob length=%lu)\n", (unsigned long)cli->secblob.length));
 
@@ -851,7 +852,7 @@ ADS_STATUS cli_session_setup_spnego(struct cli_state *cli, const char *user,
 		DEBUG(3,("got OID=%s\n", OIDs[i]));
 		if (strcmp(OIDs[i], OID_KERBEROS5_OLD) == 0 ||
 		    strcmp(OIDs[i], OID_KERBEROS5) == 0) {
-			cli->got_kerberos_mechanism = True;
+			got_kerberos_mechanism = True;
 		}
 		free(OIDs[i]);
 	}
@@ -864,7 +865,7 @@ ADS_STATUS cli_session_setup_spnego(struct cli_state *cli, const char *user,
 	/* If password is set we reauthenticate to kerberos server
 	 * and do not store results */
 
-	if (cli->got_kerberos_mechanism && cli->use_kerberos) {
+	if (got_kerberos_mechanism && cli->use_kerberos) {
 		ADS_STATUS rc;
 
 		if (pass && *pass) {
@@ -888,7 +889,6 @@ ADS_STATUS cli_session_setup_spnego(struct cli_state *cli, const char *user,
 		if (strequal(principal, ADS_IGNORE_PRINCIPAL)) {
 			SAFE_FREE(principal);
 		}
-
 		if (principal == NULL &&
 			!is_ipaddress(cli->desthost) &&
 			!strequal(star_smbserver_name,
@@ -946,19 +946,8 @@ ADS_STATUS cli_session_setup_spnego(struct cli_state *cli, const char *user,
 
 ntlmssp:
 
-	account = talloc_strdup(talloc_tos(), user);
-	if (!account) {
-		return ADS_ERROR_NT(NT_STATUS_NO_MEMORY);
-	}
-
-	/* when falling back to ntlmssp while authenticating with a machine
-	 * account strip off the realm - gd */
-
-	if ((p = strchr_m(user, '@')) != NULL) {
-		account[PTR_DIFF(p,user)] = '\0';
-	}
-
-	return ADS_ERROR_NT(cli_session_setup_ntlmssp(cli, account, pass, user_domain));
+	return ADS_ERROR_NT(cli_session_setup_ntlmssp(cli, user, pass,
+		user_domain));
 }
 
 /****************************************************************************
@@ -967,8 +956,8 @@ ntlmssp:
  password is in plaintext, the same should be done.
 ****************************************************************************/
 
-NTSTATUS cli_session_setup(struct cli_state *cli,
-			   const char *user,
+NTSTATUS cli_session_setup(struct cli_state *cli, 
+			   const char *user, 
 			   const char *pass, int passlen,
 			   const char *ntpass, int ntpasslen,
 			   const char *workgroup)
@@ -976,17 +965,8 @@ NTSTATUS cli_session_setup(struct cli_state *cli,
 	char *p;
 	fstring user2;
 
-	if (user) {
-		fstrcpy(user2, user);
-	} else {
-		user2[0] ='\0';
-	}
-
-	if (!workgroup) {
-		workgroup = "";
-	}
-
 	/* allow for workgroups as part of the username */
+	fstrcpy(user2, user);
 	if ((p=strchr_m(user2,'\\')) || (p=strchr_m(user2,'/')) ||
 	    (p=strchr_m(user2,*lp_winbind_separator()))) {
 		*p = 0;
@@ -1013,8 +993,8 @@ NTSTATUS cli_session_setup(struct cli_state *cli,
 
 		if ((cli->sec_mode & NEGOTIATE_SECURITY_CHALLENGE_RESPONSE) == 0 &&
 		    !lp_client_plaintext_auth() && (*pass)) {
-			DEBUG(1, ("Server requested plaintext password but "
-				  "'client plaintext auth' is disabled\n"));
+			DEBUG(1, ("Server requested plaintext password but 'client use plaintext auth'"
+				  " is disabled\n"));
 			return NT_STATUS_ACCESS_DENIED;
 		}
 
@@ -1040,8 +1020,8 @@ NTSTATUS cli_session_setup(struct cli_state *cli,
 
 	if ((cli->sec_mode & NEGOTIATE_SECURITY_CHALLENGE_RESPONSE) == 0) {
 		if (!lp_client_plaintext_auth() && (*pass)) {
-			DEBUG(1, ("Server requested plaintext password but "
-				  "'client plaintext auth' is disabled\n"));
+			DEBUG(1, ("Server requested plaintext password but 'client use plaintext auth'"
+				  " is disabled\n"));
 			return NT_STATUS_ACCESS_DENIED;
 		}
 		return cli_session_setup_plaintext(cli, user, pass, workgroup);
@@ -1080,10 +1060,10 @@ NTSTATUS cli_session_setup(struct cli_state *cli,
  Send a uloggoff.
 *****************************************************************************/
 
-bool cli_ulogoff(struct cli_state *cli)
+BOOL cli_ulogoff(struct cli_state *cli)
 {
 	memset(cli->outbuf,'\0',smb_size);
-	cli_set_message(cli->outbuf,2,0,True);
+	set_message(cli->outbuf,2,0,True);
 	SCVAL(cli->outbuf,smb_com,SMBulogoffX);
 	cli_setup_packet(cli);
 	SSVAL(cli->outbuf,smb_vwv0,0xFF);
@@ -1097,7 +1077,7 @@ bool cli_ulogoff(struct cli_state *cli)
 		return False;
 	}
 
-        cli->vuid = -1;
+        cli->cnum = -1;
         return True;
 }
 
@@ -1105,7 +1085,7 @@ bool cli_ulogoff(struct cli_state *cli)
  Send a tconX.
 ****************************************************************************/
 
-bool cli_send_tconX(struct cli_state *cli, 
+BOOL cli_send_tconX(struct cli_state *cli, 
 		    const char *share, const char *dev, const char *pass, int passlen)
 {
 	fstring fullshare, pword;
@@ -1127,9 +1107,8 @@ bool cli_send_tconX(struct cli_state *cli,
 	if ((cli->sec_mode & NEGOTIATE_SECURITY_CHALLENGE_RESPONSE) &&
 	    *pass && passlen != 24) {
 		if (!lp_client_lanman_auth()) {
-			DEBUG(1, ("Server requested LANMAN password "
-				  "(share-level security) but "
-				  "'client lanman auth' is disabled\n"));
+			DEBUG(1, ("Server requested LANMAN password (share-level security) but 'client use lanman auth'"
+				  " is disabled\n"));
 			return False;
 		}
 
@@ -1141,9 +1120,8 @@ bool cli_send_tconX(struct cli_state *cli,
 	} else {
 		if((cli->sec_mode & (NEGOTIATE_SECURITY_USER_LEVEL|NEGOTIATE_SECURITY_CHALLENGE_RESPONSE)) == 0) {
 			if (!lp_client_plaintext_auth() && (*pass)) {
-				DEBUG(1, ("Server requested plaintext "
-					  "password but 'client plaintext "
-					  "auth' is disabled\n"));
+				DEBUG(1, ("Server requested plaintext password but 'client use plaintext auth'"
+					  " is disabled\n"));
 				return False;
 			}
 
@@ -1162,7 +1140,7 @@ bool cli_send_tconX(struct cli_state *cli,
 	slprintf(fullshare, sizeof(fullshare)-1,
 		 "\\\\%s\\%s", cli->desthost, share);
 
-	cli_set_message(cli->outbuf,4, 0, True);
+	set_message(cli->outbuf,4, 0, True);
 	SCVAL(cli->outbuf,smb_com,SMBtconX);
 	cli_setup_packet(cli);
 
@@ -1210,10 +1188,10 @@ bool cli_send_tconX(struct cli_state *cli,
  Send a tree disconnect.
 ****************************************************************************/
 
-bool cli_tdis(struct cli_state *cli)
+BOOL cli_tdis(struct cli_state *cli)
 {
 	memset(cli->outbuf,'\0',smb_size);
-	cli_set_message(cli->outbuf,0,0,True);
+	set_message(cli->outbuf,0,0,True);
 	SCVAL(cli->outbuf,smb_com,SMBtdis);
 	SSVAL(cli->outbuf,smb_tid,cli->cnum);
 	cli_setup_packet(cli);
@@ -1245,7 +1223,7 @@ void cli_negprot_send(struct cli_state *cli)
 	memset(cli->outbuf,'\0',smb_size);
 
 	/* setup the protocol strings */
-	cli_set_message(cli->outbuf,0,0,True);
+	set_message(cli->outbuf,0,0,True);
 
 	p = smb_buf(cli->outbuf);
 	for (numprots=0;
@@ -1268,7 +1246,7 @@ void cli_negprot_send(struct cli_state *cli)
  Send a negprot command.
 ****************************************************************************/
 
-bool cli_negprot(struct cli_state *cli)
+BOOL cli_negprot(struct cli_state *cli)
 {
 	char *p;
 	int numprots;
@@ -1285,7 +1263,7 @@ bool cli_negprot(struct cli_state *cli)
 	     numprots++)
 		plength += strlen(prots[numprots].name)+2;
     
-	cli_set_message(cli->outbuf,0,plength,True);
+	set_message(cli->outbuf,0,plength,True);
 
 	p = smb_buf(cli->outbuf);
 	for (numprots=0;
@@ -1410,7 +1388,7 @@ bool cli_negprot(struct cli_state *cli)
  Send a session request. See rfc1002.txt 4.3 and 4.3.2.
 ****************************************************************************/
 
-bool cli_session_request(struct cli_state *cli,
+BOOL cli_session_request(struct cli_state *cli,
 			 struct nmb_name *calling, struct nmb_name *called)
 {
 	char *p;
@@ -1463,28 +1441,22 @@ bool cli_session_request(struct cli_state *cli,
 		int16 port;
 		};
 		*/
-		uint16_t port = (CVAL(cli->inbuf,8)<<8)+CVAL(cli->inbuf,9);
-		struct in_addr dest_ip;
-
+		int port = (CVAL(cli->inbuf,8)<<8)+CVAL(cli->inbuf,9);
 		/* SESSION RETARGET */
-		putip((char *)&dest_ip,cli->inbuf+4);
-		in_addr_to_sockaddr_storage(&cli->dest_ss, dest_ip);
+		putip((char *)&cli->dest_ip,cli->inbuf+4);
 
-		cli->fd = open_socket_out(SOCK_STREAM,
-				&cli->dest_ss,
-				port,
-				LONG_CONNECT_TIMEOUT);
+		cli->fd = open_socket_out(SOCK_STREAM, &cli->dest_ip, port, LONG_CONNECT_TIMEOUT);
 		if (cli->fd == -1)
 			return False;
 
 		DEBUG(3,("Retargeted\n"));
 
-		set_socket_options(cli->fd, lp_socket_options());
+		set_socket_options(cli->fd,user_socket_options);
 
 		/* Try again */
 		{
 			static int depth;
-			bool ret;
+			BOOL ret;
 			if (depth > 4) {
 				DEBUG(0,("Retarget recursion - failing\n"));
 				return False;
@@ -1508,92 +1480,54 @@ bool cli_session_request(struct cli_state *cli,
  Open the client sockets.
 ****************************************************************************/
 
-NTSTATUS cli_connect(struct cli_state *cli,
-		const char *host,
-		struct sockaddr_storage *dest_ss)
-
+NTSTATUS cli_connect(struct cli_state *cli, const char *host, struct in_addr *ip)
 {
 	int name_type = 0x20;
-	TALLOC_CTX *frame = talloc_stackframe();
-	unsigned int num_addrs = 0;
-	unsigned int i = 0;
-	struct sockaddr_storage *ss_arr = NULL;
-	char *p = NULL;
+	char *p;
 
 	/* reasonable default hostname */
-	if (!host) {
-		host = star_smbserver_name;
-	}
+	if (!host) host = star_smbserver_name;
 
 	fstrcpy(cli->desthost, host);
 
 	/* allow hostnames of the form NAME#xx and do a netbios lookup */
 	if ((p = strchr(cli->desthost, '#'))) {
-		name_type = strtol(p+1, NULL, 16);
+		name_type = strtol(p+1, NULL, 16);		
 		*p = 0;
 	}
-
-	if (!dest_ss || is_zero_addr(dest_ss)) {
-		NTSTATUS status =resolve_name_list(frame,
-					cli->desthost,
-					name_type,
-					&ss_arr,
-					&num_addrs);
-		if (!NT_STATUS_IS_OK(status)) {
-			TALLOC_FREE(frame);
+	
+	if (!ip || is_zero_ip(*ip)) {
+                if (!resolve_name(cli->desthost, &cli->dest_ip, name_type)) {
 			return NT_STATUS_BAD_NETWORK_NAME;
                 }
+		if (ip) *ip = cli->dest_ip;
 	} else {
-		num_addrs = 1;
-		ss_arr = TALLOC_P(frame, struct sockaddr_storage);
-		if (!ss_arr) {
-			TALLOC_FREE(frame);
-			return NT_STATUS_NO_MEMORY;
-		}
-		*ss_arr = *dest_ss;
+		cli->dest_ip = *ip;
 	}
 
-	for (i = 0; i < num_addrs; i++) {
-		cli->dest_ss = ss_arr[i];
-		if (getenv("LIBSMB_PROG")) {
-			cli->fd = sock_exec(getenv("LIBSMB_PROG"));
-		} else {
-			/* try 445 first, then 139 */
-			uint16_t port = cli->port?cli->port:445;
-			cli->fd = open_socket_out(SOCK_STREAM, &cli->dest_ss,
+	if (getenv("LIBSMB_PROG")) {
+		cli->fd = sock_exec(getenv("LIBSMB_PROG"));
+	} else {
+		/* try 445 first, then 139 */
+		int port = cli->port?cli->port:445;
+		cli->fd = open_socket_out(SOCK_STREAM, &cli->dest_ip, 
+					  port, cli->timeout);
+		if (cli->fd == -1 && cli->port == 0) {
+			port = 139;
+			cli->fd = open_socket_out(SOCK_STREAM, &cli->dest_ip, 
 						  port, cli->timeout);
-			if (cli->fd == -1 && cli->port == 0) {
-				port = 139;
-				cli->fd = open_socket_out(SOCK_STREAM, &cli->dest_ss,
-							  port, cli->timeout);
-			}
-			if (cli->fd != -1) {
-				cli->port = port;
-			}
 		}
-		if (cli->fd == -1) {
-			char addr[INET6_ADDRSTRLEN];
-			print_sockaddr(addr, sizeof(addr), &ss_arr[i]);
-			DEBUG(2,("Error connecting to %s (%s)\n",
-				 dest_ss?addr:host,strerror(errno)));
-		} else {
-			/* Exit from loop on first connection. */
-			break;
-		}
+		if (cli->fd != -1)
+			cli->port = port;
 	}
-
 	if (cli->fd == -1) {
-		TALLOC_FREE(frame);
+		DEBUG(1,("Error connecting to %s (%s)\n",
+			 ip?inet_ntoa(*ip):host,strerror(errno)));
 		return map_nt_error_from_unix(errno);
 	}
 
-	if (dest_ss) {
-		*dest_ss = cli->dest_ss;
-	}
+	set_socket_options(cli->fd,user_socket_options);
 
-	set_socket_options(cli->fd, lp_socket_options());
-
-	TALLOC_FREE(frame);
 	return NT_STATUS_OK;
 }
 
@@ -1601,23 +1535,23 @@ NTSTATUS cli_connect(struct cli_state *cli,
    establishes a connection to after the negprot. 
    @param output_cli A fully initialised cli structure, non-null only on success
    @param dest_host The netbios name of the remote host
-   @param dest_ss (optional) The the destination IP, NULL for name based lookup
+   @param dest_ip (optional) The the destination IP, NULL for name based lookup
    @param port (optional) The destination port (0 for default)
-   @param retry bool. Did this connection fail with a retryable error ?
+   @param retry BOOL. Did this connection fail with a retryable error ?
 
 */
 NTSTATUS cli_start_connection(struct cli_state **output_cli, 
 			      const char *my_name, 
 			      const char *dest_host, 
-			      struct sockaddr_storage *dest_ss, int port,
+			      struct in_addr *dest_ip, int port,
 			      int signing_state, int flags,
-			      bool *retry) 
+			      BOOL *retry) 
 {
 	NTSTATUS nt_status;
 	struct nmb_name calling;
 	struct nmb_name called;
 	struct cli_state *cli;
-	struct sockaddr_storage ss;
+	struct in_addr ip;
 
 	if (retry)
 		*retry = False;
@@ -1639,22 +1573,19 @@ NTSTATUS cli_start_connection(struct cli_state **output_cli,
 
 	cli_set_timeout(cli, 10000); /* 10 seconds. */
 
-	if (dest_ss) {
-		ss = *dest_ss;
-	} else {
-		zero_sockaddr(&ss);
-	}
+	if (dest_ip)
+		ip = *dest_ip;
+	else
+		ZERO_STRUCT(ip);
 
 again:
 
 	DEBUG(3,("Connecting to host=%s\n", dest_host));
-
-	nt_status = cli_connect(cli, dest_host, &ss);
+	
+	nt_status = cli_connect(cli, dest_host, &ip);
 	if (!NT_STATUS_IS_OK(nt_status)) {
-		char addr[INET6_ADDRSTRLEN];
-		print_sockaddr(addr, sizeof(addr), &ss);
 		DEBUG(1,("cli_start_connection: failed to connect to %s (%s). Error %s\n",
-			 nmb_namestr(&called), addr, nt_errstr(nt_status) ));
+			 nmb_namestr(&called), inet_ntoa(ip), nt_errstr(nt_status) ));
 		cli_shutdown(cli);
 		return nt_status;
 	}
@@ -1664,7 +1595,7 @@ again:
 
 	if (!cli_session_request(cli, &calling, &called)) {
 		char *p;
-		DEBUG(1,("session request to %s failed (%s)\n",
+		DEBUG(1,("session request to %s failed (%s)\n", 
 			 called.name, cli_errstr(cli)));
 		if ((p=strchr(called.name, '.')) && !is_ipaddress(called.name)) {
 			*p = 0;
@@ -1683,11 +1614,6 @@ again:
 		cli->use_spnego = False;
 	else if (flags & CLI_FULL_CONNECTION_USE_KERBEROS)
 		cli->use_kerberos = True;
-
-	if ((flags & CLI_FULL_CONNECTION_FALLBACK_AFTER_KERBEROS) &&
-	     cli->use_kerberos) {
-		cli->fallback_after_kerberos = true;
-	}
 
 	if (!cli_negprot(cli)) {
 		DEBUG(1,("failed negprot\n"));
@@ -1715,18 +1641,18 @@ again:
    @param user Username, unix string
    @param domain User's domain
    @param password User's password, unencrypted unix string.
-   @param retry bool. Did this connection fail with a retryable error ?
+   @param retry BOOL. Did this connection fail with a retryable error ?
 */
 
 NTSTATUS cli_full_connection(struct cli_state **output_cli, 
 			     const char *my_name, 
 			     const char *dest_host, 
-			     struct sockaddr_storage *dest_ss, int port,
+			     struct in_addr *dest_ip, int port,
 			     const char *service, const char *service_type,
 			     const char *user, const char *domain, 
 			     const char *password, int flags,
 			     int signing_state,
-			     bool *retry) 
+			     BOOL *retry) 
 {
 	NTSTATUS nt_status;
 	struct cli_state *cli = NULL;
@@ -1738,10 +1664,9 @@ NTSTATUS cli_full_connection(struct cli_state **output_cli,
 		password = "";
 	}
 
-	nt_status = cli_start_connection(&cli, my_name, dest_host,
-					 dest_ss, port, signing_state,
-					 flags, retry);
-
+	nt_status = cli_start_connection(&cli, my_name, dest_host, 
+					 dest_ip, port, signing_state, flags, retry);
+	
 	if (!NT_STATUS_IS_OK(nt_status)) {
 		return nt_status;
 	}
@@ -1765,7 +1690,7 @@ NTSTATUS cli_full_connection(struct cli_state **output_cli,
 			return nt_status;
 		}
 	}
-
+	
 	if (service) {
 		if (!cli_send_tconX(cli, service, service_type, password, pw_len)) {
 			nt_status = cli_nt_error(cli);
@@ -1788,8 +1713,8 @@ NTSTATUS cli_full_connection(struct cli_state **output_cli,
  Attempt a NetBIOS session request, falling back to *SMBSERVER if needed.
 ****************************************************************************/
 
-bool attempt_netbios_session_request(struct cli_state **ppcli, const char *srchost, const char *desthost,
-                                     struct sockaddr_storage *pdest_ss)
+BOOL attempt_netbios_session_request(struct cli_state **ppcli, const char *srchost, const char *desthost,
+                                     struct in_addr *pdest_ip)
 {
 	struct nmb_name calling, called;
 
@@ -1837,7 +1762,7 @@ with error %s.\n", desthost, cli_errstr(*ppcli) ));
 			return False;
 		}
 
-		status = cli_connect(*ppcli, desthost, pdest_ss);
+		status = cli_connect(*ppcli, desthost, pdest_ip);
 		if (!NT_STATUS_IS_OK(status) ||
 				!cli_session_request(*ppcli, &calling, &smbservername)) {
 			DEBUG(0,("attempt_netbios_session_request: %s rejected the session for \
@@ -1849,6 +1774,10 @@ name *SMBSERVER with error %s\n", desthost, cli_errstr(*ppcli) ));
 	return True;
 }
 
+
+
+
+
 /****************************************************************************
  Send an old style tcon.
 ****************************************************************************/
@@ -1859,15 +1788,15 @@ NTSTATUS cli_raw_tcon(struct cli_state *cli,
 	char *p;
 
 	if (!lp_client_plaintext_auth() && (*pass)) {
-		DEBUG(1, ("Server requested plaintext password but 'client "
-			  "plaintext auth' is disabled\n"));
+		DEBUG(1, ("Server requested plaintext password but 'client use plaintext auth'"
+			  " is disabled\n"));
 		return NT_STATUS_ACCESS_DENIED;
 	}
 
 	memset(cli->outbuf,'\0',smb_size);
 	memset(cli->inbuf,'\0',smb_size);
 
-	cli_set_message(cli->outbuf, 0, 0, True);
+	set_message(cli->outbuf, 0, 0, True);
 	SCVAL(cli->outbuf,smb_com,SMBtcon);
 	cli_setup_packet(cli);
 
@@ -1895,24 +1824,18 @@ NTSTATUS cli_raw_tcon(struct cli_state *cli,
 
 /* Return a cli_state pointing at the IPC$ share for the given server */
 
-struct cli_state *get_ipc_connect(char *server,
-				struct sockaddr_storage *server_ss,
-				const struct user_auth_info *user_info)
+struct cli_state *get_ipc_connect(char *server, struct in_addr *server_ip,
+                                         struct user_auth_info *user_info)
 {
         struct cli_state *cli;
+        pstring myname;
 	NTSTATUS nt_status;
-	uint32_t flags = CLI_FULL_CONNECTION_ANONYMOUS_FALLBACK;
 
-	if (user_info->use_kerberos) {
-		flags |= CLI_FULL_CONNECTION_USE_KERBEROS;
-	}
-
-	nt_status = cli_full_connection(&cli, NULL, server, server_ss, 0, "IPC$", "IPC", 
-					user_info->username ? user_info->username : "",
-					lp_workgroup(),
-					user_info->password ? user_info->password : "",
-					flags,
-					Undefined, NULL);
+        get_myname(myname);
+	
+	nt_status = cli_full_connection(&cli, myname, server, server_ip, 0, "IPC$", "IPC", 
+					user_info->username, lp_workgroup(), user_info->password, 
+					CLI_FULL_CONNECTION_ANONYMOUS_FALLBACK, Undefined, NULL);
 
 	if (NT_STATUS_IS_OK(nt_status)) {
 		return cli;
@@ -1920,8 +1843,8 @@ struct cli_state *get_ipc_connect(char *server,
 	    /* windows 9* needs a correct NMB name for connections */
 	    fstring remote_name;
 
-	    if (name_status_find("*", 0, 0, server_ss, remote_name)) {
-		cli = get_ipc_connect(remote_name, server_ss, user_info);
+	    if (name_status_find("*", 0, 0, *server_ip, remote_name)) {
+		cli = get_ipc_connect(remote_name, server_ip, user_info);
 		if (cli)
 		    return cli;
 	    }
@@ -1941,21 +1864,14 @@ struct cli_state *get_ipc_connect(char *server,
  * entire network browse list)
  */
 
-struct cli_state *get_ipc_connect_master_ip(TALLOC_CTX *ctx,
-				struct ip_service *mb_ip,
-				const struct user_auth_info *user_info,
-				char **pp_workgroup_out)
+struct cli_state *get_ipc_connect_master_ip(struct ip_service * mb_ip, pstring workgroup, struct user_auth_info *user_info)
 {
-	char addr[INET6_ADDRSTRLEN];
-        fstring name;
+        static fstring name;
 	struct cli_state *cli;
-	struct sockaddr_storage server_ss;
+	struct in_addr server_ip; 
 
-	*pp_workgroup_out = NULL;
-
-	print_sockaddr(addr, sizeof(addr), &mb_ip->ss);
         DEBUG(99, ("Looking up name of master browser %s\n",
-                   addr));
+                   inet_ntoa(mb_ip->ip)));
 
         /*
          * Do a name status query to find out the name of the master browser.
@@ -1968,27 +1884,28 @@ struct cli_state *get_ipc_connect_master_ip(TALLOC_CTX *ctx,
          * the original wildcard query as the first choice and fall back to
          * MSBROWSE if the wildcard query fails.
          */
-        if (!name_status_find("*", 0, 0x1d, &mb_ip->ss, name) &&
-            !name_status_find(MSBROWSE, 1, 0x1d, &mb_ip->ss, name)) {
+        if (!name_status_find("*", 0, 0x1d, mb_ip->ip, name) &&
+            !name_status_find(MSBROWSE, 1, 0x1d, mb_ip->ip, name)) {
 
                 DEBUG(99, ("Could not retrieve name status for %s\n",
-                           addr));
+                           inet_ntoa(mb_ip->ip)));
                 return NULL;
         }
 
-        if (!find_master_ip(name, &server_ss)) {
+        if (!find_master_ip(name, &server_ip)) {
                 DEBUG(99, ("Could not find master ip for %s\n", name));
                 return NULL;
         }
 
-	*pp_workgroup_out = talloc_strdup(ctx, name);
+                pstrcpy(workgroup, name);
 
-	DEBUG(4, ("found master browser %s, %s\n", name, addr));
+                DEBUG(4, ("found master browser %s, %s\n", 
+                  name, inet_ntoa(mb_ip->ip)));
 
-	print_sockaddr(addr, sizeof(addr), &server_ss);
-	cli = get_ipc_connect(addr, &server_ss, user_info);
+		cli = get_ipc_connect(inet_ntoa(server_ip), &server_ip, user_info);
 
-	return cli;
+		return cli;
+    
 }
 
 /*
@@ -1996,35 +1913,27 @@ struct cli_state *get_ipc_connect_master_ip(TALLOC_CTX *ctx,
  * connect to it.
  */
 
-struct cli_state *get_ipc_connect_master_ip_bcast(TALLOC_CTX *ctx,
-					const struct user_auth_info *user_info,
-					char **pp_workgroup_out)
+struct cli_state *get_ipc_connect_master_ip_bcast(pstring workgroup, struct user_auth_info *user_info)
 {
 	struct ip_service *ip_list;
 	struct cli_state *cli;
 	int i, count;
 
-	*pp_workgroup_out = NULL;
-
         DEBUG(99, ("Do broadcast lookup for workgroups on local network\n"));
 
-        /* Go looking for workgroups by broadcasting on the local network */
+        /* Go looking for workgroups by broadcasting on the local network */ 
 
-        if (!NT_STATUS_IS_OK(name_resolve_bcast(MSBROWSE, 1, &ip_list,
-						&count))) {
+        if (!name_resolve_bcast(MSBROWSE, 1, &ip_list, &count)) {
                 DEBUG(99, ("No master browsers responded\n"));
                 return False;
         }
 
 	for (i = 0; i < count; i++) {
-		char addr[INET6_ADDRSTRLEN];
-		print_sockaddr(addr, sizeof(addr), &ip_list[i].ss);
-		DEBUG(99, ("Found master browser %s\n", addr));
+            DEBUG(99, ("Found master browser %s\n", inet_ntoa(ip_list[i].ip)));
 
-		cli = get_ipc_connect_master_ip(ctx, &ip_list[i],
-				user_info, pp_workgroup_out);
-		if (cli)
-			return(cli);
+            cli = get_ipc_connect_master_ip(&ip_list[i], workgroup, user_info);
+            if (cli)
+                    return(cli);
 	}
 
 	return NULL;

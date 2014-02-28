@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -52,7 +53,7 @@ int conn_num_open(void)
 /****************************************************************************
 check if a snum is in use
 ****************************************************************************/
-bool conn_snum_used(int snum)
+BOOL conn_snum_used(int snum)
 {
 	connection_struct *conn;
 	for (conn=Connections;conn;conn=conn->next) {
@@ -91,6 +92,7 @@ thinking the server is still available.
 ****************************************************************************/
 connection_struct *conn_new(void)
 {
+	TALLOC_CTX *mem_ctx;
 	connection_struct *conn;
 	int i;
         int find_offset = 1;
@@ -138,19 +140,25 @@ find_again:
 		return NULL;
 	}
 
-	if (!(conn=TALLOC_ZERO_P(NULL, connection_struct)) ||
-	    !(conn->params = TALLOC_P(conn, struct share_params))) {
-		DEBUG(0,("TALLOC_ZERO() failed!\n"));
-		TALLOC_FREE(conn);
+	if ((mem_ctx=talloc_init("connection_struct"))==NULL) {
+		DEBUG(0,("talloc_init(connection_struct) failed!\n"));
 		return NULL;
 	}
+
+	if (!(conn=TALLOC_ZERO_P(mem_ctx, connection_struct)) ||
+	    !(conn->params = TALLOC_P(mem_ctx, struct share_params))) {
+		DEBUG(0,("TALLOC_ZERO() failed!\n"));
+		TALLOC_FREE(mem_ctx);
+		return NULL;
+	}
+	conn->mem_ctx = mem_ctx;
 	conn->cnum = i;
-	conn->force_group_gid = (gid_t)-1;
 
 	bitmap_set(bmap, i);
 
 	num_open++;
 
+	string_set(&conn->user,"");
 	string_set(&conn->dirpath,"");
 	string_set(&conn->connectpath,"");
 	string_set(&conn->origpath,"");
@@ -162,37 +170,30 @@ find_again:
 
 /****************************************************************************
  Close all conn structures.
-return true if any were closed
 ****************************************************************************/
-bool conn_close_all(void)
+
+void conn_close_all(void)
 {
 	connection_struct *conn, *next;
-	bool ret = false;
 	for (conn=Connections;conn;conn=next) {
 		next=conn->next;
 		set_current_service(conn, 0, True);
 		close_cnum(conn, conn->vuid);
-		ret = true;
 	}
-	return ret;
 }
 
 /****************************************************************************
  Idle inactive connections.
 ****************************************************************************/
 
-bool conn_idle_all(time_t t)
+BOOL conn_idle_all(time_t t, int deadtime)
 {
-	int deadtime = lp_deadtime()*60;
 	pipes_struct *plist = NULL;
-	connection_struct *conn;
+	BOOL allidle = True;
+	connection_struct *conn, *next;
 
-	if (deadtime <= 0)
-		deadtime = DEFAULT_SMBD_TIMEOUT;
-
-	for (conn=Connections;conn;conn=conn->next) {
-
-		time_t age = t - conn->lastused;
+	for (conn=Connections;conn;conn=next) {
+		next=conn->next;
 
 		/* Update if connection wasn't idle. */
 		if (conn->lastused != conn->lastused_count) {
@@ -201,12 +202,12 @@ bool conn_idle_all(time_t t)
 		}
 
 		/* close dirptrs on connections that are idle */
-		if (age > DPTR_IDLE_TIMEOUT) {
+		if ((t-conn->lastused) > DPTR_IDLE_TIMEOUT) {
 			dptr_idlecnum(conn);
 		}
 
-		if (conn->num_files_open > 0 || age < deadtime) {
-			return False;
+		if (conn->num_files_open > 0 || (t-conn->lastused)<deadtime) {
+			allidle = False;
 		}
 	}
 
@@ -215,29 +216,35 @@ bool conn_idle_all(time_t t)
 	 * idle with a handle open.
 	 */
 
-	for (plist = get_first_internal_pipe(); plist;
-	     plist = get_next_internal_pipe(plist)) {
-		if (plist->pipe_handles && plist->pipe_handles->count) {
-			return False;
-		}
-	}
+	for (plist = get_first_internal_pipe(); plist; plist = get_next_internal_pipe(plist))
+		if (plist->pipe_handles && plist->pipe_handles->count)
+			allidle = False;
 	
-	return True;
+	return allidle;
 }
 
 /****************************************************************************
  Clear a vuid out of the validity cache, and as the 'owner' of a connection.
 ****************************************************************************/
 
-void conn_clear_vuid_caches(uint16_t vuid)
+void conn_clear_vuid_cache(uint16 vuid)
 {
 	connection_struct *conn;
+	unsigned int i;
 
 	for (conn=Connections;conn;conn=conn->next) {
 		if (conn->vuid == vuid) {
 			conn->vuid = UID_FIELD_INVALID;
 		}
-		conn_clear_vuid_cache(conn, vuid);
+
+		for (i=0;i<conn->vuid_cache.entries && i< VUID_CACHE_SIZE;i++) {
+			if (conn->vuid_cache.array[i].vuid == vuid) {
+				struct vuid_cache_entry *ent = &conn->vuid_cache.array[i];
+				ent->vuid = UID_FIELD_INVALID;
+				ent->read_only = False;
+				ent->admin_user = False;
+			}
+		}
 	}
 }
 
@@ -248,6 +255,7 @@ void conn_clear_vuid_caches(uint16_t vuid)
 void conn_free_internal(connection_struct *conn)
 {
  	vfs_handle_struct *handle = NULL, *thandle = NULL;
+ 	TALLOC_CTX *mem_ctx = NULL;
 	struct trans_state *state = NULL;
 
 	/* Free vfs_connection_struct */
@@ -272,12 +280,14 @@ void conn_free_internal(connection_struct *conn)
 	free_namearray(conn->veto_oplock_list);
 	free_namearray(conn->aio_write_behind_list);
 	
+	string_free(&conn->user);
 	string_free(&conn->dirpath);
 	string_free(&conn->connectpath);
 	string_free(&conn->origpath);
 
+	mem_ctx = conn->mem_ctx;
 	ZERO_STRUCTP(conn);
-	talloc_destroy(conn);
+	talloc_destroy(mem_ctx);
 }
 
 /****************************************************************************
@@ -289,8 +299,6 @@ void conn_free(connection_struct *conn)
 	DLIST_REMOVE(Connections, conn);
 
 	bitmap_clear(bmap, conn->cnum);
-
-	SMB_ASSERT(num_open > 0);
 	num_open--;
 
 	conn_free_internal(conn);
@@ -302,16 +310,13 @@ the message contains just a share name and all instances of that
 share are unmounted
 the special sharename '*' forces unmount of all shares
 ****************************************************************************/
-void msg_force_tdis(struct messaging_context *msg,
-		    void *private_data,
-		    uint32_t msg_type,
-		    struct server_id server_id,
-		    DATA_BLOB *data)
+void msg_force_tdis(int msg_type, struct process_id pid, void *buf, size_t len,
+		    void *private_data)
 {
 	connection_struct *conn, *next;
 	fstring sharename;
 
-	fstrcpy(sharename, (const char *)data->data);
+	fstrcpy(sharename, (const char *)buf);
 
 	if (strcmp(sharename, "*") == 0) {
 		DEBUG(1,("Forcing close of all shares\n"));

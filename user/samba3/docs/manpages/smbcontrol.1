@@ -1,12 +1,12 @@
 .\"     Title: smbcontrol
 .\"    Author: [see the "AUTHOR" section]
 .\" Generator: DocBook XSL Stylesheets v1.74.0 <http://docbook.sf.net/>
-.\"      Date: 02/22/2010
+.\"      Date: 09/30/2009
 .\"    Manual: User Commands
-.\"    Source: Samba 3.3
+.\"    Source: Samba 3.0
 .\"  Language: English
 .\"
-.TH "SMBCONTROL" "1" "02/22/2010" "Samba 3\&.3" "User Commands"
+.TH "SMBCONTROL" "1" "09/30/2009" "Samba 3\&.0" "User Commands"
 .\" -----------------------------------------------------------------
 .\" * (re)Define some macros
 .\" -----------------------------------------------------------------
@@ -196,7 +196,7 @@ daemon running on the system\&.
 Print a summary of command line options\&.
 .RE
 .PP
-\-s|\-\-configfile <configuration file>
+\-s <configuration file>
 .RS 4
 The file specified contains the configuration details required by the server\&. The information in this file includes server\-specific information such as what printcap file to use, as well as descriptions of all the services that the server is to provide\&. See
 \FCsmb\&.conf\F[]
@@ -216,25 +216,13 @@ One of
 or a process ID\&.
 .sp
 The
-\fIall\fR
-destination causes the message to "broadcast" to all running daemons including nmbd and winbind\&. This is a change for Samba 3\&.3, prior to this the parameter smbd used to do this\&.
-.sp
-The
 \fIsmbd\fR
-destination causes the message to be sent to the smbd daemon specified in the
-\FCsmbd\&.pid\F[]
-file\&.
+destination causes the message to "broadcast" to all smbd daemons\&.
 .sp
 The
 \fInmbd\fR
 destination causes the message to be sent to the nmbd daemon specified in the
 \FCnmbd\&.pid\F[]
-file\&.
-.sp
-The
-\fIwinbindd\fR
-destination causes the message to be sent to the winbind daemon specified in the
-\FCwinbindd\&.pid\F[]
 file\&.
 .sp
 If a single process ID is given, the message is sent to only that process\&.
@@ -391,7 +379,7 @@ Force daemon to reload smb\&.conf configuration file\&. Can be sent to
 .RE
 .SH "VERSION"
 .PP
-This man page is correct for version 3 of the Samba suite\&.
+This man page is correct for version 3\&.0 of the Samba suite\&.
 .SH "SEE ALSO"
 .PP
 \fBnmbd\fR(8)

@@ -1,0 +1,42 @@
+############TEMPLATE SECTION START######################
+    bind interfaces only	= Yes
+
+    private dir			= /etc
+    smb passwd file		= /etc/smbpasswd
+    lock directory		= /var/lock
+    lock dir			= /var/lock
+    syslog			= 1
+    syslog only			= yes
+    max log size		= 10
+
+    security			= user
+    map to guest		= Bad User
+    encrypt passwords		= yes
+    guest account		= nobody
+
+    wins support		= yes
+    wins proxy			= no
+    dns proxy			= no
+    domain master		= yes
+    preferred master		= yes
+    local master		= yes
+    enhanced browsing		= yes
+    name cache timeout		= 660
+
+    unix charset		= UTF-8
+    display charset		= UTF-8
+    dos charset			= 866
+    force directory mode	= 0771
+    default case		= upper
+    preserve case		= yes
+    short preserve case		= yes
+
+    show add printer wizard	= no
+    load printers		= no
+    cups server			= ""
+    disable spoolss		= yes
+
+    wide links			= yes
+    unix extensions		= no
+    use mmap			= no
+############TEMPLATE SECTION END########################

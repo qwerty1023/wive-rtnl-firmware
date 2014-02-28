@@ -14,7 +14,7 @@ if [ $# -ge 4 ] ; then
 fi
 
 if test ! -d $SRCDIR../docs/manpages; then
-	echo "No manpages present.  Development version maybe?"
+	echo "No manpages present.  SVN development version maybe?"
 	exit 0
 fi
 
@@ -50,6 +50,7 @@ for lang in $langs; do
 	    case "${MP_BASENAME}" in
 		cifs.upcall.8) test -z "${CIFSUPCALL_PROGS}" && continue ;;
 	    	smbsh.1) test -z "${SMBWRAPPER}" && continue ;;
+		smbmnt.8|smbmount.8|smbumount.8) test -z "${SMBMOUNT_PROGS}" && continue ;;
 		*) ;;
 	    esac
 

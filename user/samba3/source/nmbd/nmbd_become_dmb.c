@@ -7,7 +7,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -16,11 +16,14 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
    
 */
 
 #include "includes.h"
+
+extern struct in_addr allones_ip;
 
 extern uint16 samba_nb_type; /* Samba's NetBIOS type. */
 
@@ -108,16 +111,15 @@ in workgroup %s on subnet %s\n",
 	subrec->work_changed = True;
 
 	if( DEBUGLVL( 0 ) ) {
-		dbgtext( "Samba server %s ", global_myname() );
-		dbgtext( "is now a domain master browser for " );
-		dbgtext( "workgroup %s ", work->work_group );
-		dbgtext( "on subnet %s\n", subrec->subnet_name );
+		dbgtext( "Samba server %s is now a domain master browser for "
+		         "workgroup %s on subnet %s\n",
+		         global_myname(), work->work_group, subrec->subnet_name );
 	}
 
 	if( subrec == unicast_subnet ) {
 		struct nmb_name nmbname;
 		struct in_addr my_first_ip;
-		const struct in_addr *nip;
+		struct in_addr *nip;
 
 		/* Put our name and first IP address into the 
 		   workgroup struct as domain master browser. This
@@ -127,15 +129,14 @@ in workgroup %s on subnet %s\n",
 		make_nmb_name(&nmbname, global_myname(), 0x20);
 
 		work->dmb_name = nmbname;
+		/* Pick the first interface ip address as the domain master browser ip. */
+		nip = iface_n_ip(0);
 
-		/* Pick the first interface IPv4 address as the domain master
-		 * browser ip. */
-		nip = first_ipv4_iface();
 		if (!nip) {
-			DEBUG(0,("become_domain_master_stage2: "
-				"Error. get_interface returned NULL\n"));
+			DEBUG(0,("become_domain_master_stage2: Error. iface_n_ip returned NULL\n"));
 			return;
 		}
+
 		my_first_ip = *nip;
 
 		putip((char *)&work->dmb_addr, &my_first_ip);
@@ -203,12 +204,10 @@ workgroup %s on subnet %s\n", wg_name, subrec->subnet_name));
 
 static void become_domain_master_query_success(struct subnet_record *subrec,
                         struct userdata_struct *userdata,
-                        struct nmb_name *nmbname, struct in_addr ip,
+                        struct nmb_name *nmbname, struct in_addr ip, 
                         struct res_rec *rrec)
 {
 	unstring name;
-	struct in_addr allones_ip;
-
 	pull_ascii_nstring(name, sizeof(name), nmbname->name);
 
 	/* If the given ip is not ours, then we can't become a domain
@@ -218,9 +217,7 @@ static void become_domain_master_query_success(struct subnet_record *subrec,
 	/* BUG note. Samba 1.9.16p11 servers seem to return the broadcast
 		address or zero ip for this query. Pretend this is ok. */
 
-	allones_ip.s_addr = htonl(INADDR_BROADCAST);
-
-	if(ismyip_v4(ip) || ip_equal_v4(allones_ip, ip) || is_zero_ip_v4(ip)) {
+	if(ismyip(ip) || ip_equal(allones_ip, ip) || is_zero_ip(ip)) {
 		if( DEBUGLVL( 3 ) ) {
 			dbgtext( "become_domain_master_query_success():\n" );
 			dbgtext( "Our address (%s) ", inet_ntoa(ip) );
@@ -233,10 +230,9 @@ static void become_domain_master_query_success(struct subnet_record *subrec,
 		become_domain_master_stage1(subrec, name);
 	} else {
 		if( DEBUGLVL( 0 ) ) {
-			dbgtext( "become_domain_master_query_success:\n" );
-			dbgtext( "There is already a domain master browser at " );
-			dbgtext( "IP %s for workgroup %s ", inet_ntoa(ip), name );
-			dbgtext( "registered on subnet %s.\n", subrec->subnet_name );
+			dbgtext( "There is already a domain master browser at "
+			         "IP %s for workgroup %s registered on subnet %s.\n",
+			         inet_ntoa(ip), name, subrec->subnet_name );
 		}
 	}
 }
@@ -289,8 +285,8 @@ static void become_domain_master_browser_bcast(const char *workgroup_name)
 			 */
 
 			if (find_name_on_subnet(subrec, &nmbname, FIND_SELF_NAME) == NULL) {
-				if( DEBUGLVL( 0 ) ) {
-					dbgtext( "become_domain_master_browser_bcast: " );
+				if( DEBUGLVL( 1 ) ) {
+					dbgtext( "become_domain_master_browser_bcast:\n" );
 					dbgtext( "Attempting to become domain master browser on " );
 					dbgtext( "workgroup %s on subnet %s\n",
 						workgroup_name, subrec->subnet_name );
@@ -334,8 +330,8 @@ static void become_domain_master_browser_wins(const char *workgroup_name)
 		 */
 
 		if (find_name_on_subnet(unicast_subnet, &nmbname, FIND_SELF_NAME) == NULL) {
-			if( DEBUGLVL( 0 ) ) {
-				dbgtext( "become_domain_master_browser_wins: " );
+			if( DEBUGLVL( 1 ) ) {
+				dbgtext( "become_domain_master_browser_wins:\n" );
 				dbgtext( "Attempting to become domain master browser " );
 				dbgtext( "on workgroup %s, subnet %s.\n",
 					workgroup_name, unicast_subnet->subnet_name );

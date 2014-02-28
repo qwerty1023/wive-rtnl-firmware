@@ -6,7 +6,7 @@
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 3 of the License, or
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program; if not, see <http://www.gnu.org/licenses/>.
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
 #ifndef __NFS4_ACLS_H__
@@ -117,34 +118,29 @@ SMB4ACL_T *smb_create_smb4acl(void);
 
 /* prop's contents are copied */
 /* it doesn't change the order, appends */
-SMB4ACE_T *smb_add_ace4(SMB4ACL_T *theacl, SMB_ACE4PROP_T *prop);
+SMB4ACE_T *smb_add_ace4(SMB4ACL_T *acl, SMB_ACE4PROP_T *prop);
 
 SMB_ACE4PROP_T *smb_get_ace4(SMB4ACE_T *ace);
 
 /* Returns NULL if none - or error */
-SMB4ACE_T *smb_first_ace4(SMB4ACL_T *theacl);
+SMB4ACE_T *smb_first_ace4(SMB4ACL_T *acl);
 
 /* Returns NULL in the end - or error */
 SMB4ACE_T *smb_next_ace4(SMB4ACE_T *ace);
 
-uint32 smb_get_naces(SMB4ACL_T *theacl);
+uint32 smb_get_naces(SMB4ACL_T *acl);
 
-NTSTATUS smb_fget_nt_acl_nfs4(files_struct *fsp,
+size_t smb_get_nt_acl_nfs4(files_struct *fsp,
 	uint32 security_info,
-	SEC_DESC **ppdesc, SMB4ACL_T *theacl);
-
-NTSTATUS smb_get_nt_acl_nfs4(connection_struct *conn,
-	const char *name,
-	uint32 security_info,
-	SEC_DESC **ppdesc, SMB4ACL_T *theacl);
+	SEC_DESC **ppdesc, SMB4ACL_T *acl);
 
 /* Callback function needed to set the native acl
  * when applicable */
-typedef bool (*set_nfs4acl_native_fn_t)(files_struct *, SMB4ACL_T *);
+typedef BOOL (*set_nfs4acl_native_fn_t)(files_struct *, SMB4ACL_T *);
 
-NTSTATUS smb_set_nt_acl_nfs4(files_struct *fsp,
+BOOL smb_set_nt_acl_nfs4(files_struct *fsp,
 	uint32 security_info_sent,
-	const SEC_DESC *psd,
+	SEC_DESC *psd,
 	set_nfs4acl_native_fn_t set_nfs4_native);
 
 #endif /* __NFS4_ACLS_H__ */

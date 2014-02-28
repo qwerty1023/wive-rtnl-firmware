@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -23,73 +24,7 @@
 #undef DBGC_CLASS
 #define DBGC_CLASS DBGC_AUTH
 
-extern bool global_machine_password_needs_changing;
-static struct named_mutex *mutex;
-
-/*
- * Change machine password (called from main loop
- * idle timeout. Must be done as root.
- */
-
-void attempt_machine_password_change(void)
-{
-	unsigned char trust_passwd_hash[16];
-	time_t lct;
-	void *lock;
-
-	if (!global_machine_password_needs_changing) {
-		return;
-	}
-
-	if (lp_security() != SEC_DOMAIN) {
-		return;
-	}
-
-	/*
-	 * We're in domain level security, and the code that
-	 * read the machine password flagged that the machine
-	 * password needs changing.
-	 */
-
-	/*
-	 * First, open the machine password file with an exclusive lock.
-	 */
-
-	lock = secrets_get_trust_account_lock(NULL, lp_workgroup());
-
-	if (lock == NULL) {
-		DEBUG(0,("attempt_machine_password_change: unable to lock "
-			"the machine account password for machine %s in "
-			"domain %s.\n",
-			global_myname(), lp_workgroup() ));
-		return;
-	}
-
-	if(!secrets_fetch_trust_account_password(lp_workgroup(),
-			trust_passwd_hash, &lct, NULL)) {
-		DEBUG(0,("attempt_machine_password_change: unable to read the "
-			"machine account password for %s in domain %s.\n",
-			global_myname(), lp_workgroup()));
-		TALLOC_FREE(lock);
-		return;
-	}
-
-	/*
-	 * Make sure someone else hasn't already done this.
-	 */
-
-	if(time(NULL) < lct + lp_machine_password_timeout()) {
-		global_machine_password_needs_changing = false;
-		TALLOC_FREE(lock);
-		return;
-	}
-
-	/* always just contact the PDC here */
-
-	change_trust_account_password( lp_workgroup(), NULL);
-	global_machine_password_needs_changing = false;
-	TALLOC_FREE(lock);
-}
+extern BOOL global_machine_password_needs_changing;
 
 /**
  * Connect to a remote server for (inter)domain security authenticaion.
@@ -108,9 +43,9 @@ void attempt_machine_password_change(void)
 static NTSTATUS connect_to_domain_password_server(struct cli_state **cli,
 						const char *domain,
 						const char *dc_name,
-						struct sockaddr_storage *dc_ss, 
+						struct in_addr dc_ip, 
 						struct rpc_pipe_client **pipe_ret,
-						bool *retry)
+						BOOL *retry)
 {
         NTSTATUS result;
 	struct rpc_pipe_client *netlogon_pipe = NULL;
@@ -133,14 +68,13 @@ static NTSTATUS connect_to_domain_password_server(struct cli_state **cli,
 	 * ACCESS_DENIED errors if 2 auths are done from the same machine. JRA.
 	 */
 
-	mutex = grab_named_mutex(NULL, dc_name, 10);
-	if (mutex == NULL) {
+	if (!grab_server_mutex(dc_name)) {
 		return NT_STATUS_NO_LOGON_SERVERS;
 	}
 	
 	/* Attempt connection */
 	*retry = True;
-	result = cli_full_connection(cli, global_myname(), dc_name, dc_ss, 0, 
+	result = cli_full_connection(cli, global_myname(), dc_name, &dc_ip, 0, 
 		"IPC$", "IPC", "", "", "", 0, Undefined, retry);
 
 	if (!NT_STATUS_IS_OK(result)) {
@@ -154,7 +88,7 @@ static NTSTATUS connect_to_domain_password_server(struct cli_state **cli,
 			*cli = NULL;
 		}
 
-		TALLOC_FREE(mutex);
+		release_server_mutex();
 		return result;
 	}
 
@@ -174,20 +108,18 @@ static NTSTATUS connect_to_domain_password_server(struct cli_state **cli,
 	/* open the netlogon pipe. */
 	if (lp_client_schannel()) {
 		/* We also setup the creds chain in the open_schannel call. */
-		result = cli_rpc_pipe_open_schannel(
-			*cli, &ndr_table_netlogon.syntax_id, NCACN_NP,
-			PIPE_AUTH_LEVEL_PRIVACY, domain, &netlogon_pipe);
+		netlogon_pipe = cli_rpc_pipe_open_schannel(*cli, PI_NETLOGON,
+					PIPE_AUTH_LEVEL_PRIVACY, domain, &result);
 	} else {
-		result = cli_rpc_pipe_open_noauth(
-			*cli, &ndr_table_netlogon.syntax_id, &netlogon_pipe);
+		netlogon_pipe = cli_rpc_pipe_open_noauth(*cli, PI_NETLOGON, &result);
 	}
 
-	if (!NT_STATUS_IS_OK(result)) {
+	if(!netlogon_pipe) {
 		DEBUG(0,("connect_to_domain_password_server: unable to open the domain client session to \
 machine %s. Error was : %s.\n", dc_name, nt_errstr(result)));
 		cli_shutdown(*cli);
 		*cli = NULL;
-		TALLOC_FREE(mutex);
+		release_server_mutex();
 		return result;
 	}
 
@@ -206,7 +138,7 @@ machine %s. Error was : %s.\n", dc_name, nt_errstr(result)));
 				domain));
 			cli_shutdown(*cli);
 			*cli = NULL;
-			TALLOC_FREE(mutex);
+			release_server_mutex();
 			return NT_STATUS_CANT_ACCESS_DOMAIN_INFO;
 		}
 
@@ -222,7 +154,7 @@ machine %s. Error was : %s.\n", dc_name, nt_errstr(result)));
 		if (!NT_STATUS_IS_OK(result)) {
 			cli_shutdown(*cli);
 			*cli = NULL;
-			TALLOC_FREE(mutex);
+			release_server_mutex();
 			return result;
 		}
 	}
@@ -232,7 +164,7 @@ machine %s. Error was : %s.\n", dc_name, nt_errstr(result)));
 machine %s. Error was : %s.\n", dc_name, cli_errstr(*cli)));
 		cli_shutdown(*cli);
 		*cli = NULL;
-		TALLOC_FREE(mutex);
+		release_server_mutex();
 		return NT_STATUS_NO_LOGON_SERVERS;
 	}
 
@@ -255,15 +187,15 @@ static NTSTATUS domain_client_validate(TALLOC_CTX *mem_ctx,
 					uchar chal[8],
 					auth_serversupplied_info **server_info, 
 					const char *dc_name,
-					struct sockaddr_storage *dc_ss)
+					struct in_addr dc_ip)
 
 {
-	struct netr_SamInfo3 *info3 = NULL;
+	NET_USER_INFO_3 info3;
 	struct cli_state *cli = NULL;
 	struct rpc_pipe_client *netlogon_pipe = NULL;
 	NTSTATUS nt_status = NT_STATUS_NO_LOGON_SERVERS;
 	int i;
-	bool retry = True;
+	BOOL retry = True;
 
 	/*
 	 * At this point, smb_apasswd points to the lanman response to
@@ -279,7 +211,7 @@ static NTSTATUS domain_client_validate(TALLOC_CTX *mem_ctx,
 		nt_status = connect_to_domain_password_server(&cli,
 							domain,
 							dc_name,
-							dc_ss,
+							dc_ip,
 							&netlogon_pipe,
 							&retry);
 	}
@@ -295,6 +227,8 @@ static NTSTATUS domain_client_validate(TALLOC_CTX *mem_ctx,
 	/* store a successful connection */
 
 	saf_store( domain, cli->desthost );
+
+	ZERO_STRUCT(info3);
 
         /*
          * If this call succeeds, we now have lots of info about the user
@@ -316,7 +250,7 @@ static NTSTATUS domain_client_validate(TALLOC_CTX *mem_ctx,
 	/* Let go as soon as possible so we avoid any potential deadlocks
 	   with winbind lookup up users or groups. */
 	   
-	TALLOC_FREE(mutex);
+	release_server_mutex();
 
 	if (!NT_STATUS_IS_OK(nt_status)) {
 		DEBUG(0,("domain_client_validate: unable to validate password "
@@ -334,10 +268,10 @@ static NTSTATUS domain_client_validate(TALLOC_CTX *mem_ctx,
 						user_info->smb_name,
 						domain,
 						server_info,
-						info3);
+						&info3);
 
 		if (NT_STATUS_IS_OK(nt_status)) {
-			(*server_info)->nss_token |= user_info->was_mapped;
+			(*server_info)->was_mapped |= user_info->was_mapped;
 
 			if ( ! (*server_info)->guest) {
 				/* if a real user check pam account restrictions */
@@ -346,14 +280,12 @@ static NTSTATUS domain_client_validate(TALLOC_CTX *mem_ctx,
 				if (  !NT_STATUS_IS_OK(nt_status)) {
 					DEBUG(1, ("PAM account restriction prevents user login\n"));
 					cli_shutdown(cli);
-					TALLOC_FREE(info3);
 					return nt_status;
 				}
 			}
 		}
 
-		netsamlogon_cache_store(user_info->smb_name, info3);
-		TALLOC_FREE(info3);
+		netsamlogon_cache_store( user_info->smb_name, &info3 );
 	}
 
 	/* Note - once the cli stream is shutdown the mem_ctx used
@@ -377,7 +309,7 @@ static NTSTATUS check_ntdomain_security(const struct auth_context *auth_context,
 	NTSTATUS nt_status = NT_STATUS_LOGON_FAILURE;
 	const char *domain = lp_workgroup();
 	fstring dc_name;
-	struct sockaddr_storage dc_ss;
+	struct in_addr dc_ip;
 
 	if ( lp_server_role() != ROLE_DOMAIN_MEMBER ) {
 		DEBUG(0,("check_ntdomain_security: Configuration error!  Cannot use "
@@ -403,7 +335,7 @@ static NTSTATUS check_ntdomain_security(const struct auth_context *auth_context,
 
 	/* we need our DC to send the net_sam_logon() request to */
 
-	if ( !get_dc_name(domain, NULL, dc_name, &dc_ss) ) {
+	if ( !get_dc_name(domain, NULL, dc_name, &dc_ip) ) {
 		DEBUG(5,("check_ntdomain_security: unable to locate a DC for domain %s\n",
 			user_info->domain));
 		return NT_STATUS_NO_LOGON_SERVERS;
@@ -415,7 +347,7 @@ static NTSTATUS check_ntdomain_security(const struct auth_context *auth_context,
 					(uchar *)auth_context->challenge.data,
 					server_info,
 					dc_name,
-					&dc_ss);
+					dc_ip);
 		
 	return nt_status;
 }
@@ -449,7 +381,7 @@ static NTSTATUS check_trustdomain_security(const struct auth_context *auth_conte
 	time_t last_change_time;
 	DOM_SID sid;
 	fstring dc_name;
-	struct sockaddr_storage dc_ss;
+	struct in_addr dc_ip;
 
 	if (!user_info || !server_info || !auth_context) {
 		DEBUG(1,("check_trustdomain_security: Critical variables not present.  Failing.\n"));
@@ -479,8 +411,8 @@ static NTSTATUS check_trustdomain_security(const struct auth_context *auth_conte
 	 * No need to become_root() as secrets_init() is done at startup.
 	 */
 
-	if (!pdb_get_trusteddom_pw(user_info->domain, &trust_password,
-				   &sid, &last_change_time)) {
+	if (!secrets_fetch_trusted_domain_password(user_info->domain, &trust_password,
+				&sid, &last_change_time)) {
 		DEBUG(0, ("check_trustdomain_security: could not fetch trust "
 			  "account password for domain %s\n",
 			  user_info->domain));
@@ -505,7 +437,7 @@ static NTSTATUS check_trustdomain_security(const struct auth_context *auth_conte
 	/* use get_dc_name() for consistency even through we know that it will be 
 	   a netbios name */
 	   
-	if ( !get_dc_name(user_info->domain, NULL, dc_name, &dc_ss) ) {
+	if ( !get_dc_name(user_info->domain, NULL, dc_name, &dc_ip) ) {
 		DEBUG(5,("check_trustdomain_security: unable to locate a DC for domain %s\n",
 			user_info->domain));
 		return NT_STATUS_NO_LOGON_SERVERS;
@@ -517,7 +449,7 @@ static NTSTATUS check_trustdomain_security(const struct auth_context *auth_conte
 					(uchar *)auth_context->challenge.data,
 					server_info,
 					dc_name,
-					&dc_ss);
+					dc_ip);
 
 	return nt_status;
 }

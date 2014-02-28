@@ -6,7 +6,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -15,11 +15,11 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
-#include "smb_krb5.h"
 
 #ifdef HAVE_KRB5
 
@@ -88,7 +88,7 @@ static DATA_BLOB encode_krb5_setpw(const char *principal, const char *password)
 		realm = c;
 	} else {
 		/* We must have a realm component. */
-		return data_blob_null;
+		return data_blob(NULL, 0);
 	}
 
 	memset(&req, 0, sizeof(req));
@@ -137,7 +137,7 @@ static krb5_error_code build_kpasswd_request(uint16 pversion,
 					   krb5_data *ap_req,
 					   const char *princ,
 					   const char *passwd,
-					   bool use_tcp,
+					   BOOL use_tcp,
 					   krb5_data *packet)
 {
 	krb5_error_code ret;
@@ -268,7 +268,7 @@ static krb5_error_code setpw_result_code_string(krb5_context context,
 	}
 }
 static krb5_error_code parse_setpw_reply(krb5_context context,
-					 bool use_tcp,
+					 BOOL use_tcp,
 					 krb5_auth_context auth_context,
 					 krb5_data *packet)
 {
@@ -286,7 +286,7 @@ static krb5_error_code parse_setpw_reply(krb5_context context,
 		return KRB5KRB_AP_ERR_MODIFIED;
 	}
 	
-	p = (char *)packet->data;
+	p = packet->data;
 	/*
 	** see if it is an error
 	*/
@@ -369,7 +369,7 @@ static krb5_error_code parse_setpw_reply(krb5_context context,
 		return KRB5KRB_AP_ERR_MODIFIED;
 	}
 	
-	p = (char *)clearresult.data;
+	p = clearresult.data;
 	
 	res_code = RSVAL(p, 0);
 	
@@ -402,14 +402,11 @@ static ADS_STATUS do_krb5_kpasswd_request(krb5_context context,
 	krb5_data ap_req, chpw_req, chpw_rep;
 	int ret, sock;
 	socklen_t addr_len;
-	struct sockaddr_storage remote_addr, local_addr;
-	struct sockaddr_storage addr;
+	struct sockaddr remote_addr, local_addr;
+	struct in_addr *addr = interpret_addr2(kdc_host);
 	krb5_address local_kaddr, remote_kaddr;
-	bool use_tcp = False;
+	BOOL	use_tcp = False;
 
-
-	if (!interpret_string_addr(&addr, kdc_host, 0)) {
-	}
 
 	ret = krb5_mk_req_extended(context, &auth_context, AP_OPTS_USE_SUBKEY,
 				   NULL, credsp, &ap_req);
@@ -426,7 +423,7 @@ static ADS_STATUS do_krb5_kpasswd_request(krb5_context context,
 
 		} else {
 
-			sock = open_socket_out(SOCK_STREAM, &addr, DEFAULT_KPASSWD_PORT, 
+			sock = open_socket_out(SOCK_STREAM, addr, DEFAULT_KPASSWD_PORT, 
 					       LONG_CONNECT_TIMEOUT);
 		}
 
@@ -434,37 +431,19 @@ static ADS_STATUS do_krb5_kpasswd_request(krb5_context context,
 			int rc = errno;
 			SAFE_FREE(ap_req.data);
 			krb5_auth_con_free(context, auth_context);
-			DEBUG(1,("failed to open kpasswd socket to %s (%s)\n",
+			DEBUG(1,("failed to open kpasswd socket to %s (%s)\n", 
 				 kdc_host, strerror(errno)));
 			return ADS_ERROR_SYSTEM(rc);
 		}
+		
 		addr_len = sizeof(remote_addr);
-		if (getpeername(sock, (struct sockaddr *)&remote_addr, &addr_len) != 0) {
-			close(sock);
-			SAFE_FREE(ap_req.data);
-			krb5_auth_con_free(context, auth_context);
-			DEBUG(1,("getpeername() failed (%s)\n", error_message(errno)));
-			return ADS_ERROR_SYSTEM(errno);
-		}
+		getpeername(sock, &remote_addr, &addr_len);
 		addr_len = sizeof(local_addr);
-		if (getsockname(sock, (struct sockaddr *)&local_addr, &addr_len) != 0) {
-			close(sock);
-			SAFE_FREE(ap_req.data);
-			krb5_auth_con_free(context, auth_context);
-			DEBUG(1,("getsockname() failed (%s)\n", error_message(errno)));
-			return ADS_ERROR_SYSTEM(errno);
-		}
-		if (!setup_kaddr(&remote_kaddr, &remote_addr) ||
-				!setup_kaddr(&local_kaddr, &local_addr)) {
-			DEBUG(1,("do_krb5_kpasswd_request: "
-				"Failed to setup addresses.\n"));
-			close(sock);
-			SAFE_FREE(ap_req.data);
-			krb5_auth_con_free(context, auth_context);
-			errno = EINVAL;
-			return ADS_ERROR_SYSTEM(EINVAL);
-		}
-
+		getsockname(sock, &local_addr, &addr_len);
+		
+		setup_kaddr(&remote_kaddr, &remote_addr);
+		setup_kaddr(&local_kaddr, &local_addr);
+	
 		ret = krb5_auth_con_setaddrs(context, auth_context, &local_kaddr, NULL);
 		if (ret) {
 			close(sock);
@@ -473,7 +452,7 @@ static ADS_STATUS do_krb5_kpasswd_request(krb5_context context,
 			DEBUG(1,("krb5_auth_con_setaddrs failed (%s)\n", error_message(ret)));
 			return ADS_ERROR_KRB5(ret);
 		}
-
+	
 		ret = build_kpasswd_request(pversion, context, auth_context, &ap_req,
 					  princ, newpw, use_tcp, &chpw_req);
 		if (ret) {
@@ -603,13 +582,7 @@ ADS_STATUS ads_krb5_set_password(const char *kdc_host, const char *princ,
 	}
 	realm++;
 
-	if (asprintf(&princ_name, "kadmin/changepw@%s", realm) == -1) {
-		krb5_cc_close(context, ccache);
-                krb5_free_context(context);
-		DEBUG(1,("asprintf failed\n"));
-		return ADS_ERROR_NT(NT_STATUS_NO_MEMORY);
-	}
-
+	asprintf(&princ_name, "kadmin/changepw@%s", realm);
 	ret = smb_krb5_parse_name(context, princ_name, &creds.server);
 	if (ret) {
 		krb5_cc_close(context, ccache);
@@ -694,10 +667,10 @@ kerb_prompter(krb5_context ctx, void *data,
 	memset(prompts[0].reply->data, 0, prompts[0].reply->length);
 	if (prompts[0].reply->length > 0) {
 		if (data) {
-			strncpy((char *)prompts[0].reply->data,
+			strncpy(prompts[0].reply->data,
 				(const char *)data,
 				prompts[0].reply->length-1);
-			prompts[0].reply->length = strlen((const char *)prompts[0].reply->data);
+			prompts[0].reply->length = strlen(prompts[0].reply->data);
 		} else {
 			prompts[0].reply->length = 0;
 		}
@@ -740,13 +713,8 @@ static ADS_STATUS ads_krb5_chg_password(const char *kdc_host,
     krb5_get_init_creds_opt_set_proxiable(&opts, 0);
 
     /* We have to obtain an INITIAL changepw ticket for changing password */
-    if (asprintf(&chpw_princ, "kadmin/changepw@%s",
-				(char *) krb5_princ_realm(context, princ)) == -1) {
-	krb5_free_context(context);
-	DEBUG(1,("ads_krb5_chg_password: asprintf fail\n"));
-	return ADS_ERROR_NT(NT_STATUS_NO_MEMORY);
-    }
-
+    asprintf(&chpw_princ, "kadmin/changepw@%s",
+				(char *) krb5_princ_realm(context, princ));
     password = SMB_STRDUP(oldpw);
     ret = krb5_get_init_creds_password(context, &creds, princ, password,
 					   kerb_prompter, NULL, 
@@ -816,14 +784,16 @@ ADS_STATUS ads_set_machine_password(ADS_STRUCT *ads,
 	  as otherwise the server might end up setting the password for a user
 	  instead
 	 */
-	if (asprintf(&principal, "%s@%s", machine_account, ads->config.realm) < 0) {
-		return ADS_ERROR_NT(NT_STATUS_NO_MEMORY);
-	}
+	asprintf(&principal, "%s@%s", machine_account, ads->config.realm);
 	
 	status = ads_krb5_set_password(ads->auth.kdc_server, principal, 
 				       password, ads->auth.time_offset);
 	
-	SAFE_FREE(principal);
+	free(principal);
+
 	return status;
 }
+
+
+
 #endif

@@ -30,9 +30,7 @@ static int test_readdir_os2_delete_ret;
 static void cleanup(void)
 {
 	/* I'm a lazy bastard */
-	if (system("rm -rf " TESTDIR)) {
-		FAILED("system");
-	}
+	system("rm -rf " TESTDIR);
 	mkdir(TESTDIR, 0700) == 0 || FAILED("mkdir");
 }
 
@@ -41,15 +39,8 @@ static void create_files(void)
 	int i;
 	for (i=0;i<NUM_FILES;i++) {
 		char fname[40];
-		int fd;
 		sprintf(fname, TESTDIR "/test%u.txt", i);
-		fd = open(fname, O_CREAT|O_RDWR, 0600);
-		if (fd < 0) {
-			FAILED("open");
-		}
-		if (close(fd) != 0) {
-			FAILED("close");
-		}
+		close(open(fname, O_CREAT|O_RDWR, 0600)) == 0 || FAILED("close");
 	}
 }
 
@@ -120,9 +111,7 @@ int test_readdir_os2_delete(void)
 
 	rmdir(TESTDIR) == 0 || FAILED("rmdir");
 
-	if (system("rm -rf " TESTDIR) == -1) {
-		FAILED("system");
-	}
+	system("rm -rf " TESTDIR);
 
 	return test_readdir_os2_delete_ret;
 }

@@ -1,22 +1,22 @@
-/*
-   Samba Unix/Linux SMB client library
-   Distributed SMB/CIFS Server Management Utility
+/* 
+   Samba Unix/Linux SMB client library 
+   Distributed SMB/CIFS Server Management Utility 
    Copyright (C) Gerald (Jerry) Carter          2004
-   Copyright (C) Guenther Deschner              2008
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
-
+   
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-
+   
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.  */
+ 
 #include "includes.h"
 #include "utils/net.h"
 
@@ -29,18 +29,18 @@ static NTSTATUS sid_to_name(struct rpc_pipe_client *pipe_hnd,
 				fstring name)
 {
 	POLICY_HND pol;
-	enum lsa_SidType *sid_types = NULL;
+	enum lsa_SidType *sid_types;
 	NTSTATUS result;
-	char **domains = NULL, **names = NULL;
+	char **domains, **names;
 
-	result = rpccli_lsa_open_policy(pipe_hnd, mem_ctx, true,
+	result = rpccli_lsa_open_policy(pipe_hnd, mem_ctx, True, 
 		SEC_RIGHTS_MAXIMUM_ALLOWED, &pol);
-
+		
 	if ( !NT_STATUS_IS_OK(result) )
 		return result;
 
 	result = rpccli_lsa_lookup_sids(pipe_hnd, mem_ctx, &pol, 1, sid, &domains, &names, &sid_types);
-
+	
 	if ( NT_STATUS_IS_OK(result) ) {
 		if ( *domains[0] )
 			fstr_sprintf( name, "%s\\%s", domains[0], names[0] );
@@ -48,7 +48,7 @@ static NTSTATUS sid_to_name(struct rpc_pipe_client *pipe_hnd,
 			fstrcpy( name, names[0] );
 	}
 
-	rpccli_lsa_Close(pipe_hnd, mem_ctx, &pol);
+	rpccli_lsa_close(pipe_hnd, mem_ctx, &pol);
 	return result;
 }
 
@@ -69,19 +69,19 @@ static NTSTATUS name_to_sid(struct rpc_pipe_client *pipe_hnd,
 		return NT_STATUS_OK;
 	}
 
-	result = rpccli_lsa_open_policy(pipe_hnd, mem_ctx, true,
+	result = rpccli_lsa_open_policy(pipe_hnd, mem_ctx, True, 
 		SEC_RIGHTS_MAXIMUM_ALLOWED, &pol);
-
+		
 	if ( !NT_STATUS_IS_OK(result) )
 		return result;
 
 	result = rpccli_lsa_lookup_names(pipe_hnd, mem_ctx, &pol, 1, &name,
-					 NULL, 1, &sids, &sid_types);
-
+					 NULL, &sids, &sid_types);
+	
 	if ( NT_STATUS_IS_OK(result) )
 		sid_copy( sid, &sids[0] );
 
-	rpccli_lsa_Close(pipe_hnd, mem_ctx, &pol);
+	rpccli_lsa_close(pipe_hnd, mem_ctx, &pol);
 	return result;
 }
 
@@ -95,49 +95,37 @@ static NTSTATUS enum_privileges(struct rpc_pipe_client *pipe_hnd,
 	NTSTATUS result;
 	uint32 enum_context = 0;
 	uint32 pref_max_length=0x1000;
+	uint32 count=0;
+	char   **privs_name;
+	uint32 *privs_high;
+	uint32 *privs_low;
 	int i;
 	uint16 lang_id=0;
 	uint16 lang_id_sys=0;
 	uint16 lang_id_desc;
-	struct lsa_StringLarge *description = NULL;
-	struct lsa_PrivArray priv_array;
+	fstring description;
 
-	result = rpccli_lsa_EnumPrivs(pipe_hnd, ctx,
-				      pol,
-				      &enum_context,
-				      &priv_array,
-				      pref_max_length);
+	result = rpccli_lsa_enum_privilege(pipe_hnd, ctx, pol, &enum_context, 
+		pref_max_length, &count, &privs_name, &privs_high, &privs_low);
 
 	if ( !NT_STATUS_IS_OK(result) )
 		return result;
 
 	/* Print results */
-
-	for (i = 0; i < priv_array.count; i++) {
-
-		struct lsa_String lsa_name;
-
-		d_printf("%30s  ",
-			priv_array.privs[i].name.string ? priv_array.privs[i].name.string : "*unknown*" );
-
+	
+	for (i = 0; i < count; i++) {
+		d_printf("%30s  ", privs_name[i] ? privs_name[i] : "*unknown*" );
+		
 		/* try to get the description */
-
-		init_lsa_String(&lsa_name, priv_array.privs[i].name.string);
-
-		result = rpccli_lsa_LookupPrivDisplayName(pipe_hnd, ctx,
-							  pol,
-							  &lsa_name,
-							  lang_id,
-							  lang_id_sys,
-							  &description,
-							  &lang_id_desc);
-
-		if (!NT_STATUS_IS_OK(result)) {
+		
+		if ( !NT_STATUS_IS_OK(rpccli_lsa_get_dispname(pipe_hnd, ctx, pol, 
+			privs_name[i], lang_id, lang_id_sys, description, &lang_id_desc)) )
+		{
 			d_printf("??????\n");
 			continue;
 		}
-
-		d_printf("%s\n", description->string);
+		
+		d_printf("%s\n", description );		
 	}
 
 	return NT_STATUS_OK;
@@ -153,24 +141,22 @@ static NTSTATUS check_privilege_for_user(struct rpc_pipe_client *pipe_hnd,
 					const char *right)
 {
 	NTSTATUS result;
-	struct lsa_RightSet rights;
+	uint32 count;
+	char **rights;
 	int i;
 
-	result = rpccli_lsa_EnumAccountRights(pipe_hnd, ctx,
-					      pol,
-					      sid,
-					      &rights);
+	result = rpccli_lsa_enum_account_rights(pipe_hnd, ctx, pol, sid, &count, &rights);
 
 	if (!NT_STATUS_IS_OK(result)) {
 		return result;
 	}
 
-	if (rights.count == 0) {
+	if (count == 0) {
 		return NT_STATUS_OBJECT_NAME_NOT_FOUND;
 	}
-
-	for (i = 0; i < rights.count; i++) {
-		if (StrCaseCmp(rights.names[i].string, right) == 0) {
+		
+	for (i = 0; i < count; i++) {
+		if (StrCaseCmp(rights[i], right) == 0) {
 			return NT_STATUS_OK;
 		}
 	}
@@ -187,23 +173,20 @@ static NTSTATUS enum_privileges_for_user(struct rpc_pipe_client *pipe_hnd,
 					DOM_SID *sid )
 {
 	NTSTATUS result;
-	struct lsa_RightSet rights;
+	uint32 count;
+	char **rights;
 	int i;
 
-	result = rpccli_lsa_EnumAccountRights(pipe_hnd, ctx,
-					      pol,
-					      sid,
-					      &rights);
+	result = rpccli_lsa_enum_account_rights(pipe_hnd, ctx, pol, sid, &count, &rights);
 
 	if (!NT_STATUS_IS_OK(result))
 		return result;
 
-	if (rights.count == 0) {
+	if ( count == 0 )
 		d_printf("No privileges assigned\n");
-	}
-
-	for (i = 0; i < rights.count; i++) {
-		printf("%s\n", rights.names[i].string);
+		
+	for (i = 0; i < count; i++) {
+		printf("%s\n", rights[i]);
 	}
 
 	return NT_STATUS_OK;
@@ -220,27 +203,24 @@ static NTSTATUS enum_accounts_for_privilege(struct rpc_pipe_client *pipe_hnd,
 	NTSTATUS result;
 	uint32 enum_context=0;
 	uint32 pref_max_length=0x1000;
-	struct lsa_SidArray sid_array;
+	DOM_SID *sids;
+	uint32 count=0;
 	int i;
 	fstring name;
 
-	result = rpccli_lsa_EnumAccounts(pipe_hnd, ctx,
-					 pol,
-					 &enum_context,
-					 &sid_array,
-					 pref_max_length);
+	result = rpccli_lsa_enum_sids(pipe_hnd, ctx, pol, &enum_context, 
+		pref_max_length, &count, &sids);
 
 	if (!NT_STATUS_IS_OK(result))
 		return result;
-
+		
 	d_printf("%s:\n", privilege);
 
-	for ( i=0; i<sid_array.num_sids; i++ ) {
-
-		result = check_privilege_for_user(pipe_hnd, ctx, pol,
-						  sid_array.sids[i].sid,
-						  privilege);
-
+	for ( i=0; i<count; i++ ) {
+	
+		   
+		result = check_privilege_for_user( pipe_hnd, ctx, pol, &sids[i], privilege);
+		
 		if ( ! NT_STATUS_IS_OK(result)) {
 			if ( ! NT_STATUS_EQUAL(result, NT_STATUS_OBJECT_NAME_NOT_FOUND)) {
 				return result;
@@ -248,12 +228,12 @@ static NTSTATUS enum_accounts_for_privilege(struct rpc_pipe_client *pipe_hnd,
 			continue;
 		}
 
-		/* try to convert the SID to a name.  Fall back to
+		/* try to convert the SID to a name.  Fall back to 
 		   printing the raw SID if necessary */
-		result = sid_to_name( pipe_hnd, ctx, sid_array.sids[i].sid, name );
+		result = sid_to_name( pipe_hnd, ctx, &sids[i], name );
 		if ( !NT_STATUS_IS_OK (result) )
-			sid_to_fstring(name, sid_array.sids[i].sid);
-
+			fstrcpy( name, sid_string_static(&sids[i]) );
+			
 		d_printf("  %s\n", name);
 	}
 
@@ -270,32 +250,30 @@ static NTSTATUS enum_privileges_for_accounts(struct rpc_pipe_client *pipe_hnd,
 	NTSTATUS result;
 	uint32 enum_context=0;
 	uint32 pref_max_length=0x1000;
-	struct lsa_SidArray sid_array;
+	DOM_SID *sids;
+	uint32 count=0;
 	int i;
 	fstring name;
 
-	result = rpccli_lsa_EnumAccounts(pipe_hnd, ctx,
-					 pol,
-					 &enum_context,
-					 &sid_array,
-					 pref_max_length);
+	result = rpccli_lsa_enum_sids(pipe_hnd, ctx, pol, &enum_context, 
+		pref_max_length, &count, &sids);
 
 	if (!NT_STATUS_IS_OK(result))
 		return result;
-
-	for ( i=0; i<sid_array.num_sids; i++ ) {
-
-		/* try to convert the SID to a name.  Fall back to
+		
+	for ( i=0; i<count; i++ ) {
+	
+		/* try to convert the SID to a name.  Fall back to 
 		   printing the raw SID if necessary */
-
-		result = sid_to_name(pipe_hnd, ctx, sid_array.sids[i].sid, name);
+		   
+		result = sid_to_name(pipe_hnd, ctx, &sids[i], name );
 		if ( !NT_STATUS_IS_OK (result) )
-			sid_to_fstring(name, sid_array.sids[i].sid);
-
+			fstrcpy( name, sid_string_static(&sids[i]) );
+			
 		d_printf("%s\n", name);
-
-		result = enum_privileges_for_user(pipe_hnd, ctx, pol,
-						  sid_array.sids[i].sid);
+		
+		result = enum_privileges_for_user(pipe_hnd, ctx, pol, &sids[i] );
+		
 		if ( !NT_STATUS_IS_OK(result) )
 			return result;
 
@@ -308,12 +286,11 @@ static NTSTATUS enum_privileges_for_accounts(struct rpc_pipe_client *pipe_hnd,
 /********************************************************************
 ********************************************************************/
 
-static NTSTATUS rpc_rights_list_internal(struct net_context *c,
-					const DOM_SID *domain_sid,
-					const char *domain_name,
+static NTSTATUS rpc_rights_list_internal(const DOM_SID *domain_sid,
+					const char *domain_name, 
 					struct cli_state *cli,
 					struct rpc_pipe_client *pipe_hnd,
-					TALLOC_CTX *mem_ctx,
+					TALLOC_CTX *mem_ctx, 
 					int argc,
 					const char **argv )
 {
@@ -321,20 +298,20 @@ static NTSTATUS rpc_rights_list_internal(struct net_context *c,
 	NTSTATUS result;
 	DOM_SID sid;
 	fstring privname;
-	struct lsa_String lsa_name;
-	struct lsa_StringLarge *description = NULL;
+	fstring description;
 	uint16 lang_id = 0;
 	uint16 lang_id_sys = 0;
 	uint16 lang_id_desc;
-
-	result = rpccli_lsa_open_policy(pipe_hnd, mem_ctx, true,
+	
+	
+	result = rpccli_lsa_open_policy(pipe_hnd, mem_ctx, True, 
 		SEC_RIGHTS_MAXIMUM_ALLOWED, &pol);
 
 	if ( !NT_STATUS_IS_OK(result) )
 		return result;
-
+	
 	/* backwards compatibility; just list available privileges if no arguement */
-
+	   
 	if (argc == 0) {
 		result = enum_privileges(pipe_hnd, mem_ctx, &pol );
 		goto done;
@@ -349,19 +326,14 @@ static NTSTATUS rpc_rights_list_internal(struct net_context *c,
 		}
 
 		while ( argv[i] != NULL ) {
-			fstrcpy(privname, argv[i]);
-			init_lsa_String(&lsa_name, argv[i]);
+			fstrcpy( privname, argv[i] );
 			i++;
-
+		
 			/* verify that this is a valid privilege for error reporting */
-			result = rpccli_lsa_LookupPrivDisplayName(pipe_hnd, mem_ctx,
-								  &pol,
-								  &lsa_name,
-								  lang_id,
-								  lang_id_sys,
-								  &description,
-								  &lang_id_desc);
-
+			
+			result = rpccli_lsa_get_dispname(pipe_hnd, mem_ctx, &pol, privname, lang_id, 
+				lang_id_sys, description, &lang_id_desc);
+			
 			if ( !NT_STATUS_IS_OK(result) ) {
 				if ( NT_STATUS_EQUAL( result, NT_STATUS_NO_SUCH_PRIVILEGE ) ) 
 					d_fprintf(stderr, "No such privilege exists: %s.\n", privname);
@@ -369,7 +341,7 @@ static NTSTATUS rpc_rights_list_internal(struct net_context *c,
 					d_fprintf(stderr, "Error resolving privilege display name [%s].\n", nt_errstr(result));
 				continue;
 			}
-
+			
 			result = enum_accounts_for_privilege(pipe_hnd, mem_ctx, &pol, privname);
 			if (!NT_STATUS_IS_OK(result)) {
 				d_fprintf(stderr, "Error enumerating accounts for privilege %s [%s].\n", 
@@ -381,7 +353,7 @@ static NTSTATUS rpc_rights_list_internal(struct net_context *c,
 	}
 
 	/* special case to enumerate all privileged SIDs with associated rights */
-
+	
 	if (strequal( argv[0], "accounts")) {
 		int i = 1;
 
@@ -419,7 +391,7 @@ static NTSTATUS rpc_rights_list_internal(struct net_context *c,
 	result = enum_privileges_for_user(pipe_hnd, mem_ctx, &pol, &sid );
 
 done:
-	rpccli_lsa_Close(pipe_hnd, mem_ctx, &pol);
+	rpccli_lsa_close(pipe_hnd, mem_ctx, &pol);
 
 	return result;
 }
@@ -427,19 +399,16 @@ done:
 /********************************************************************
 ********************************************************************/
 
-static NTSTATUS rpc_rights_grant_internal(struct net_context *c,
-					const DOM_SID *domain_sid,
-					const char *domain_name,
+static NTSTATUS rpc_rights_grant_internal(const DOM_SID *domain_sid,
+					const char *domain_name, 
 					struct cli_state *cli,
 					struct rpc_pipe_client *pipe_hnd,
-					TALLOC_CTX *mem_ctx,
+					TALLOC_CTX *mem_ctx, 
 					int argc,
 					const char **argv )
 {
 	POLICY_HND dom_pol;
 	NTSTATUS result = NT_STATUS_UNSUCCESSFUL;
-	struct lsa_RightSet rights;
-	int i;
 
 	DOM_SID sid;
 
@@ -450,64 +419,49 @@ static NTSTATUS rpc_rights_grant_internal(struct net_context *c,
 
 	result = name_to_sid(pipe_hnd, mem_ctx, &sid, argv[0]);
 	if (!NT_STATUS_IS_OK(result))
-		return result;
+		return result;	
 
-	result = rpccli_lsa_open_policy2(pipe_hnd, mem_ctx, true,
+	result = rpccli_lsa_open_policy2(pipe_hnd, mem_ctx, True, 
 				     SEC_RIGHTS_MAXIMUM_ALLOWED,
 				     &dom_pol);
 
 	if (!NT_STATUS_IS_OK(result))
-		return result;
+		return result;	
 
-	rights.count = argc-1;
-	rights.names = TALLOC_ARRAY(mem_ctx, struct lsa_StringLarge,
-				    rights.count);
-	if (!rights.names) {
-		return NT_STATUS_NO_MEMORY;
-	}
-
-	for (i=0; i<argc-1; i++) {
-		init_lsa_StringLarge(&rights.names[i], argv[i+1]);
-	}
-
-	result = rpccli_lsa_AddAccountRights(pipe_hnd, mem_ctx,
-					     &dom_pol,
-					     &sid,
-					     &rights);
+	result = rpccli_lsa_add_account_rights(pipe_hnd, mem_ctx, &dom_pol, sid, 
+					    argc-1, argv+1);
 
 	if (!NT_STATUS_IS_OK(result))
 		goto done;
-
+		
 	d_printf("Successfully granted rights.\n");
 
  done:
 	if ( !NT_STATUS_IS_OK(result) ) {
-		d_fprintf(stderr, "Failed to grant privileges for %s (%s)\n",
+		d_fprintf(stderr, "Failed to grant privileges for %s (%s)\n", 
 			argv[0], nt_errstr(result));
 	}
-
- 	rpccli_lsa_Close(pipe_hnd, mem_ctx, &dom_pol);
-
+		
+ 	rpccli_lsa_close(pipe_hnd, mem_ctx, &dom_pol);
+	
 	return result;
 }
 
 /********************************************************************
 ********************************************************************/
 
-static NTSTATUS rpc_rights_revoke_internal(struct net_context *c,
-					const DOM_SID *domain_sid,
-					const char *domain_name,
+static NTSTATUS rpc_rights_revoke_internal(const DOM_SID *domain_sid,
+					const char *domain_name, 
 					struct cli_state *cli,
 					struct rpc_pipe_client *pipe_hnd,
-					TALLOC_CTX *mem_ctx,
+					TALLOC_CTX *mem_ctx, 
 					int argc,
 					const char **argv )
 {
 	POLICY_HND dom_pol;
 	NTSTATUS result = NT_STATUS_UNSUCCESSFUL;
-	struct lsa_RightSet rights;
+
 	DOM_SID sid;
-	int i;
 
 	if (argc < 2 ) {
 		d_printf("Usage: net rpc rights revoke <name|SID> <rights...>\n");
@@ -516,31 +470,17 @@ static NTSTATUS rpc_rights_revoke_internal(struct net_context *c,
 
 	result = name_to_sid(pipe_hnd, mem_ctx, &sid, argv[0]);
 	if (!NT_STATUS_IS_OK(result))
-		return result;
+		return result;	
 
-	result = rpccli_lsa_open_policy2(pipe_hnd, mem_ctx, true,
+	result = rpccli_lsa_open_policy2(pipe_hnd, mem_ctx, True, 
 				     SEC_RIGHTS_MAXIMUM_ALLOWED,
 				     &dom_pol);
 
 	if (!NT_STATUS_IS_OK(result))
-		return result;
+		return result;	
 
-	rights.count = argc-1;
-	rights.names = TALLOC_ARRAY(mem_ctx, struct lsa_StringLarge,
-				    rights.count);
-	if (!rights.names) {
-		return NT_STATUS_NO_MEMORY;
-	}
-
-	for (i=0; i<argc-1; i++) {
-		init_lsa_StringLarge(&rights.names[i], argv[i+1]);
-	}
-
-	result = rpccli_lsa_RemoveAccountRights(pipe_hnd, mem_ctx,
-						&dom_pol,
-						&sid,
-						false,
-						&rights);
+	result = rpccli_lsa_remove_account_rights(pipe_hnd, mem_ctx, &dom_pol, sid, 
+					       False, argc-1, argv+1);
 
 	if (!NT_STATUS_IS_OK(result))
 		goto done;
@@ -549,155 +489,120 @@ static NTSTATUS rpc_rights_revoke_internal(struct net_context *c,
 
 done:
 	if ( !NT_STATUS_IS_OK(result) ) {
-		d_fprintf(stderr, "Failed to revoke privileges for %s (%s)\n",
+		d_fprintf(stderr, "Failed to revoke privileges for %s (%s)\n", 
 			argv[0], nt_errstr(result));
 	}
-
-	rpccli_lsa_Close(pipe_hnd, mem_ctx, &dom_pol);
+	
+	rpccli_lsa_close(pipe_hnd, mem_ctx, &dom_pol);
 
 	return result;
-}
+}	
 
 
 /********************************************************************
 ********************************************************************/
 
-static int rpc_rights_list(struct net_context *c, int argc, const char **argv )
+static int rpc_rights_list( int argc, const char **argv )
 {
-	if (c->display_usage) {
-		d_printf("Usage:\n"
-			 "net rpc rights list [{accounts|privileges} "
-			 "[name|SID]]\n"
-			 "    View available/assigned privileges\n");
-		return 0;
-	}
-
-	return run_rpc_command(c, NULL, &ndr_table_lsarpc.syntax_id, 0,
+	return run_rpc_command( NULL, PI_LSARPC, 0, 
 		rpc_rights_list_internal, argc, argv );
 }
 
 /********************************************************************
 ********************************************************************/
 
-static int rpc_rights_grant(struct net_context *c, int argc, const char **argv )
+static int rpc_rights_grant( int argc, const char **argv )
 {
-	if (c->display_usage) {
-		d_printf("Usage:\n"
-			 "net rpc rights grant <name|SID> <right>\n"
-			 "    Assign privilege[s]\n");
-		d_printf("For example:\n");
-		d_printf("    net rpc rights grant 'VALE\\biddle' "
-			 "SePrintOperatorPrivilege SeDiskOperatorPrivilege\n");
-		d_printf("    would grant the printer admin and disk manager "
-			 "rights to the user 'VALE\\biddle'\n");
-		return 0;
-	}
-
-	return run_rpc_command(c, NULL, &ndr_table_lsarpc.syntax_id, 0,
+	return run_rpc_command( NULL, PI_LSARPC, 0, 
 		rpc_rights_grant_internal, argc, argv );
 }
 
 /********************************************************************
 ********************************************************************/
 
-static int rpc_rights_revoke(struct net_context *c, int argc, const char **argv)
+static int rpc_rights_revoke( int argc, const char **argv )
 {
-	if (c->display_usage) {
-		d_printf("Usage:\n"
-			 "net rpc rights revoke <name|SID> <right>\n"
-			 "    Revoke privilege[s]\n");
-		d_printf("For example:\n");
-		d_printf("    net rpc rights revoke 'VALE\\biddle' "
-			 "SePrintOperatorPrivilege SeDiskOperatorPrivilege\n");
-		d_printf("    would revoke the printer admin and disk manager "
-			 "rights from the user 'VALE\\biddle'\n");
-		return 0;
-	}
-
-	return run_rpc_command(c, NULL, &ndr_table_lsarpc.syntax_id, 0,
+	return run_rpc_command( NULL, PI_LSARPC, 0, 
 		rpc_rights_revoke_internal, argc, argv );
 }
 
 /********************************************************************
 ********************************************************************/
 
-int net_rpc_rights(struct net_context *c, int argc, const char **argv)
+static int net_help_rights( int argc, const char **argv )
 {
-	struct functable func[] = {
-		{
-			"list",
-			rpc_rights_list,
-			NET_TRANSPORT_RPC,
-			"View available/assigned privileges",
-			"net rpc rights list\n"
-			"    View available/assigned privileges"
-		},
-		{
-			"grant",
-			rpc_rights_grant,
-			NET_TRANSPORT_RPC,
-			"Assign privilege[s]",
-			"net rpc rights grant\n"
-			"    Assign privilege[s]"
-		},
-		{
-			"revoke",
-			rpc_rights_revoke,
-			NET_TRANSPORT_RPC,
-			"Revoke privilege[s]",
-			"net rpc rights revoke\n"
-			"    Revoke privilege[s]"
-		},
-		{NULL, NULL, 0, NULL, NULL}
-	};
-
-	return net_run_function(c, argc, argv, "net rpc rights", func);
+	d_printf("net rpc rights list [{accounts|privileges} [name|SID]]   View available or assigned privileges\n");
+	d_printf("net rpc rights grant <name|SID> <right>                  Assign privilege[s]\n");
+	d_printf("net rpc rights revoke <name|SID> <right>                 Revoke privilege[s]\n");
+	
+	d_printf("\nBoth 'grant' and 'revoke' require a SID and a list of privilege names.\n");
+	d_printf("For example\n");
+	d_printf("\n  net rpc rights grant 'VALE\\biddle' SePrintOperatorPrivilege SeDiskOperatorPrivilege\n");
+	d_printf("\nwould grant the printer admin and disk manager rights to the user 'VALE\\biddle'\n\n");
+	
+	
+	return -1;
 }
 
-static NTSTATUS rpc_sh_rights_list(struct net_context *c,
-				   TALLOC_CTX *mem_ctx, struct rpc_sh_ctx *ctx,
+/********************************************************************
+********************************************************************/
+
+int net_rpc_rights(int argc, const char **argv) 
+{
+	struct functable func[] = {
+		{"list", rpc_rights_list},
+		{"grant", rpc_rights_grant},
+		{"revoke", rpc_rights_revoke},
+		{NULL, NULL}
+	};
+	
+	if ( argc )
+		return net_run_function( argc, argv, func, net_help_rights );
+		
+	return net_help_rights( argc, argv );
+}
+
+static NTSTATUS rpc_sh_rights_list(TALLOC_CTX *mem_ctx, struct rpc_sh_ctx *ctx,
 				   struct rpc_pipe_client *pipe_hnd,
 				   int argc, const char **argv)
 {
-	return rpc_rights_list_internal(c, ctx->domain_sid, ctx->domain_name,
+	return rpc_rights_list_internal(ctx->domain_sid, ctx->domain_name,
 					ctx->cli, pipe_hnd, mem_ctx,
 					argc, argv);
 }
 
-static NTSTATUS rpc_sh_rights_grant(struct net_context *c,
-				    TALLOC_CTX *mem_ctx,
+static NTSTATUS rpc_sh_rights_grant(TALLOC_CTX *mem_ctx,
 				    struct rpc_sh_ctx *ctx,
 				    struct rpc_pipe_client *pipe_hnd,
 				    int argc, const char **argv)
 {
-	return rpc_rights_grant_internal(c, ctx->domain_sid, ctx->domain_name,
+	return rpc_rights_grant_internal(ctx->domain_sid, ctx->domain_name,
 					 ctx->cli, pipe_hnd, mem_ctx,
 					 argc, argv);
 }
 
-static NTSTATUS rpc_sh_rights_revoke(struct net_context *c,
-				     TALLOC_CTX *mem_ctx,
+static NTSTATUS rpc_sh_rights_revoke(TALLOC_CTX *mem_ctx,
 				     struct rpc_sh_ctx *ctx,
 				     struct rpc_pipe_client *pipe_hnd,
 				     int argc, const char **argv)
 {
-	return rpc_rights_revoke_internal(c, ctx->domain_sid, ctx->domain_name,
+	return rpc_rights_revoke_internal(ctx->domain_sid, ctx->domain_name,
 					  ctx->cli, pipe_hnd, mem_ctx,
 					  argc, argv);
 }
 
-struct rpc_sh_cmd *net_rpc_rights_cmds(struct net_context *c, TALLOC_CTX *mem_ctx,
+struct rpc_sh_cmd *net_rpc_rights_cmds(TALLOC_CTX *mem_ctx,
 				       struct rpc_sh_ctx *ctx)
 {
 	static struct rpc_sh_cmd cmds[] = {
 
-	{ "list", NULL, &ndr_table_lsarpc.syntax_id, rpc_sh_rights_list,
+	{ "list", NULL, PI_LSARPC, rpc_sh_rights_list,
 	  "View available or assigned privileges" },
 
-	{ "grant", NULL, &ndr_table_lsarpc.syntax_id, rpc_sh_rights_grant,
+	{ "grant", NULL, PI_LSARPC, rpc_sh_rights_grant,
 	  "Assign privilege[s]" },
 
-	{ "revoke", NULL, &ndr_table_lsarpc.syntax_id, rpc_sh_rights_revoke,
+	{ "revoke", NULL, PI_LSARPC, rpc_sh_rights_revoke,
 	  "Revoke privilege[s]" },
 
 	{ NULL, NULL, 0, NULL, NULL }

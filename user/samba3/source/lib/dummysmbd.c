@@ -6,7 +6,7 @@
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
 
    This program is distributed in the hope that it will be useful,
@@ -15,7 +15,8 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 /* Stupid dummy functions required due to the horrible dependency mess
@@ -23,17 +24,12 @@
 
 #include "includes.h"
 
-int get_client_fd(void)
-{
-	return -1;
-}
-
 int find_service(fstring service)
 {
 	return -1;
 }
 
-bool conn_snum_used(int snum)
+BOOL conn_snum_used(int snum)
 {
 	return False;
 }
@@ -52,22 +48,3 @@ NTSTATUS can_delete_directory(struct connection_struct *conn,
 	return NT_STATUS_OK;
 }
 
-bool change_to_root_user(void)
-{
-	return false;
-}
-
-struct event_context *smbd_event_context(void)
-{
-	static struct event_context *ev;
-
-	if (!ev) {
-		ev = event_context_init(NULL);
-	}
-	return ev;
-}
-
-struct messaging_context *smbd_messaging_context(void)
-{
-	return NULL;
-}

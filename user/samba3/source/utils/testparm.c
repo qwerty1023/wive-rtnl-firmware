@@ -8,7 +8,7 @@
    
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -17,7 +17,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 /*
@@ -33,7 +34,7 @@
 
 #include "includes.h"
 
-extern bool AllowDebugChange;
+extern BOOL AllowDebugChange;
 
 /***********************************************
  Here we do a set of 'hard coded' checks for bad
@@ -82,19 +83,18 @@ cannot be set in the smb.conf file. nmbd will abort with this setting.\n");
 	 */
 
 	if((lp_security() == SEC_SERVER || lp_security() >= SEC_DOMAIN) && !lp_passwordserver()) {
-		const char *sec_setting;
+		pstring sec_setting;
 		if(lp_security() == SEC_SERVER)
-			sec_setting = "server";
+			pstrcpy(sec_setting, "server");
 		else if(lp_security() == SEC_DOMAIN)
-			sec_setting = "domain";
-		else
-			sec_setting = "";
+			pstrcpy(sec_setting, "domain");
 
 		fprintf(stderr, "ERROR: The setting 'security=%s' requires the 'password server' parameter be set \
 to a valid password server.\n", sec_setting );
 		ret = 1;
 	}
 
+	
 	/*
 	 * Password chat sanity checks.
 	 */
@@ -109,28 +109,27 @@ to a valid password server.\n", sec_setting );
 		if (!lp_pam_password_change()) {
 #endif
 
-			if((lp_passwd_program() == NULL) ||
-			   (strlen(lp_passwd_program()) == 0))
-			{
+			if(lp_passwd_program() == NULL) {
 				fprintf( stderr, "ERROR: the 'unix password sync' parameter is set and there is no valid 'passwd program' \
 parameter.\n" );
 				ret = 1;
 			} else {
-				const char *passwd_prog;
-				char *truncated_prog = NULL;
+				pstring passwd_prog;
+				pstring truncated_prog;
 				const char *p;
 
-				passwd_prog = lp_passwd_program();
+				pstrcpy( passwd_prog, lp_passwd_program());
 				p = passwd_prog;
-				next_token_talloc(talloc_tos(),
-						&p,
-						&truncated_prog, NULL);
-				if (truncated_prog && access(truncated_prog, F_OK) == -1) {
+				*truncated_prog = '\0';
+				next_token(&p, truncated_prog, NULL, sizeof(pstring));
+
+				if(access(truncated_prog, F_OK) == -1) {
 					fprintf(stderr, "ERROR: the 'unix password sync' parameter is set and the 'passwd program' (%s) \
 cannot be executed (error was %s).\n", truncated_prog, strerror(errno) );
 					ret = 1;
 				}
-			}
+
+             }
 
 #ifdef WITH_PAM
 		}
@@ -140,16 +139,11 @@ cannot be executed (error was %s).\n", truncated_prog, strerror(errno) );
 			fprintf(stderr, "ERROR: the 'unix password sync' parameter is set and there is no valid 'passwd chat' \
 parameter.\n");
 			ret = 1;
-		}
-
-		if ((lp_passwd_program() != NULL) &&
-		    (strlen(lp_passwd_program()) > 0))
-		{
-			/* check if there's a %u parameter present */
-			if(strstr_m(lp_passwd_program(), "%u") == NULL) {
-				fprintf(stderr, "ERROR: the 'passwd program' (%s) requires a '%%u' parameter.\n", lp_passwd_program());
-				ret = 1;
-			}
+		} else 
+		/* check if there's a %u parameter present */
+		if(strstr_m(lp_passwd_program(), "%u") == NULL) {
+			fprintf(stderr, "ERROR: the 'passwd program' (%s) requires a '%%u' parameter.\n", lp_passwd_program());
+			ret = 1;
 		}
 
 		/*
@@ -194,86 +188,16 @@ via the %%o substitution. With encrypted passwords this is not possible.\n", lp_
 	if (!lp_passdb_backend()) {
 		fprintf(stderr,"ERROR: passdb backend must have a value or be left out\n");
 	}
-	
-	if (lp_os_level() > 255) {
-		fprintf(stderr,"WARNING: Maximum value for 'os level' is 255!\n");	
-	}
 
 	return ret;
 }   
 
-/**
- * per-share logic tests
- */
-static void do_per_share_checks(int s)
-{
-	const char **deny_list = lp_hostsdeny(s);
-	const char **allow_list = lp_hostsallow(s);
-	int i;
-
-	if(deny_list) {
-		for (i=0; deny_list[i]; i++) {
-			char *hasstar = strchr_m(deny_list[i], '*');
-			char *hasquery = strchr_m(deny_list[i], '?');
-			if(hasstar || hasquery) {
-				fprintf(stderr,"Invalid character %c in hosts deny list (%s) for service %s.\n",
-					   hasstar ? *hasstar : *hasquery, deny_list[i], lp_servicename(s) );
-			}
-		}
-	}
-
-	if(allow_list) {
-		for (i=0; allow_list[i]; i++) {
-			char *hasstar = strchr_m(allow_list[i], '*');
-			char *hasquery = strchr_m(allow_list[i], '?');
-			if(hasstar || hasquery) {
-				fprintf(stderr,"Invalid character %c in hosts allow list (%s) for service %s.\n",
-					   hasstar ? *hasstar : *hasquery, allow_list[i], lp_servicename(s) );
-			}
-		}
-	}
-
-	if(lp_level2_oplocks(s) && !lp_oplocks(s)) {
-		fprintf(stderr,"Invalid combination of parameters for service %s. \
-			   Level II oplocks can only be set if oplocks are also set.\n",
-			   lp_servicename(s) );
-	}
-
-	if (lp_map_hidden(s) && !(lp_create_mask(s) & S_IXOTH)) {
-		fprintf(stderr,"Invalid combination of parameters for service %s. \
-			   Map hidden can only work if create mask includes octal 01 (S_IXOTH).\n",
-			   lp_servicename(s) );
-	}
-	if (lp_map_hidden(s) && (lp_force_create_mode(s) & S_IXOTH)) {
-		fprintf(stderr,"Invalid combination of parameters for service %s. \
-			   Map hidden can only work if force create mode excludes octal 01 (S_IXOTH).\n",
-			   lp_servicename(s) );
-	}
-	if (lp_map_system(s) && !(lp_create_mask(s) & S_IXGRP)) {
-		fprintf(stderr,"Invalid combination of parameters for service %s. \
-			   Map system can only work if create mask includes octal 010 (S_IXGRP).\n",
-			   lp_servicename(s) );
-	}
-	if (lp_map_system(s) && (lp_force_create_mode(s) & S_IXGRP)) {
-		fprintf(stderr,"Invalid combination of parameters for service %s. \
-			   Map system can only work if force create mode excludes octal 010 (S_IXGRP).\n",
-			   lp_servicename(s) );
-	}
-#ifdef HAVE_CUPS
-	if (lp_printing(s) == PRINT_CUPS && *(lp_printcommand(s)) != '\0') {
-		 fprintf(stderr,"Warning: Service %s defines a print command, but \
-rameter is ignored when using CUPS libraries.\n",
-			   lp_servicename(s) );
-	}
-#endif
-}
-
  int main(int argc, const char *argv[])
 {
-	const char *config_file = get_dyn_CONFIGFILE();
+	const char *config_file = dyn_CONFIGFILE;
 	int s;
-	static int silent_mode = False;
-	static int show_all_parameters = False;
+	static BOOL silent_mode = False;
+	static BOOL show_all_parameters = False;
 	int ret = 0;
 	poptContext pc;
 	static const char *term_code = "";
@@ -283,7 +207,6 @@ rameter is ignored when using CUPS libraries.\n",
 	const char *cname;
 	const char *caddr;
 	static int show_defaults;
-	static int skip_logic_checks = 0;
 
 	struct poptOption long_options[] = {
 		POPT_AUTOHELP
@@ -291,24 +214,14 @@ rameter is ignored when using CUPS libraries.\n",
 		{"verbose", 'v', POPT_ARG_NONE, &show_defaults, 1, "Show default options too"},
 		{"server", 'L',POPT_ARG_STRING, &new_local_machine, 0, "Set %%L macro to servername\n"},
 		{"encoding", 't', POPT_ARG_STRING, &term_code, 0, "Print parameters with encoding"},
-		{"skip-logic-checks", 'l', POPT_ARG_NONE, &skip_logic_checks, 1, "Skip the global checks"},
 		{"show-all-parameters", '\0', POPT_ARG_VAL, &show_all_parameters, True, "Show the parameters, type, possible values" },
 		{"parameter-name", '\0', POPT_ARG_STRING, &parameter_name, 0, "Limit testparm to a named parameter" },
 		{"section-name", '\0', POPT_ARG_STRING, &section_name, 0, "Limit testparm to a named section" },
 		POPT_COMMON_VERSION
-		POPT_COMMON_DEBUGLEVEL
 		POPT_TABLEEND
 	};
 
-	TALLOC_CTX *frame = talloc_stackframe();
-
 	load_case_tables();
-	/*
-	 * Set the default debug level to 2.
-	 * Allow it to be overridden by the command line,
-	 * not by smb.conf.
-	 */
-	DEBUGLEVEL_CLASS[DBGC_ALL] = 2;
 
 	pc = poptGetContext(NULL, argc, argv, long_options, 
 			    POPT_CONTEXT_KEEP_FIRST);
@@ -339,21 +252,19 @@ rameter is ignored when using CUPS libraries.\n",
 	}
 
 	dbf = x_stderr;
-	/* Don't let the debuglevel be changed by smb.conf. */
+	DEBUGLEVEL = 2;
 	AllowDebugChange = False;
 
 	fprintf(stderr,"Load smb config files from %s\n",config_file);
 
-	if (!lp_load_with_registry_shares(config_file,False,True,False,True)) {
+	if (!lp_load(config_file,False,True,False,True)) {
 		fprintf(stderr,"Error loading services.\n");
 		return(1);
 	}
 
 	fprintf(stderr,"Loaded services file OK.\n");
 
-	if (skip_logic_checks == 0) {
-		ret = do_global_checks();
-	}
+	ret = do_global_checks();
 
 	for (s=0;s<1000;s++) {
 		if (VALID_SNUM(s))
@@ -366,8 +277,65 @@ rameter is ignored when using CUPS libraries.\n",
 	}
 
 	for (s=0;s<1000;s++) {
-		if (VALID_SNUM(s) && (skip_logic_checks == 0)) {
-			do_per_share_checks(s);
+		if (VALID_SNUM(s)) {
+			const char **deny_list = lp_hostsdeny(s);
+			const char **allow_list = lp_hostsallow(s);
+			int i;
+			if(deny_list) {
+				for (i=0; deny_list[i]; i++) {
+					char *hasstar = strchr_m(deny_list[i], '*');
+					char *hasquery = strchr_m(deny_list[i], '?');
+					if(hasstar || hasquery) {
+						fprintf(stderr,"Invalid character %c in hosts deny list (%s) for service %s.\n",
+							   hasstar ? *hasstar : *hasquery, deny_list[i], lp_servicename(s) );
+					}
+				}
+			}
+
+			if(allow_list) {
+				for (i=0; allow_list[i]; i++) {
+					char *hasstar = strchr_m(allow_list[i], '*');
+					char *hasquery = strchr_m(allow_list[i], '?');
+					if(hasstar || hasquery) {
+						fprintf(stderr,"Invalid character %c in hosts allow list (%s) for service %s.\n",
+							   hasstar ? *hasstar : *hasquery, allow_list[i], lp_servicename(s) );
+					}
+				}
+			}
+
+			if(lp_level2_oplocks(s) && !lp_oplocks(s)) {
+				fprintf(stderr,"Invalid combination of parameters for service %s. \
+					   Level II oplocks can only be set if oplocks are also set.\n",
+					   lp_servicename(s) );
+			}
+
+			if (lp_map_hidden(s) && !(lp_create_mask(s) & S_IXOTH)) {
+				fprintf(stderr,"Invalid combination of parameters for service %s. \
+					   Map hidden can only work if create mask includes octal 01 (S_IXOTH).\n",
+					   lp_servicename(s) );
+			}
+			if (lp_map_hidden(s) && (lp_force_create_mode(s) & S_IXOTH)) {
+				fprintf(stderr,"Invalid combination of parameters for service %s. \
+					   Map hidden can only work if force create mode excludes octal 01 (S_IXOTH).\n",
+					   lp_servicename(s) );
+			}
+			if (lp_map_system(s) && !(lp_create_mask(s) & S_IXGRP)) {
+				fprintf(stderr,"Invalid combination of parameters for service %s. \
+					   Map system can only work if create mask includes octal 010 (S_IXGRP).\n",
+					   lp_servicename(s) );
+			}
+			if (lp_map_system(s) && (lp_force_create_mode(s) & S_IXGRP)) {
+				fprintf(stderr,"Invalid combination of parameters for service %s. \
+					   Map system can only work if force create mode excludes octal 010 (S_IXGRP).\n",
+					   lp_servicename(s) );
+			}
+#ifdef HAVE_CUPS
+			if (lp_printing(s) == PRINT_CUPS && *(lp_printcommand(s)) != '\0') {
+				 fprintf(stderr,"Warning: Service %s defines a print command, but \
+print command parameter is ignored when using CUPS libraries.\n",
+					   lp_servicename(s) );
+			}
+#endif
 		}
 	}
 
@@ -383,7 +351,7 @@ rameter is ignored when using CUPS libraries.\n",
 			getc(stdin);
 		}
 		if (parameter_name || section_name) {
-			bool isGlobal = False;
+			BOOL isGlobal = False;
 			s = GLOBAL_SECTION_SNUM;
 
 			if (!section_name) {
@@ -428,7 +396,6 @@ rameter is ignored when using CUPS libraries.\n",
 			}
 		}
 	}
-	TALLOC_FREE(frame);
 	return(ret);
 }
 

@@ -8,7 +8,7 @@
       
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
-   the Free Software Foundation; either version 3 of the License, or
+   the Free Software Foundation; either version 2 of the License, or
    (at your option) any later version.
    
    This program is distributed in the hope that it will be useful,
@@ -17,7 +17,8 @@
    GNU General Public License for more details.
    
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+   along with this program; if not, write to the Free Software
+   Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
 */
 
 #include "includes.h"
@@ -35,11 +36,11 @@ static DOM_SID *global_sam_sid=NULL;
  style of SID storage
 ****************************************************************************/
 
-static bool read_sid_from_file(const char *fname, DOM_SID *sid)
+static BOOL read_sid_from_file(const char *fname, DOM_SID *sid)
 {
 	char **lines;
 	int numlines;
-	bool ret;
+	BOOL ret;
 
 	lines = file_lines_load(fname, &numlines,0);
 	
@@ -103,7 +104,7 @@ static DOM_SID *pdb_generate_sam_sid(void)
 			/* No domain sid and we're a pdc/bdc. Store it */
 
 			if (!secrets_store_domain_sid(lp_workgroup(), sam_sid)) {
-				DEBUG(1,("pdb_generate_sam_sid: Can't store domain SID as a pdc/bdc.\n"));
+				DEBUG(0,("pdb_generate_sam_sid: Can't store domain SID as a pdc/bdc.\n"));
 				SAFE_FREE(sam_sid);
 				return NULL;
 			}
@@ -114,9 +115,9 @@ static DOM_SID *pdb_generate_sam_sid(void)
 
 			/* Domain name sid doesn't match global sam sid. Re-store domain sid as 'local' sid. */
 
-			DEBUG(1,("pdb_generate_sam_sid: Mismatched SIDs as a pdc/bdc.\n"));
+			DEBUG(0,("pdb_generate_sam_sid: Mismatched SIDs as a pdc/bdc.\n"));
 			if (!secrets_store_domain_sid(global_myname(), &domain_sid)) {
-				DEBUG(1,("pdb_generate_sam_sid: Can't re-store domain SID for local sid as PDC/BDC.\n"));
+				DEBUG(0,("pdb_generate_sam_sid: Can't re-store domain SID for local sid as PDC/BDC.\n"));
 				SAFE_FREE(sam_sid);
 				return NULL;
 			}
@@ -128,15 +129,12 @@ static DOM_SID *pdb_generate_sam_sid(void)
 	}
 
 	/* check for an old MACHINE.SID file for backwards compatibility */
-	if (asprintf(&fname, "%s/MACHINE.SID", lp_private_dir()) == -1) {
-		SAFE_FREE(sam_sid);
-		return NULL;
-	}
+	asprintf(&fname, "%s/MACHINE.SID", lp_private_dir());
 
 	if (read_sid_from_file(fname, sam_sid)) {
 		/* remember it for future reference and unlink the old MACHINE.SID */
 		if (!secrets_store_domain_sid(global_myname(), sam_sid)) {
-			DEBUG(1,("pdb_generate_sam_sid: Failed to store SID from file.\n"));
+			DEBUG(0,("pdb_generate_sam_sid: Failed to store SID from file.\n"));
 			SAFE_FREE(fname);
 			SAFE_FREE(sam_sid);
 			return NULL;
@@ -144,7 +142,7 @@ static DOM_SID *pdb_generate_sam_sid(void)
 		unlink(fname);
 		if ( !IS_DC ) {
 			if (!secrets_store_domain_sid(lp_workgroup(), sam_sid)) {
-				DEBUG(1,("pdb_generate_sam_sid: Failed to store domain SID from file.\n"));
+				DEBUG(0,("pdb_generate_sam_sid: Failed to store domain SID from file.\n"));
 				SAFE_FREE(fname);
 				SAFE_FREE(sam_sid);
 				return NULL;
@@ -163,13 +161,13 @@ static DOM_SID *pdb_generate_sam_sid(void)
 	generate_random_sid(sam_sid);
 
 	if (!secrets_store_domain_sid(global_myname(), sam_sid)) {
-		DEBUG(1,("pdb_generate_sam_sid: Failed to store generated machine SID.\n"));
+		DEBUG(0,("pdb_generate_sam_sid: Failed to store generated machine SID.\n"));
 		SAFE_FREE(sam_sid);
 		return NULL;
 	}
 	if ( IS_DC ) {
 		if (!secrets_store_domain_sid(lp_workgroup(), sam_sid)) {
-			DEBUG(1,("pdb_generate_sam_sid: Failed to store generated domain SID.\n"));
+			DEBUG(0,("pdb_generate_sam_sid: Failed to store generated domain SID.\n"));
 			SAFE_FREE(sam_sid);
 			return NULL;
 		}
@@ -181,36 +179,14 @@ static DOM_SID *pdb_generate_sam_sid(void)
 /* return our global_sam_sid */
 DOM_SID *get_global_sam_sid(void)
 {
-	struct db_context *db;
-
 	if (global_sam_sid != NULL)
 		return global_sam_sid;
 	
-	/*
-	 * memory for global_sam_sid is allocated in
-	 * pdb_generate_sam_sid() as needed
-	 *
-	 * Note: this is garded by a transaction
-	 *       to prevent races on startup which
-	 *       can happen with some dbwrap backends
-	 */
-
-	db = secrets_db_ctx();
-	if (!db) {
-		smb_panic("could not open secrets db");
-	}
-
-	if (db->transaction_start(db) != 0) {
-		smb_panic("could not start transaction on secrets db");
-	}
+	/* memory for global_sam_sid is allocated in 
+	   pdb_generate_sam_sid() as needed */
 
 	if (!(global_sam_sid = pdb_generate_sam_sid())) {
-		db->transaction_cancel(db);
-		smb_panic("could not generate a machine SID");
-	}
-
-	if (db->transaction_commit(db) != 0) {
-		smb_panic("could not start commit secrets db");
+		smb_panic("Could not generate a machine SID\n");
 	}
 
 	return global_sam_sid;
@@ -228,7 +204,7 @@ void reset_global_sam_sid(void)
  Check if the SID is our domain SID (S-1-5-21-x-y-z).
 *****************************************************************/  
 
-bool sid_check_is_domain(const DOM_SID *sid)
+BOOL sid_check_is_domain(const DOM_SID *sid)
 {
 	return sid_equal(sid, get_global_sam_sid());
 }
@@ -237,12 +213,13 @@ bool sid_check_is_domain(const DOM_SID *sid)
  Check if the SID is our domain SID (S-1-5-21-x-y-z).
 *****************************************************************/  
 
-bool sid_check_is_in_our_domain(const DOM_SID *sid)
+BOOL sid_check_is_in_our_domain(const DOM_SID *sid)
 {
 	DOM_SID dom_sid;
 	uint32 rid;
 
 	sid_copy(&dom_sid, sid);
 	sid_split_rid(&dom_sid, &rid);
-	return sid_check_is_domain(&dom_sid);
+	
+	return sid_equal(&dom_sid, get_global_sam_sid());
 }

@@ -1,5 +1,5 @@
 ##
-## Coding conventions in the Samba 3 tree
+## Coding conventions in the Samba 3.0 tree
 ##
 
 ===========
@@ -7,11 +7,11 @@ Quick Start
 ===========
 
 Coding style guidelines are about reducing the number of unnecessary
-reformatting patches and making things easier for developers to work together.
+reformatting patches and making things easier developers to work together.
 You don't have to like them or even agree with them, but once put in place
 we all have to abide by them (or vote to change them).  However, coding
 style should never outweigh coding itself and so the the guidelines
-described here are hopefully easy enough to follow as they are very
+described here are hopefully easier enough to follow as they are very
 common and supported by tools and editors.
 
 The basic style, also mentioned in the SAMBA_4_0/prog_guide.txt is the
@@ -76,12 +76,6 @@ displaying trailing whitespace:
 	endf
 	autocmd BufNewFile,BufRead * call ActivateInvisibleCharIndicator()
   endif
-  " Show tabs, trailing whitespace, and continued lines visually
-  set list listchars=tab:»·,trail:·,extends:…
-
-  " highlight overly long lines same as TODOs.
-  set textwidth=80
-  autocmd BufNewFile,BufRead *.c,*.h exec 'match Todo /\%>' . &textwidth . 'v.\+/'
 
 
 =========================
@@ -219,18 +213,3 @@ or
 	if (!x) {
 		fprintf(stderr, "Unable to alloc memory!\n");
 	}
-
-
-Primitive Data Types
---------------------
-
-Samba has large amounts of historical code which makes use of data types 
-commonly supported by the C99 standard. However, at the time such types 
-as boolean and exact width integers did not exist and Samba developers 
-were forced to provide their own.  Now that these types are guaranteed to 
-be available either as part of the compiler C99 support or from lib/replace/, 
-new code should adhere to the following conventions:
-
-  * Booleans are of type "bool" (not BOOL)
-  * Boolean values are "true" and "false" (not True or False)
-  * Exact width integers are of type [u]int[8|16|32|64]_t
