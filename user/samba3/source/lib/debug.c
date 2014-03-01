@@ -870,10 +870,10 @@ static void format_debug_text( const char *msg )
 
 	for( i = 0; msg[i]; i++ ) {
 		/* Indent two spaces at each new line. */
-		if(timestamp && 0 == format_pos) {
+		/*if(timestamp && 0 == format_pos) {
 			format_bufr[0] = format_bufr[1] = ' ';
 			format_pos = 2;
-		}
+		}*/
 
 		/* If there's room, copy the character to the format buffer. */
 		if( format_pos < FORMAT_BUFR_MAX )
