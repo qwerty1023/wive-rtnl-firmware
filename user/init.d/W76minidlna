@@ -91,6 +91,7 @@ gen_config() {
     echo "notify_interval=10" >> $fname
     echo "serial=12345678" >> $fname
     echo "model_number=1" >> $fname
+    echo "max_connections=10" >> $fname
 }
 
 case "$1" in
