@@ -25,7 +25,7 @@ function initValue(form)
 function DlnaEnabledSwitch(form)
 {
 	disableElement( [ form.dlnaPort, form.dlnastart, form.dlnastop, form.dlnarescan,
-	form.dlnaDBPath, form.dlnaAPath, form.dlnaVPath, form.dlnaPPath] , form.DlnaEnabled.value != '1');
+	form.dlnaDBPath, form.dlna0Path, form.dlna1Path, form.dlna2Path] , form.DlnaEnabled.value != '1');
 }
 
 function CheckValue(form)
@@ -110,16 +110,16 @@ function submit_apply(parm)
 	<td><input type=text name="dlnaDBPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaDBPath"); %>" ></td>
 </tr>
 <tr>
-	<td class="head">Audo file</td>
-	<td><input type=text name="dlnaAPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaAPath"); %>" ></td>
+	<td class="head">DLNA scan path</td>
+	<td><input type=text name="dlna0Path" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlna0Path"); %>" ></td>
 </tr>
 <tr>
-	<td class="head">Video file</td>
-	<td><input type=text name="dlnaVPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaVPath"); %>" ></td>
+	<td class="head">DLNA scan path</td>
+	<td><input type=text name="dlna1Path" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlna1Path"); %>" ></td>
 </tr>
 <tr>
-	<td class="head">Pics file</td>
-	<td><input type=text name="dlnaPPath" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlnaPPath"); %>" ></td>
+	<td class="head">DLNA scan path</td>
+	<td><input type=text name="dlna2Path" size=64 maxlength=256 value="<% getCfgGeneral(1, "dlna2Path"); %>" ></td>
 </tr>
 </table>
 

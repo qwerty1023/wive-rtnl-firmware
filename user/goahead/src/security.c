@@ -118,13 +118,12 @@ int websSecurityHandler(webs_t wp, char_t *urlPrefix, char_t *webDir, int arg,
 		if (!umUserExists(userid)) {
 			websStats.access++;
 			websError(wp, 401, T("Access Denied\nUnknown User"));
-			//trace(3, T("SEC: Unknown user <%s> attempted to access <%s>\n"), userid, path);
-			syslog(LOG_WARNING, T("Access Denied - Unknown User: %s from %s:%s"), userid, wp->ipaddr, wp->userAgent);
+			syslog(LOG_WARNING, T("Access Denied - Unknown User: %s-%s from %s:%s"), userid, password, wp->ipaddr, wp->userAgent);
 			nRet = 1;
 		} else if (!umUserCanAccessURL(userid, accessLimit)) {
 			websStats.access++;
 			websError(wp, 403, T("Access Denied\nProhibited User"));
-			syslog(LOG_WARNING, T("Access Denied - Prohibited User: %s from %s:%s"), userid, wp->ipaddr, wp->userAgent);
+			syslog(LOG_WARNING, T("Access Denied - Prohibited User: %s-%s from %s:%s"), userid, password, wp->ipaddr, wp->userAgent);
 			nRet = 1;
 		} else if (password && * password) {
 			char_t * userpass = umGetUserPassword(userid);
@@ -132,7 +131,6 @@ int websSecurityHandler(webs_t wp, char_t *urlPrefix, char_t *webDir, int arg,
 				if (gstrcmp(password, userpass) != 0) {
 					websStats.access++;
 					websError(wp, 401, T("Access Denied\nWrong Password"));
-					//trace(3, T("SEC: Password fail for user <%s> attempt to access <%s>\n"), userid, path);
 					syslog(LOG_WARNING, T("Access Denied - Wrong Password: %s-%s from %s:%s"), userid, password, wp->ipaddr, wp->userAgent);
 					nRet = 1;
 				} else {

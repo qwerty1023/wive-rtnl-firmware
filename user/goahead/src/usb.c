@@ -422,9 +422,9 @@ const parameter_fetch_t dlna_args[] =
 {
 	{ T("dlnaPort"), "dlnaPort", 0, T("") },
 	{ T("dlnaDBPath"), "dlnaDBPath", 0, T("") },
-	{ T("dlnaAPath"), "dlnaAPath", 0, T("") },
-	{ T("dlnaVPath"), "dlnaVPath", 0, T("") },
-	{ T("dlnaPPath"), "dlnaPPath", 0, T("") },
+	{ T("dlna0Path"), "dlna0Path", 0, T("") },
+	{ T("dlna1Path"), "dlna1Path", 0, T("") },
+	{ T("dlna2Path"), "dlna2Path", 0, T("") },
 	{ NULL, NULL, 0, NULL } // Terminator
 };
 

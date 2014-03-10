@@ -75,9 +75,15 @@ gen_config() {
     # network interfaces to serve, comma delimited
     echo "network_interface=$lan_if" >> $fname
     #  scan fie path
-    echo "media_dir=A,$dlnaAPath" >> $fname
-    echo "media_dir=V,$dlnaVPath" >> $fname
-    echo "media_dir=P,$dlnaPPath" >> $fname
+    if [ "$dlna0Path" != "" ]; then
+        echo "media_dir=$dlna0Path" >> $fname
+    fi
+    if [ "$dlna1Path" != "" ]; then
+        echo "media_dir=$dlna1Path" >> $fname
+    fi
+    if [ "$dlna2Path" != "" ]; then
+        echo "media_dir=$dlna2Path" >> $fname
+    fi
     # set this if you would like to specify the directory where you want MiniDLNA to store its database and album art cache
     echo "db_dir=$dlnaDBPath" >> $fname
     echo "log_dir=$dlnaDBPath" >> $fname
