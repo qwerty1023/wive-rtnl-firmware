@@ -8,12 +8,6 @@
 LOG="logger -t services"
 MODE="$1"
 
-
-##########################################################
-# drop prio to normal for prevent services prio jitter
-##########################################################
-renice 0 -p $$
-
 $LOG "Restart needed services and scripts. Mode $MODE"
 
 ##########################################################
@@ -35,19 +29,6 @@ if [ -f /etc/init.d/zebra ]; then
 fi
 
     service dnsserver reload
-
-##########################################################
-# Need restart this servieces only:                    	 #
-# 1) if not VPN enable                               	 #
-# 2) if VPN enable and this scripts called from ip-up	 #
-# 3) if DHCP full renew					 #
-# 4) if restart mode = all				 #
-##########################################################
-if [ "$MODE" = "pppd" ] || [ "$MODE" = "dhcp" ] || [ "$MODE" = "all" ] || [ "$vpnEnabled" != "on" ]; then
-    service ddns restart
-    service ntp restart
-    service miniupnpd restart
-fi
 
 ##########################################################
 # Need restart this servieces only:			 #
@@ -100,6 +81,19 @@ if [ "$MODE" != "pppd" ]; then
     if [ -e /etc/init.d/udpxy ]; then
 	service udpxy restart
     fi
+fi
+
+##########################################################
+# Need restart this servieces only:                    	 #
+# 1) if not VPN enable                               	 #
+# 2) if VPN enable and this scripts called from ip-up	 #
+# 3) if DHCP full renew					 #
+# 4) if restart mode = all				 #
+##########################################################
+if [ "$MODE" = "pppd" ] || [ "$MODE" = "dhcp" ] || [ "$MODE" = "all" ] || [ "$vpnEnabled" != "on" ]; then
+    service ddns restart
+    service ntp restart
+    service miniupnpd restart
 fi
 
 # renew /etc/udhcpd.conf and restart dhcp server
