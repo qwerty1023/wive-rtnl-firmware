@@ -8,7 +8,6 @@
 .sgbuilt_user
 .libs
 libtool
-aclocal.m4
 autom4te.cache
 autom4te.cache/*
 config.h.in~

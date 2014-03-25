@@ -17,4 +17,7 @@ CONFOPTS="$CONFOPTS --enable-ipv6"
 CONFOPTS="$CONFOPTS --disable-smb"
 CONFOPTS="$CONFOPTS --without-smi --without-crypto"
 
+ac_cv_linux_vers="3"
+td_cv_buggygetaddrinfo="no"
+
 ./configure $CONFOPTS
