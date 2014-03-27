@@ -55,7 +55,7 @@ cfg.dlna_notify=true
 cfg.dlna_subscribe_ttl=60
 
 -- group by 'group-title'
-cfg.group=false
+cfg.group=true
 
 -- sort files
 cfg.sort_files=true
@@ -73,10 +73,10 @@ cfg.cache_size=4
 cfg.cache_ttl=300
 
 -- default mime type (mpeg, mpeg_ts, mpeg1, mpeg2, ts, ...)
-cfg.default_mime_type='mpeg'
+cfg.default_mime_type='mpeg_ts'
 
 -- feeds update interval (seconds, 0 - disabled)
-cfg.feeds_update_interval=1800
+cfg.feeds_update_interval=0
 cfg.playlists_update_interval=0
 
 -- playlist (m3u file path or path with alias
