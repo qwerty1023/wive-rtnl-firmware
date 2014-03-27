@@ -184,6 +184,11 @@ int __udp_lib_get_port(struct sock *sk, unsigned short snum,
 	inet_sk(sk)->num = snum;
 	sk->sk_hash = snum;
 	if (sk_unhashed(sk)) {
+		/*
+		 * We need that previous write to sk->sk_hash committed
+		 * before write to sk->next done in following add_node() variant
+		 */
+		smp_wmb();
 		head = &udptable[udp_hashfn(snum)];
 		sk_add_node(sk, head);
 		sock_prot_inc_use(sk->sk_prot);
@@ -984,6 +989,8 @@ int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 	nf_reset(skb);
 
 	if (up->encap_type) {
+		int (*encap_rcv)(struct sock *sk, struct sk_buff *skb);
+
 		/*
 		 * This is an encapsulation socket so pass the skb to
 		 * the socket's udp_encap_rcv() hook. Otherwise, just
@@ -996,11 +1003,11 @@ int udp_queue_rcv_skb(struct sock * sk, struct sk_buff *skb)
 		 */
 
 		/* if we're overly short, let UDP handle it */
-		if (skb->len > sizeof(struct udphdr) &&
-		    up->encap_rcv != NULL) {
+		encap_rcv = ACCESS_ONCE(up->encap_rcv);
+		if (skb->len > sizeof(struct udphdr) && encap_rcv != NULL) {
 			int ret;
 
-			ret = (*up->encap_rcv)(sk, skb);
+			ret = encap_rcv(sk, skb);
 			if (ret <= 0) {
 				UDP_INC_STATS_BH(UDP_MIB_INDATAGRAMS, up->pcflag);
 				return -ret;

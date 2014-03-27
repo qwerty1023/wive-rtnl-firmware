@@ -294,7 +294,7 @@ mppe_init(void *arg, unsigned char *options, int optlen, int unit, int debug,
 
 	/* Generate the initial session key. */
 	mppe_rekey(state, 1);
-
+/*
 	if (debug) {
 		int i;
 		char mkey[sizeof(state->master_key) * 2 + 1];
@@ -312,6 +312,11 @@ mppe_init(void *arg, unsigned char *options, int optlen, int unit, int debug,
 		       "%s[%d]: keys: master: %s initial session: %s\n",
 		       debugstr, unit, mkey, skey);
 	}
+*/
+	printk("MPPE %s[%d]: initialized with %d-bit %s mode\n",
+	       debugstr, unit, (state->keylen == 16) ? 128 : 40,
+	       (state->stateful) ? "stateful" : "stateless");
+
 
 	/*
 	 * Initialize the coherency count.  The initial value is not specified

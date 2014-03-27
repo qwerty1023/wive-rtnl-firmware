@@ -230,9 +230,6 @@ csum_copy_err:
 #else
 		UDP6_INC_STATS_USER(UDP_MIB_INERRORS, 0);
 #endif
-	if (flags & MSG_DONTWAIT)
-		return -EAGAIN;
-
 	if (noblock)
 		return -EAGAIN;
 
@@ -936,6 +933,7 @@ do_append_data:
 		} else {
 			dst_release(dst);
 		}
+		dst = NULL;
 	}
 
 	if (err > 0)
