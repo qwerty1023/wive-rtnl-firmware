@@ -1246,7 +1246,7 @@ send_file(struct upnphttp * h, int sendfd, off_t offset, off_t end_offset)
 	int try_sendfile = 1;
 #endif
 
-	while( offset < end_offset )
+	while( offset <= end_offset )
 	{
 #if HAVE_SENDFILE
 		if( try_sendfile )
@@ -1556,7 +1556,7 @@ SendResp_resizedimg(struct upnphttp * h, char * object)
 	char *resolution = NULL;
 	char *key, *val;
 	char *saveptr, *item = NULL;
-	int rotate;
+	int rotate = 0;
 	/* Not implemented yet *
 	char *pixelshape=NULL; */
 	long long id;
