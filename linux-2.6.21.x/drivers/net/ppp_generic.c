@@ -2053,7 +2053,7 @@ ppp_mp_reconstruct(struct ppp *ppp)
 				minseq + 1: p->sequence;
 
 			if (ppp->debug & 1)
-				netdev_printk(KERN_DEBUG, ppp->dev,
+				printk(KERN_DEBUG, ppp->dev,
 					      "lost frag %u..%u\n",
 					      oldseq, seq-1);
 			goto again;
