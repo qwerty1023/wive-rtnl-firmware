@@ -170,6 +170,8 @@ function initValue()
 
 	// Enable/disable
 	l2tpEnableSwitch(form);
+	mtuChange(form);
+	mruChange(form);
 }
 
 function CheckValue(form)
@@ -260,8 +262,9 @@ function mruChange(form)
 		<select name="l2tp_srv_mtu_sel" onChange="mtuChange(this.form);" class="mid" >
 			<option value="AUTO">AUTO</option>
 			<option value="1" selected="selected">Custom</option>
-			<option value="1460">1460</option>
+			<option value="1452">1452</option>
 			<option value="1440">1440</option>
+			<option value="1404">1404</option>
 			<option value="1400">1400</option>
 			<option value="1300">1300</option>
 			<option value="1200">1200</option>
@@ -277,8 +280,9 @@ function mruChange(form)
 		<select name="l2tp_srv_mru_sel" onChange="mruChange(this.form);" class="mid" >
 			<option value="AUTO">AUTO</option>
 			<option value="1" selected="selected">Custom</option>
-			<option value="1460">1460</option>
+			<option value="1452">1452</option>
 			<option value="1440">1440</option>
+			<option value="1404">1404</option>
 			<option value="1400">1400</option>
 			<option value="1300">1300</option>
 			<option value="1200">1200</option>
