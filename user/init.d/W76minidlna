@@ -28,17 +28,17 @@ start() {
 	    sleep 2
 	    #kill if not stopped
 	    killall -q -SIGKILL minidlna
-	    sleep 1
         fi
 
 	gen_config
 
 	$LOG "Start minidlna."
-
 	if [ "$public" = "" ]; then
 	    $LOG "Disc not mounted... minidlna cant start."
 	    exit 0
 	fi
+
+	sleep 2
 
 	/bin/minidlna $SCAN_OPT
     fi
@@ -54,6 +54,7 @@ stop() {
 	    #kill if not stopped
 	    killall -q -SIGKILL minidlna
         fi
+	sleep 1
 }
 
 get_param() {

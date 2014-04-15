@@ -1,4 +1,4 @@
-/* dnsmasq is Copyright (c) 2000-2013 Simon Kelley
+/* dnsmasq is Copyright (c) 2000-2014 Simon Kelley
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,7 +18,8 @@
 #define MAX_PROCS 10 /* max no children for TCP requests */
 #define CHILD_LIFETIME 150 /* secs 'till terminated (RFC1035 suggests > 120s) */
 #define EDNS_PKTSZ 4096 /* default max EDNS.0 UDP packet from RFC5625 */
-#define KEYBLOCK_LEN 140 /* choose to mininise fragmentation when storing DNSSEC keys */
+#define KEYBLOCK_LEN 40 /* choose to mininise fragmentation when storing DNSSEC keys */
+#define DNSSEC_WORK 50 /* Max number of queries to validate one question */
 #define TIMEOUT 10 /* drop UDP queries after TIMEOUT seconds */
 #define FORWARD_TEST 250 /* try all servers every 250 queries */
 #define FORWARD_TIME 60 /* or 60 seconds */
@@ -30,7 +31,8 @@
 #define PING_CACHE_TIME 30 /* Ping test assumed to be valid this long. */
 #define DECLINE_BACKOFF 600 /* disable DECLINEd static addresses for this long */
 #define DHCP_PACKET_MAX 16384 /* hard limit on DHCP packet size */
-#define SMALLDNAME 40 /* most domain names are smaller than this */
+#define SMALLDNAME 50 /* most domain names are smaller than this */
+#define CNAME_CHAIN 10 /* chains longer than this atr dropped for loop protection */
 #define HOSTSFILE "/etc/hosts"
 #define ETHERSFILE "/etc/ethers"
 #define RESOLVFILE "/etc/resolv.conf"
@@ -49,7 +51,6 @@
 #define TFTP_MAX_CONNECTIONS 50 /* max simultaneous connections */
 #define LOG_MAX 5 /* log-queue length */
 #define RANDFILE "/dev/urandom"
-#define EDNS0_OPTION_MAC 5 /* dyndns.org temporary assignment */
 
 /* DBUS interface specifics */
 #define DNSMASQ_SERVICE "uk.org.thekelleys.dnsmasq" /* Default - may be overridden by config */
@@ -114,7 +115,6 @@ NOTES:
       HAVE_LINUX_NETWORK
       HAVE_GETOPT_LONG
   you should NOT define 
-      HAVE_ARC4RANDOM
       HAVE_SOCKADDR_SA_LEN
 
    For *BSD systems you should define 
@@ -127,11 +127,19 @@ NOTES:
 
 */
 
-//#define NO_HAVE_DBUS
-/* #define HAVE_BROKEN_RTC */
+/* Build options which require external libraries.
+   
+   Defining HAVE_<opt>_STATIC as _well_ as HAVE_<opt> will link the library statically.
+
+   You can use "make COPTS=-DHAVE_<opt>" instead of editing these.
+*/
+
+/* #define HAVE_LUASCRIPT */
+/* #define NO_HAVE_DBUS */
 /* #define HAVE_DBUS */
 /* #define HAVE_IDN */
 /* #define HAVE_CONNTRACK */
+/* #define HAVE_DNSSEC */
 
 /* Allow TFTP to be disabled with COPTS=-DNO_TFTP */
 #ifdef NO_TFTP
@@ -162,7 +170,6 @@ NOTES:
 #if defined(__uClinux__)
 #define HAVE_LINUX_NETWORK
 #define HAVE_GETOPT_LONG
-#undef HAVE_ARC4RANDOM
 #undef HAVE_SOCKADDR_SA_LEN
 /* Never use fork() on uClinux. Note that this is subtly different from the
    --keep-in-foreground option, since it also  suppresses forking new 
@@ -176,7 +183,6 @@ NOTES:
    ((__UCLIBC_MAJOR__==0) && (__UCLIBC_MINOR__==9) && (__UCLIBC_SUBLEVEL__<21))
 #    define HAVE_GETOPT_LONG
 #endif
-#undef HAVE_ARC4RANDOM
 #undef HAVE_SOCKADDR_SA_LEN
 #if !defined(__ARCH_HAS_MMU__) && !defined(__UCLIBC_HAS_MMU__)
 #  define NO_FORK
@@ -191,7 +197,6 @@ NOTES:
 #elif defined(__linux__)
 #define HAVE_LINUX_NETWORK
 #define HAVE_GETOPT_LONG
-#undef HAVE_ARC4RANDOM
 #undef HAVE_SOCKADDR_SA_LEN
 
 #elif defined(__FreeBSD__) || \
@@ -203,29 +208,26 @@ NOTES:
 #if defined(optional_argument) && defined(required_argument)
 #   define HAVE_GETOPT_LONG
 #endif
-#if !defined(__FreeBSD_kernel__)
-#   define HAVE_ARC4RANDOM
-#endif
 #define HAVE_SOCKADDR_SA_LEN
 
 #elif defined(__APPLE__)
 #define HAVE_BSD_NETWORK
 #define HAVE_GETOPT_LONG
-#define HAVE_ARC4RANDOM
 #define HAVE_SOCKADDR_SA_LEN
 /* Define before sys/socket.h is included so we get socklen_t */
 #define _BSD_SOCKLEN_T_
+/* Select the RFC_3542 version of the IPv6 socket API. 
+   Define before netinet6/in6.h is included. */
+#define __APPLE_USE_RFC_3542 
  
 #elif defined(__NetBSD__)
 #define HAVE_BSD_NETWORK
 #define HAVE_GETOPT_LONG
-#undef HAVE_ARC4RANDOM
 #define HAVE_SOCKADDR_SA_LEN
 
 #elif defined(__sun) || defined(__sun__)
 #define HAVE_SOLARIS_NETWORK
 #define HAVE_GETOPT_LONG
-#undef HAVE_ARC4RANDOM
 #undef HAVE_SOCKADDR_SA_LEN
 #define ETHER_ADDR_LEN 6 
  
@@ -253,6 +255,11 @@ NOTES:
 #  define ADDRSTRLEN INET_ADDRSTRLEN
 #endif
 
+/* Defining this builds a binary which handles time differently and works better on a system without a 
+   stable RTC (it uses uptime, not epoch time) and writes the DHCP leases file less often to avoid flash wear. 
+*/
+
+/* #define HAVE_BROKEN_RTC */
 
 /* rules to implement compile-time option dependencies and 
    the NO_XXX flags */
@@ -366,6 +373,11 @@ static char *compile_opts =
 #ifndef HAVE_AUTH
 "no-"
 #endif
-  "auth";
+"auth "
+#ifndef HAVE_DNSSEC
+"no-"
+#endif
+"DNSSEC";
+
 
 #endif
