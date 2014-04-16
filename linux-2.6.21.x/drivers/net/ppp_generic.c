@@ -1696,7 +1696,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		skb = ppp_decompress_frame(ppp, skb);
 
 	if ((ppp->flags & SC_MUST_COMP) && (ppp->rstate & SC_DC_FERROR)) {
-		printk("PPP: ppp_receive_nonmp_frame MPPE decompress fatal error\n");
+		printk("PPP: ppp_receive_nonmp_frame decompress fatal error\n");
 		goto err;
 	}
 
@@ -1768,7 +1768,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	npi = proto_to_npindex(proto);
 	if (npi < 0) {
 
-		printk("resiv npi[%d] proto[%d]\n", npi, proto);
+		printk("receive -npi: proto[0x%04x]\n", proto);
 
 		/* control or unknown frame - pass it to pppd */
 		skb_queue_tail(&ppp->file.rq, skb);

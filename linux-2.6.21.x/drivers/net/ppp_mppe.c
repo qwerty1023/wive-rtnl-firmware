@@ -658,7 +658,7 @@ static void mppe_incomp(void *arg, unsigned char *ibuf, int icnt)
 	struct ppp_mppe_state *state = (struct ppp_mppe_state *) arg;
 
 	if ((PPP_PROTOCOL(ibuf) >= 0x0021 && PPP_PROTOCOL(ibuf) <= 0x00fa))
-		printk("mppe_incomp[%d]: incompressible (unencrypted) data! (proto %04x)\n", state->unit, PPP_PROTOCOL(ibuf));
+		printk("mppe_incomp[%d]: incompressible (unencrypted) data! (proto 0x%04x)\n", state->unit, PPP_PROTOCOL(ibuf));
 
 	state->stats.inc_bytes += icnt;
 	state->stats.inc_packets++;
