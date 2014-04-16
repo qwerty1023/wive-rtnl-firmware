@@ -1695,8 +1695,10 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	    (ppp->rstate & (SC_DC_FERROR | SC_DC_ERROR)) == 0)
 		skb = ppp_decompress_frame(ppp, skb);
 
-	if (ppp->flags & SC_MUST_COMP && ppp->rstate & SC_DC_FERROR)
+	if ((ppp->flags & SC_MUST_COMP) && (ppp->rstate & SC_DC_FERROR)) {
+		printk("PPP: ppp_receive_nonmp_frame MPPE decompress fatal error\n");
 		goto err;
+	}
 
 	proto = PPP_PROTO(skb);
 
@@ -1839,7 +1841,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 
 		switch(ppp->rcomp->compress_proto) {
 		case CI_MPPE:
-			obuff_size = ppp->mru + PPP_HDRLEN + 1;
+			obuff_size = ppp->mru + PPP_HDRLEN + 2;
 			break;
 		default:
 			obuff_size = ppp->mru + PPP_HDRLEN;
@@ -1858,6 +1860,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 		if (len < 0) {
 			/* Pass the compressed frame to pppd as an
 			   error indication. */
+			printk("PPP: MPPE decompress error\n");
 			if (len == DECOMP_FATALERROR)
 				ppp->rstate |= SC_DC_FERROR;
 			kfree_skb(ns);
