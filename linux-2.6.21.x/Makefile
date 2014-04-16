@@ -1,7 +1,7 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 21
-EXTRAVERSION = .46
+EXTRAVERSION = .50
 NAME = Nocturnal Monster Puppy
 
 #########################################################################################################
@@ -18,7 +18,7 @@ MAKEFLAGS     = -rR --no-print-directory
 # More optimization flag only for kernel if flash size = 4MB.
 # Or for kernel and modules if flash size > 4MB
 # Use -O2 for kernel code. Route/NAT speed up ~15-20% more -Os.
-MOREOPTIMIZE  = -O2
+MOREOPTIMIZE  =
 
 # this flags for fast net debug enable
 #802.11
@@ -334,6 +334,13 @@ MODFLAGS	= -DMODULE -fno-delete-null-pointer-checks
 
 AFLAGS_MODULE   = $(MODFLAGS)
 LDFLAGS_MODULE  = -r --strip-discarded
+
+ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+MOREOPTIMIZE  += -Os
+else
+MOREOPTIMIZE  += -O2
+endif
+
 # for kernel always use full version optimization
 CFLAGS_KERNEL	=  $(MOREOPTIMIZE)
 AFLAGS_KERNEL	=
@@ -348,7 +355,7 @@ LINUXINCLUDE    := -Iinclude \
 CPPFLAGS        := -D__KERNEL__ $(LINUXINCLUDE)
 
 CFLAGS		:= -Wall -Wundef -Wstrict-prototypes -Wno-trigraphs \
-                   -Wno-format-security -Wno-strict-aliasing
+                   -Wno-format-security -Wno-strict-aliasing $(MOREOPTIMIZE)
 
 AFLAGS          := -D__ASSEMBLY__
 
@@ -531,12 +538,15 @@ endif
 
 # We trigger additional mismatches with less inlining
 ifdef CONFIG_DEBUG_SECTION_MISMATCH
-KBUILD_CFLAGS += $(call cc-option,-fno-inline-functions-called-once)
+CFLAGS += $(call cc-option,-fno-inline-functions-called-once)
 endif
 
 # crazy optimizations
 CFLAGS += $(call cc-option,-ffast-math)
 CFLAGS += $(call cc-option,-fforce-addr)
+
+# enable for all inlude -Os (default enabled only >-O2)
+CFLAGS += $(call cc-option,-funit-at-a-time)
 
 # conserve stack if available
 CFLAGS += $(call cc-option,-fconserve-stack)
@@ -556,9 +566,6 @@ CFLAGS += $(call cc-option,-fno-tree-slsr)
 # more safe - small decrease speed (default in all upstream kernels)
 CFLAGS += $(call cc-option,-fno-delete-null-pointer-checks)
 
-# improves compression ratio for generated code - save size - slow speed
-#CFLAGS += $(call cc-option,-fno-caller-saves)
-
 # warn about C99 declaration after statement
 CFLAGS += $(call cc-disable-warning, -Wdeclaration-after-statement)
 
@@ -568,18 +575,24 @@ CFLAGS += $(call cc-disable-warning, pointer-sign)
 # disable variable unused warnings in gcc 4.6.0 and later
 CFLAGS += $(call cc-disable-warning, unused-but-set-variable)
 
+# small slow code and save some memory
+ifdef CONFIG_RAETH_MEMORY_OPTIMIZATION
+CFLAGS += $(call cc-option,-membedded-data)
+CFLAGS += $(call cc-option,-muninit-const-in-rodata)
+endif
+
+ifdef CONFIG_CC_OPTIMIZE_FOR_SIZE
+# improves compression ratio for generated code - save size - slow speed
+CFLAGS += $(call cc-option,-fno-caller-saves)
+CFLAGS += $(call cc-option,-fno-unwind-tables)
+CFLAGS += $(call cc-option,-fno-asynchronous-unwind-tables)
+endif
+
+CFLAGS_MODULE := $(MODFLAGS) $(CFLAGS) $(MOREOPTIMIZE)
+
 # use the deterministic mode of AR if available
 EXTRA_ARFLAGS := $(call ar-option,D)
 ARFLAGS	+= $(EXTRA_ARFLAGS)
-
-ifdef CONFIG_RT2860V2_AP_MEMORY_OPTIMIZATION
-# if flash size is small use optimize for size
-CFLAGS_MODULE = $(MODFLAGS) -Os -fno-aggressive-loop-optimizations -fno-tree-slsr
-CFLAGS_MODULE += $(call cc-option,-fno-caller-saves)
-else
-# if flash size big use full optimize for speed
-CFLAGS_MODULE = $(MODFLAGS) $(CFLAGS) $(MOREOPTIMIZE)
-endif
 
 # arch Makefile may override CC so keep this after arch Makefile is included
 NOSTDINC_FLAGS += -nostdinc -isystem $(shell $(CC) -print-file-name=include)

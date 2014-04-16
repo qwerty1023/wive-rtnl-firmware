@@ -36,7 +36,7 @@ include Rules.mak
 ############## DO NOT DIRECT INCLUDE ARCH_CCONFIG ########################
 
 #Need direct include for easy porting some libs
-CFLAGS += -O2 -I$(ROOTDIR)/$(LINUXDIR)/include -I$(ROOTDIR)/lib/include
+CFLAGS += -I$(ROOTDIR)/$(LINUXDIR)/include -I$(ROOTDIR)/lib/include
 
 export $(CFLAGS)
 
@@ -433,11 +433,6 @@ endif
 # Installs helper applications, such as 'ldd' and 'ldconfig'
 install_utils: utils
 	$(MAKE) CROSS="$(CROSS)" CC="$(CC)" -C utils install
-#ifeq ($(strip $(UCLIBC_HAS_LOCALE)),y)
-#	@$(MAKE) -C libc/misc/wchar iconv.target
-#	$(INSTALL) -d $(PREFIX)$(RUNTIME_PREFIX)/usr/bin;
-#	$(INSTALL) -m 755 libc/misc/wchar/iconv.target $(PREFIX)$(RUNTIME_PREFIX)/usr/bin/iconv
-#endif
 
 finished2:
 	$(SECHO)

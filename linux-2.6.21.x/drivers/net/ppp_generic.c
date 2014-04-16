@@ -1767,6 +1767,9 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 
 	npi = proto_to_npindex(proto);
 	if (npi < 0) {
+
+		printk("resiv npi[%d] proto[%d]\n", npi, proto);
+
 		/* control or unknown frame - pass it to pppd */
 		skb_queue_tail(&ppp->file.rq, skb);
 		/* limit queue length by dropping old frames */
