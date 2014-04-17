@@ -1844,7 +1844,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 
 		switch(ppp->rcomp->compress_proto) {
 		case CI_MPPE:
-			obuff_size = ppp->mru + PPP_HDRLEN + 2;
+			obuff_size = ppp->mru + PPP_HDRLEN + 1;
 			break;
 		default:
 			obuff_size = ppp->mru + PPP_HDRLEN;
@@ -1870,10 +1870,8 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 			goto err;
 		}
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-#if !defined(HNAT_USE_TAILROOM)
-		if(ra_sw_nat_hook_rx != NULL)
+		if(ra_sw_nat_hook_rx!= NULL && IS_SPACE_AVAILABLED(skb))
 			memcpy(FOE_INFO_START_ADDR(ns), FOE_INFO_START_ADDR(skb), FOE_INFO_LEN); // copy FoE Info
-#endif
 #endif
 		kfree_skb(skb);
 		skb = ns;
