@@ -38,7 +38,7 @@ start() {
 	    exit 0
 	fi
 
-	sleep 2
+	sleep 3
 
 	/bin/minidlna $SCAN_OPT
     fi
@@ -54,7 +54,7 @@ stop() {
 	    #kill if not stopped
 	    killall -q -SIGKILL minidlna
         fi
-	sleep 1
+	sleep 3
 }
 
 get_param() {
@@ -95,7 +95,7 @@ gen_config() {
     echo "inotify=yes" >> $fname
     echo "enable_tivo=no" >> $fname
     echo "strict_dlna=no" >> $fname
-    echo "notify_interval=10" >> $fname
+    echo "notify_interval=15" >> $fname
     echo "serial=12345678" >> $fname
     echo "model_number=1" >> $fname
     echo "max_connections=10" >> $fname

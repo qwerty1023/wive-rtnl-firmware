@@ -1768,7 +1768,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	npi = proto_to_npindex(proto);
 	if (npi < 0) {
 
-		printk("receive -npi: proto[0x%04x]\n", proto);
+		if ((proto != PPP_IPCP) && (proto != PPP_CCP)) printk("receive bed data: proto[0x%04x]\n", proto);
 
 		/* control or unknown frame - pass it to pppd */
 		skb_queue_tail(&ppp->file.rq, skb);
