@@ -1870,8 +1870,10 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 			goto err;
 		}
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-		if(ra_sw_nat_hook_rx!= NULL && IS_SPACE_AVAILABLED(skb))
+#if !defined(HNAT_USE_TAILROOM)
+		if(ra_sw_nat_hook_rx != NULL)
 			memcpy(FOE_INFO_START_ADDR(ns), FOE_INFO_START_ADDR(skb), FOE_INFO_LEN); // copy FoE Info
+#endif
 #endif
 		kfree_skb(skb);
 		skb = ns;
