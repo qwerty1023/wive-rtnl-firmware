@@ -12,14 +12,21 @@ web_wait
 #include global config
 . /etc/scripts/global.sh
 
+# include wait to web full load
+. /etc/scripts/start_wait.sh
+
 LOG="logger -t minidlna"
 
 SCAN_OPT=""
 
 start() {
     get_param
-
     if [ "$DlnaEnabled" = "1" ]; then
+     ( # send to background
+
+	# wait to web full load
+	start_wait
+
 	# if need kill minidlna
 	pid=`pidof minidlna`
 	if [ "$pid" != "" ]; then
@@ -34,14 +41,14 @@ start() {
 
 	$LOG "Start minidlna."
 	if [ "$public" = "" ]; then
-	    $LOG "Disc not mounted... minidlna cant start."
+	    $LOG "Disc not mounted... minidlna cant start!"
 	    exit 0
 	fi
 
-	sleep 3
-
 	/bin/minidlna $SCAN_OPT
+      ) & # send to background
     fi
+)
 }
 
 stop() {
@@ -54,7 +61,6 @@ stop() {
 	    #kill if not stopped
 	    killall -q -SIGKILL minidlna
         fi
-	sleep 3
 }
 
 get_param() {

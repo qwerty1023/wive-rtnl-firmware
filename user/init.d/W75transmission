@@ -12,6 +12,9 @@ web_wait
 #include global config
 . /etc/scripts/global.sh
 
+# include wait to web full load
+. /etc/scripts/start_wait.sh
+
 LOG="logger -t transmission"
 
 wait_for_close() {
@@ -38,24 +41,18 @@ start() {
     if [ "$TransmissionEnabled" = "1" ]; then
       ( # send to background
 
-	# 10*10=100 seconds check media mount and exit
-	count=0
-	while [ "$public" = "" ]; do
-	    count="$(($count+1))"
-	    if [ "$count" != "10" ]; then
-		$LOG "Disc not mounted... Please check USB connection. Wait 10sec and recheck. $count"
-	        sleep 10
-		# recheck public set
-		. /etc/profile
-	    else
-		exit 0
-	    fi
-	done
+	# wait to web full load
+	start_wait
 
 	# if need kill transmission-daemon
 	wait_for_close
 
 	$LOG "Start transmission daemon."
+	if [ "$public" = "" ]; then
+	    $LOG "Disc not mounted... transmission cant start!"
+	    exit 0
+	fi
+
 	mkdir -p $TRANSMISSION_HOME
 	if [ "$TransAuthor" = "1" ]; then
 		authory="-t -u $TransLogin -v $TransPass"

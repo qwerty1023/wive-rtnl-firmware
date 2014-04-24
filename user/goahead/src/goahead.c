@@ -22,9 +22,9 @@
 #include	<unistd.h>
 #include	<sys/types.h>
 #include	<sys/wait.h>
-#include        <sys/ioctl.h>
+#include	<sys/ioctl.h>
 
-#include <syslog.h>
+#include	<syslog.h>
 
 #include	"utils.h"
 #include	"uemf.h"
@@ -53,6 +53,7 @@ void	formDefineUserMgmt(void);
 static char_t		*rootWeb = T("/tmp/web");		/* Root web directory */
 static char_t		*password = T("");			/* Security password */
 static char_t		*gopid = T("/var/run/goahead.pid");	/* pid file */
+static char_t		*gostart = T("/var/run/goahead.str");	/* start flag file */
 static int		port = 80;				/* Server port */
 static int		retries = 5;				/* Server port retries */
 static int		finished;				/* Finished flag */
@@ -64,6 +65,7 @@ extern void defaultTraceHandler(int level, char_t *buf);
 extern void formDefineWireless(void);
 
 static int writeGoPid(void);
+static int writeGoStarted(void);
 static void InitSignals(int helper);
 static int initWebs(void);
 static int websHomePageHandler(webs_t wp, char_t *urlPrefix, char_t *webDir, int arg, char_t *url, char_t *path, char_t *query);
@@ -102,7 +104,7 @@ int main(int argc, char** argv)
 	signal(SIGPIPE, SIG_IGN);
 
 	openlog("goahead", LOG_PID|LOG_NDELAY, LOG_USER);
-	syslog(LOG_INFO, "version %s started", WEBS_VERSION);
+	syslog(LOG_INFO, T("version %s started"), WEBS_VERSION);
 
 	//Boot = Orange ON
 	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green LED
@@ -160,6 +162,8 @@ int main(int argc, char** argv)
         
         ledAlways(GPIO_LED_WAN_ORANGE, LED_OFF);	//Turn off orange LED            
 	    ledAlways(GPIO_LED_WAN_GREEN, LED_ON);	//Turn on green LED
+
+		if (writeGoStarted() < 0) syslog(LOG_WARNING, T("write start flag file fail!"));
 	}
 
 /*
@@ -223,6 +227,24 @@ int writeGoPid(void)
 		return (-1);
 	}
 	fprintf(fp, "%d", getpid());
+	fclose(fp);
+    return 0;
+}
+
+/******************************************************************************/
+/*
+ *	Write start flag file
+ */
+int writeGoStarted(void)
+{
+	FILE *fp;
+
+	fp = fopen(gostart, "w+");
+	if (NULL == fp) {
+		error(E_L, E_LOG, T("goahead.c: cannot open start flag file"));
+		return (-1);
+	}
+	fprintf(fp, "started");
 	fclose(fp);
     return 0;
 }
