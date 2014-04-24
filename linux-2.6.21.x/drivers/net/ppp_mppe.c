@@ -558,7 +558,7 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 
 	if (!state->stateful) {
 		if (mppe_cmp_ccount(ccount, state->ccount) < 0) {
-			printk("mppe_decompress[%d]: Dropping out-of-order packet with ccount %u, expecting %u!\n",
+			printk("mppe_decompress[%d]: dropping out-of-order packet with ccount %u, expecting %u!\n",
 					     state->unit, ccount, state->ccount);
 			return DECOMP_ERROR;
 		}
