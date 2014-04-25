@@ -48,7 +48,6 @@ start() {
 	/bin/minidlna $SCAN_OPT
       ) & # send to background
     fi
-)
 }
 
 stop() {
