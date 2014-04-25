@@ -392,7 +392,7 @@ mppe_compress(void *arg, unsigned char *ibuf, unsigned char *obuf,
 	/* Make sure we have enough room to generate an encrypted packet. */
 	if (osize < isize + MPPE_OVHD + 2) {
 		/* Drop the packet if we should encrypt it, but can't. */
-		printk("mppe_compress[%d]: osize too small! "
+		printk(KERN_DEBUG "mppe_compress[%d]: osize too small! "
 		       "(have: %d need: %d)\n", state->unit,
 		       osize, osize + MPPE_OVHD + 2);
 		return -1;
@@ -435,7 +435,7 @@ mppe_compress(void *arg, unsigned char *ibuf, unsigned char *obuf,
 	setup_sg(sg_in, ibuf, isize);
 	setup_sg(sg_out, obuf, osize);
 	if (crypto_blkcipher_encrypt(&desc, sg_out, sg_in, isize) != 0) {
-		printk("crypto_cypher_encrypt failed\n");
+		printk(KERN_DEBUG "crypto_cypher_encrypt failed\n");
 		return -1;
 	}
 
@@ -498,8 +498,9 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 	struct scatterlist sg_in[1], sg_out[1];
 
 	if (isize <= PPP_HDRLEN + MPPE_OVHD) {
-		printk("mppe_decompress[%d]: short pkt (%d)\n",
-			state->unit, isize);
+		printk(KERN_DEBUG
+		       "mppe_decompress[%d]: short pkt (%d)\n",
+		       state->unit, isize);
 		return DECOMP_ERROR;
 	}
 
@@ -510,7 +511,7 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 	 * this is to account for possible PFC.
 	 */
 	if (osize < isize - MPPE_OVHD - 1) {
-		printk("mppe_decompress[%d]: osize too small! "
+		printk(KERN_DEBUG "mppe_decompress[%d]: osize too small! "
 		       "(have: %d need: %d)\n", state->unit,
 		       osize, isize - MPPE_OVHD - 1);
 		return DECOMP_ERROR;
@@ -524,18 +525,21 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 
 	/* sanity checks -- terminate with extreme prejudice */
 	if (!(MPPE_BITS(ibuf) & MPPE_BIT_ENCRYPTED)) {
-		printk("mppe_decompress[%d]: ENCRYPTED bit not set!\n",
+		printk(KERN_DEBUG
+		       "mppe_decompress[%d]: ENCRYPTED bit not set!\n",
 		       state->unit);
 		state->sanity_errors += 100;
 		sanity = 1;
 	}
 	if (!state->stateful && !flushed) {
-		printk("mppe_decompress[%d]: FLUSHED bit not set in stateless mode!\n", state->unit);
+		printk(KERN_DEBUG "mppe_decompress[%d]: FLUSHED bit not set in "
+		       "stateless mode!\n", state->unit);
 		state->sanity_errors += 100;
 		sanity = 1;
 	}
 	if (state->stateful && ((ccount & 0xff) == 0xff) && !flushed) {
-		printk("mppe_decompress[%d]: FLUSHED bit not set on flag packet!\n", state->unit);
+		printk(KERN_DEBUG "mppe_decompress[%d]: FLUSHED bit not set on "
+		       "flag packet!\n", state->unit);
 		state->sanity_errors += 100;
 		sanity = 1;
 	}
@@ -558,9 +562,10 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 
 	if (!state->stateful) {
 		if (mppe_cmp_ccount(ccount, state->ccount) < 0) {
-			printk("mppe_decompress[%d]: dropping out-of-order packet with ccount %u, expecting %u!\n",
-					     state->unit, ccount, state->ccount);
-			return DECOMP_ERROR;
+			if (state->debug)
+				printk(KERN_DEBUG "mppe_decompress[%d]: dropping out-of-order packet with ccount %u, expecting %u!\n",
+					   state->unit, ccount, state->ccount);
+			return DECOMP_DROPERROR;
 		}
 
 		/* RFC 3078, sec 8.1.  Rekey for every packet. */
@@ -631,7 +636,7 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 	setup_sg(sg_in, ibuf, 1);
 	setup_sg(sg_out, obuf, 1);
 	if (crypto_blkcipher_decrypt(&desc, sg_out, sg_in, 1) != 0) {
-		printk("crypto_cypher_decrypt failed\n");
+		printk(KERN_DEBUG "crypto_cypher_decrypt failed\n");
 		return DECOMP_ERROR;
 	}
 
@@ -651,7 +656,7 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 	setup_sg(sg_in, ibuf + 1, isize - 1);
 	setup_sg(sg_out, obuf + 1, osize - 1);
 	if (crypto_blkcipher_decrypt(&desc, sg_out, sg_in, isize - 1)) {
-		printk("crypto_cypher_decrypt failed\n");
+		printk(KERN_DEBUG "crypto_cypher_decrypt failed\n");
 		return DECOMP_ERROR;
 	}
 
@@ -677,7 +682,9 @@ static void mppe_incomp(void *arg, unsigned char *ibuf, int icnt)
 	struct ppp_mppe_state *state = (struct ppp_mppe_state *) arg;
 
 	if ((PPP_PROTOCOL(ibuf) >= 0x0021 && PPP_PROTOCOL(ibuf) <= 0x00fa))
-		printk("mppe_incomp[%d]: incompressible (unencrypted) data! (proto 0x%04x)\n", state->unit, PPP_PROTOCOL(ibuf));
+		printk(KERN_DEBUG
+		       "mppe_incomp[%d]: incompressible (unencrypted) data! "
+		       "(proto %04x)\n", state->unit, PPP_PROTOCOL(ibuf));
 
 	state->stats.inc_bytes += icnt;
 	state->stats.inc_packets++;
