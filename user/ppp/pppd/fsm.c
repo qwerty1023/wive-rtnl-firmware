@@ -620,7 +620,10 @@ fsm_rtermreq(f, id, p, len)
 	break;
 
     case OPENED:
-	info("%s terminated by peer", PROTO_NAME(f));
+	if (len > 0) {
+	    info("%s terminated by peer (%0.*v)", PROTO_NAME(f), len, p);
+	} else
+	    info("%s terminated by peer", PROTO_NAME(f));
 	f->retransmits = 0;
 	f->state = STOPPING;
 	if (f->callbacks->down)

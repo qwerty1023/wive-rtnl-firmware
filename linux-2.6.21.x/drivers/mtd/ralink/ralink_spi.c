@@ -313,6 +313,7 @@ static struct chip_info chips_data [] = {
 #endif
 #ifdef SP_4B_MODE
 	{ "S25FL256S",		0x01, 0x02194D01, 64 * 1024, 512, 1 },
+	{ "W25Q256FV",          0xef, 0x40190000, 64 * 1024, 512, 1 },
 #endif
 //16Mb
 	{ "MX25L12805D",	0xc2, 0x2018c220, 64 * 1024, 256, 0 },
@@ -342,6 +343,7 @@ static struct chip_info chips_data [] = {
 	{ "FL016AIF",		0x01, 0x02140000, 64 * 1024, 32,  0 },
 	{ "MX25L1605D",		0xc2, 0x2015c220, 64 * 1024, 32,  0 },
 	{ "EN25F16",		0x1c, 0x31151c31, 64 * 1024, 32,  0 },
+	{ "S25FL116K",          0x01, 0x40150140, 64 * 1024, 32,  0 },
 #endif
 //Default if not detect 4Mb
 	{ "STUB",		0x00, 0xffffffff, 64 * 1024, 64,  0 },
@@ -451,9 +453,24 @@ static int raspi_cmd(const u8 cmd, const u32 addr, const u8 mode, u8 *buf, const
 
 	return retval;
 }
+#endif
 
-static inline int raspi_write_enable(void);
+/*
+ * Set write enable latch with Write Enable command.
+ * Returns negative if error occurred.
+ */
+static inline int raspi_write_enable(void)
+{
+	u8 code = OPCODE_WREN;
 
+#ifdef COMMAND_MODE
+	raspi_cmd(code, 0, 0, 0, 0, 0, 0);
+#else
+	return spic_write(&code, 1, NULL, 0);
+#endif
+}
+
+#ifdef COMMAND_MODE
 static int raspi_set_quad()
 {
 	int retval = 0;
@@ -550,6 +567,8 @@ static int raspi_read_rg(u8 *val, u8 opcode)
 
 	return 0;
 }
+#endif
+
 static int raspi_write_rg(u8 *val, u8 opcode)
 {
 	ssize_t retval;
@@ -574,7 +593,6 @@ static int raspi_write_rg(u8 *val, u8 opcode)
 	ra_outl(RT2880_SPI_DMA, dr);
 	return 0;
 }
-#endif
 
 /*
  * Read the status register, returning its value in the location
@@ -664,6 +682,14 @@ static int raspi_4byte_mode(int enable)
 #else
 	retval = spic_read(&code, 1, 0, 0);
 #endif
+	// for Winbond's W25Q256FV, need to clear extend address register
+	if ((!enable) && (flash->chip->id == 0xef))
+	{
+		code = 0x0;
+		raspi_write_enable();
+		raspi_write_rg(&code, 0xc5);
+	}
+
 	if (retval != 0) {
 		printk("%s: ret: %x\n", __func__, retval);
 		return -1;
@@ -703,25 +729,6 @@ static int raspi_4byte_mode(int enable)
 	return 0;
 }
 #endif
-
-
-
-
-/*
- * Set write enable latch with Write Enable command.
- * Returns negative if error occurred.
- */
-static inline int raspi_write_enable(void)
-{
-	u8 code = OPCODE_WREN;
-
-#ifdef COMMAND_MODE
-	raspi_cmd(code, 0, 0, 0, 0, 0, 0);
-#else
-	return spic_write(&code, 1, NULL, 0);
-#endif
-}
-
 static inline int raspi_write_disable(void)
 {
 	u8 code = OPCODE_WRDI;
