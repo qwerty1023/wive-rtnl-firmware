@@ -46,8 +46,7 @@
 #define GPIO_DEV		"/dev/gpio"	//userlevel devname
 
 #if defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT2883) || \
-      defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_RT3052) || \
-      defined (CONFIG_RALINK_RT5350)
+      defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_RT5350) || defined (CONFIG_RALINK_MT7620)
 /* BUTTONS GPIO */
 #if defined(CONFIG_RALINK_I2S) || defined(CONFIG_RALINK_I2S_MODULE)
 #define GPIO_BTN_RESET		43
@@ -61,14 +60,10 @@
 
 #define GPIO_LED_WAN_GREEN      12
 #define GPIO_LED_WAN_ORANGE     14
-
 #define GPIO_LED_SEC_GREEN      15
-
 #define GPIO_WPS_LED_ORANGE  	11
 #define GPIO_WPS_LED_GREEN   	11
-
 #define GPIO_USB_LED_GREEN   	13
-
 #ifdef CONFIG_RALINK_GPIO_LED
 #define GPIO_VPN_LED1		GPIO_LED_WAN_ORANGE /* VPN tx/rx led */
 #endif
@@ -93,9 +88,13 @@
 #define GPIO_MTD_LED1		GPIO_POWER_LED_ORANGE
 #define GPIO_MTD_LED2		GPIO_POWER_LED
 
+/* todo - need port gpio support for 3352 and other new chips */
+#define RALINK_GPIO_HAS_5124            1
+//#define RALINK_GPIO_HAS_9524            1
 
-#define RALINK_GPIO_HAS_5124	1
-//#define RALINK_GPIO_HAS_9524	1
+#if !defined (CONFIG_RALINK_RT5350)
+#define RALINK_GPIO_LED_LOW_ACT		1
+#endif
 
 /*
  * ioctl commands
@@ -341,7 +340,6 @@ typedef struct {
 	pid_t pid;			//process id to notify
 } ralink_gpio_reg_info;
 
-#define RALINK_GPIO_LED_LOW_ACT		1
 #define RALINK_GPIO_LED_INFINITY	4000
 typedef struct {
 	int gpio;			//gpio number (0 ~ 23)
