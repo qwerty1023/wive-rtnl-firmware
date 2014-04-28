@@ -1696,7 +1696,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		skb = ppp_decompress_frame(ppp, skb);
 
 	/* Packet dropped */
-	if (skb == NULL) {
+	if (unlikely(skb == NULL)) {
 		++ppp->stats.rx_dropped;
 		return;
 	}
@@ -1870,7 +1870,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 				kfree_skb(ns);
 				kfree_skb(skb);
 				skb = NULL;
-				return skb;
+				goto err2;
 			}
 			/* Pass the compressed frame to pppd as an
 			   error indication. */
@@ -1903,6 +1903,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 
  err:
 	ppp->rstate |= SC_DC_ERROR;
+ err2:
 	ppp_receive_error(ppp);
 	return skb;
 }
