@@ -1692,13 +1692,14 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	 * that come in as well as compressed frames.
 	 */
 	if (ppp->rc_state && (ppp->rstate & SC_DECOMP_RUN) &&
-	    (ppp->rstate & (SC_DC_FERROR | SC_DC_ERROR)) == 0)
+	    (ppp->rstate & (SC_DC_FERROR | SC_DC_ERROR)) == 0) {
 		skb = ppp_decompress_frame(ppp, skb);
 
-	/* Packet dropped */
-	if (unlikely(skb == NULL)) {
-		++ppp->stats.rx_dropped;
-		return;
+		/* Packet dropped */
+		if (unlikely(skb == NULL)) {
+			++ppp->stats.rx_dropped;
+			return;
+		}
 	}
 
 	if (unlikely(ppp->flags & SC_MUST_COMP && ppp->rstate & SC_DC_FERROR))
