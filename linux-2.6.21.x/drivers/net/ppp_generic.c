@@ -1701,7 +1701,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		return;
 	}
 
-	if (ppp->flags & SC_MUST_COMP && ppp->rstate & SC_DC_FERROR)
+	if (unlikely(ppp->flags & SC_MUST_COMP && ppp->rstate & SC_DC_FERROR))
 		goto err;
 
 	proto = PPP_PROTO(skb);
@@ -1770,7 +1770,7 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 	ppp->stats.rx_bytes += skb->len - 2;
 
 	npi = proto_to_npindex(proto);
-	if (npi < 0) {
+	if (unlikely(npi < 0)) {
 
 		//if ((proto != PPP_IPCP) && (proto != PPP_CCP)) printk("receive bed data: proto[0x%04x]\n", proto);
 
