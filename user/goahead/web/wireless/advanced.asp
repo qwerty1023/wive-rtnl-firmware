@@ -33,6 +33,7 @@ var lnaGain = '<% getCfgZero(1, "HiPower"); %>';
 var htNoiseThresh = '<% getCfgZero(1, "HT_BSSCoexApCntThr"); %>';
 var htNoiseCoex = '<% getCfgZero(1, "HT_BSSCoexistence"); %>';
 var ap2040Rescan = '<% getCfgZero(1, "AP2040Rescan"); %>';
+var wmmCapable = '<% getCfgZero(1, "WmmCapable"); %>';
 
 function initTranslation()
 {
@@ -171,6 +172,9 @@ function initValue()
 	form.HT_BSSCoexistence[1].checked = (htNoiseCoex != '1');
 	form.AP2040Rescan[0].checked = (ap2040Rescan == '1');
 	form.AP2040Rescan[1].checked = (ap2040Rescan != '1');
+	form.WmmCapable[0].checked = (wmmCapable == '1');
+	form.WmmCapable[1].checked = (wmmCapable != '1');
+
 	
 	wifiCoexThrChange(form);
 }
@@ -385,6 +389,13 @@ function CheckValue(form)
 	<td>
 		<input type="radio" name="AP2040Rescan" value="1">Enable&nbsp;
 		<input type="radio" name="AP2040Rescan" value="0" checked>Disable
+	</td>
+</tr>
+<tr>
+	<td class="head">WMM Capable</td>
+	<td>
+		<input type="radio" name="WmmCapable" value="1">Enable&nbsp;
+		<input type="radio" name="WmmCapable" value="0" checked>Disable
 	</td>
 </tr>
 <tr>
