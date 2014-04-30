@@ -1,9 +1,7 @@
 EXEC = mtd_write
 OBJS = led.o mtd.o
-
-CFLAGS := -Os -I$(ROOTDIR)/$(LINUXDIR)
-CFLAGS += -fno-caller-saves -fno-unwind-tables -fno-asynchronous-unwind-tables
-LDFLAGS := -static
+CFLAGS += -I$(ROOTDIR)/$(LINUXDIR)
+LDFLAGS += -static
 
 all: $(EXEC)
 
