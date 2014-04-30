@@ -1243,13 +1243,13 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 	/* try to do packet compression */
 	if ((ppp->xstate & SC_COMP_RUN) && ppp->xc_state &&
 	    proto != PPP_LCP && proto != PPP_CCP) {
-		if (!(ppp->flags & SC_CCP_UP) && (ppp->flags & SC_MUST_COMP)) {
+		if (unlikely(!(ppp->flags & SC_CCP_UP) && (ppp->flags & SC_MUST_COMP))) {
 			if (net_ratelimit())
 				printk(KERN_ERR "ppp: compression required but down - pkt dropped.\n");
 			goto drop;
 		}
 		skb = pad_compress_skb(ppp, skb);
-		if (!skb)
+		if (unlikely(!skb))
 			goto drop;
 	}
 
@@ -1291,7 +1291,7 @@ ppp_push(struct ppp *ppp)
 	struct channel *pch;
 	struct sk_buff *skb = ppp->xmit_pending;
 
-	if (!skb)
+	if (unlikely(!skb))
 		return;
 
 	list = &ppp->channels;
@@ -1841,7 +1841,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 	/* Until we fix all the decompressor's need to make sure
 	 * data portion is linear.
 	 */
-	if (!pskb_may_pull(skb, skb->len))
+	if (unlikely(!pskb_may_pull(skb, skb->len)))
 		goto err;
 
 	if (proto == PPP_COMP) {
@@ -1857,7 +1857,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 		}
 
 		ns = dev_alloc_skb(obuff_size);
-		if (!ns) {
+		if (unlikely(!ns)) {
 			printk(KERN_ERR "ppp_decompress_frame: no memory\n");
 			goto err;
 		}
@@ -1865,7 +1865,7 @@ ppp_decompress_frame(struct ppp *ppp, struct sk_buff *skb)
 		/* the decompressor still expects the A/C bytes in the hdr */
 		len = ppp->rcomp->decompress(ppp->rc_state, skb->data - 2,
 				skb->len + 2, ns->data, obuff_size);
-		if (len < 0) {
+		if (unlikely(len < 0)) {
 			/* Drop the packet and continue */
 			if (len == DECOMP_DROPERROR) {
 				kfree_skb(ns);
