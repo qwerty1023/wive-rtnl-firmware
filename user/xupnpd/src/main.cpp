@@ -39,7 +39,7 @@ int main(int argc,char** argv)
 #endif
     const char* root=getenv("XUPNPDROOTDIR");
     if(root && *root)
-        rc=chdir(root);        
+        rc=chdir(root);
 
     {
         FILE* fp=fopen("xupnpd.lua","r");

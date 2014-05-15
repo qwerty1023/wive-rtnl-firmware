@@ -82,7 +82,7 @@ cfg.playlists_update_interval=0
 -- playlist (m3u file path or path with alias
 playlist=
 {
-    { '/media/sda1/transmission/downloads/video', 'Local Media Files' }
+--    { '/media/sda1/transmission/downloads/video', 'Local Media Files' }
 }
 
 -- feeds list (plugin, feed name, feed type)
