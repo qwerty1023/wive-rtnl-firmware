@@ -7,7 +7,7 @@ cfg.ssdp_interface='br0'
 cfg.ssdp_loop=0
 
 -- SSDP announcement interval
-cfg.ssdp_notify_interval=5
+cfg.ssdp_notify_interval=15
 
 -- SSDP announcement age
 cfg.ssdp_max_age=300
@@ -73,7 +73,7 @@ cfg.cache_size=4
 cfg.cache_ttl=300
 
 -- default mime type (mpeg, mpeg_ts, mpeg1, mpeg2, ts, ...)
-cfg.default_mime_type='mpeg_ts'
+cfg.default_mime_type='mpeg'
 
 -- feeds update interval (seconds, 0 - disabled)
 cfg.feeds_update_interval=0

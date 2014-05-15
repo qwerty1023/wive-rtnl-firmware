@@ -105,8 +105,8 @@ function vimeo_get_video_url(vimeo_url)
                 url=x.request.files.h264.sd
             else
                 url=x.request.files.h264.hd or x.request.files.h264.sd
+            end
         end
-    end
     end
 
     if url then return url.url end
