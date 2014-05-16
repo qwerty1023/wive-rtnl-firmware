@@ -460,19 +460,19 @@ function ui_upload()
                 local pls=m3u.parse(tfname)
 
                 if pls then
-                    if os.execute(string.format('mv "%s" "%s"',tfname,cfg.playlists_path..fname))~=0 then
-                        os.remove(tfname)
-                        http.send('<h3>Fail1</h3>')
-                    else
+                    if os.execute(string.format('mv %s %s',tfname,cfg.playlists_path..fname))==0 then
                         core.sendevent('reload')
                         http.send('<h3>OK</h3>')
+                    else
+                        os.remove(tfname)
+                        http.send('<h3>Fail move</h3>')
                     end
                 else
                     os.remove(tfname)
-                    http.send('<h3>Fail2</h3>')
+                    http.send('<h3>Fail parse</h3>')
                 end
             else
-                http.send('<h3>Fail3</h3>')
+                http.send('<h3>Fail</h3>')
             end
         end
     end
