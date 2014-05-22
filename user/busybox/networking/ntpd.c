@@ -1729,7 +1729,7 @@ recv_and_process_peer_pkt(peer_t *p)
 // TODO: stratum 0 responses may have commands in 32-bit m_refid field:
 // "DENY", "RSTR" - peer does not like us at all
 // "RATE" - peer is overloaded, reduce polling freq
-		bb_error_msg("reply from %s: peer is unsynced", p->p_dotted);
+		//bb_error_msg("reply from %s: peer is unsynced", p->p_dotted);
 		goto pick_normal_interval;
 	}
 
