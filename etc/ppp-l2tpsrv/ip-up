@@ -13,7 +13,7 @@ PPP_NUM=`echo $PPP_IFACE | sed 's/[^0-65535]//g'`
 LOG="logger -t L2TP server"
 
 # get some variables
-eval `nvram_buf_get 2860 l2tp_srv_nat_enabled l2tp_srv_proxyarp parproutedEnabled`
+eval `nvram_buf_get 2860 l2tp_srv_nat_enabled l2tp_srv_proxyarp parproutedEnabled RemoteSSH RemoteSSHPort RemoteFTP FtpPort`
 
 if [ "$l2tp_srv_proxyarp" != "1" ] && [ "$parproutedEnabled" != "1" ]; then
     #disable multicast on $PPP_IFACE interface
@@ -36,13 +36,16 @@ fi
 
 # allow SSH for l2tp clients
 if [ "$RemoteSSH" != "0" ]; then
-    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport 22 -j ACCEPT
+    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $RemoteSSHPort -j ACCEPT
 fi
 
 # allow FTP for l2tp clients
 if [ "$RemoteFTP" != "0" ]; then
-    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport 21 -j ACCEPT
+    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $FtpPort -j ACCEPT
 fi
+
+# allow DNS for l2tp clients
+iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p udp --dport 53 -j ACCEPT
 
 $LOG "Add low prio route to client $PPP_REMOTE network metric 100$PPP_NUM."
 ip route replace default dev $PPP_IFACE metric 100$PPP_NUM via $PPP_REMOTE > /dev/null 2>&1
