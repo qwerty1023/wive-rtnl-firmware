@@ -567,6 +567,7 @@ mppe_decompress(void *arg, unsigned char *ibuf, int isize, unsigned char *obuf,
 					   state->unit, ccount, state->ccount);
 			return DECOMP_DROPERROR;
 		}
+
 		/* RFC 3078, sec 8.1.  Rekey for every packet. */
 		while (state->ccount != ccount) {
 			mppe_rekey(state, 0);
