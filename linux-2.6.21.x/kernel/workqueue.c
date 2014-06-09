@@ -355,8 +355,6 @@ static int worker_thread(void *__cwq)
 	if (!cwq->freezeable)
 		current->flags |= PF_NOFREEZE;
 
-	set_user_nice(current, -5);
-
 	/* Block and flush all signals */
 	sigfillset(&blocked);
 	sigprocmask(SIG_BLOCK, &blocked, NULL);
