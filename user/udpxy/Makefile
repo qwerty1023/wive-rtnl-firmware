@@ -24,6 +24,10 @@ EXEC := udpxy
 UDPXREC := udpxrec
 NO_UDPXREC := yes
 
+# drop all clients if limit reached
+# this workaround for situation freezez bad clients as some panasonic TV
+DROPATFULL := yes
+
 STRIP := /usr/bin/strip
 GZIP  := /bin/gzip
 
@@ -32,8 +36,8 @@ ifdef DEBUG
 DEBUG_ON := -g
 endif
 
-ALL_FLAGS = -W -Wall -Werror --pedantic $(CFLAGS) $(INCLUDES)
-ALL_FLAGS += -ffunction-sections -fdata-sections
+ALL_CFLAGS = -W -Wall --pedantic $(CFLAGS) $(INCLUDES)
+ALL_CFLAGS += -ffunction-sections -fdata-sections
 LDFLAGS += -Wl,--gc-sections
 
 SYSTEM=$(shell uname 2>/dev/null)
@@ -68,6 +72,15 @@ ARCFILE := $(ARCDIR)/$(EXEC).$(VERSION).$(BUILDNO)-$(PATCHNO)-$(BTYPE).tar.gz
 
 ifneq (yes,$(NO_UDPXREC))
 	COPT += -DUDPXREC_MOD
+endif
+
+ifneq (yes,$(DROPATFULL))
+	COPT += -DDROPATFULL
+endif
+
+-include $(LINUX_CONFIG)
+ifdef CONFIG_FILE_LOCKING
+	COPT += -DFILE_LOCKING
 endif
 
 DEBUG_OPT  := $(COPT) $(DEBUG_ON) -DTRACE_MODULE

@@ -310,7 +310,6 @@ terminate_all_clients( struct server_ctx* ctx )
     return;
 }
 
-
 /* send HTTP response to socket
  */
 static int
@@ -499,7 +498,7 @@ sync_dsockbuf_len( int ssockfd, int dsockfd )
     return rc;
 }
 
-//#define DEBUG_TS_FILTER
+/* #define DEBUG_TS_FILTER */
 
 struct filter_ctx {
 	uint8_t strmHdr[TS_SIZE*2];
@@ -533,6 +532,9 @@ init_ts_filter(struct filter_ctx* f)
 static void
 consume_ts_packet(uint8_t* pkt, struct filter_ctx* f)
 {
+	uint16_t pid=0;
+	uint32_t flags=0;
+
 	if( !ts_validate(pkt) ) {
 #ifdef DEBUG_TS_FILTER
 		TRACE( (void)tmfprintf( g_flog, "--- broken pkt:\n"
@@ -546,21 +548,21 @@ consume_ts_packet(uint8_t* pkt, struct filter_ctx* f)
 	if( !ts_get_unitstart(pkt) )
 		return;
 
-	uint16_t pid = ts_get_pid(pkt);
+	pid = ts_get_pid(pkt);
 
 #ifdef DEBUG_TS_FILTER
 	TRACE( (void)tmfprintf( g_flog, "--- PID: %d, #%04x\n", f->nnn, pid ) );
 	f->nnn++;
 #endif
 
-	uint32_t flags = f->flags;
+	flags = f->flags;
 	if( !HAS_FLAGS(flags, F_PAT) && pid == 0 ) {
 		uint8_t *pkt_end = pkt + TS_SIZE;
 		uint8_t *pat, *prg;
 
-		// PAT found
+		/* PAT found */
 		memcpy(f->strmHdr, pkt, TS_SIZE);
-		
+
 		pat = ts_section(pkt);
 		if( pat >= pkt_end ) {
 			TRACE( (void)tmfprintf( g_flog, "Got PAT. No section\n" ) );
@@ -575,7 +577,7 @@ consume_ts_packet(uint8_t* pkt, struct filter_ctx* f)
 		TRACE( (void)tmfprintf( g_flog, "Got PAT. Found program #%04x\n", f->pmtId ) );
 
 		f->flags |= F_PAT;
-		
+
 		return;
 	}
 	if( HAS_FLAGS(flags, F_PAT) && pid == f->pmtId ) {
@@ -610,7 +612,7 @@ apply_ts_filter(struct dstream_ctx* ds, uint8_t* data, ssize_t nrcv, struct filt
 			if( HAS_FLAGS(f->flags, F_FOUND) )
 				return;
 		}
-	}	
+	}
 }
 
 /* relay traffic from source to destination socket
@@ -732,7 +734,6 @@ relay_traffic( int ssockfd, int dsockfd, struct server_ctx* ctx,
     init_ts_filter(&ts_filter);
 
     while( (0 == rc) && !(quit = must_quit()) ) {
-    	ssize_t i, imax;
     	char* pdata = data;
 
         if( g_uopt.mcast_refresh > 0 ) {
@@ -1051,12 +1052,13 @@ report_status( int sockfd, const struct server_ctx* ctx, int options )
     if( 0 != rc ) {
         TRACE( (void)tmfprintf( g_flog, "Error generating status report\n" ) );
     }
+#ifdef DEBUG
     else {
-        /* DEBUG only
+        /* DEBUG only */
         TRACE( (void)tmfprintf( g_flog, "Saved status buffer to file\n" ) );
         TRACE( (void)save_buffer(buf, nlen, "/tmp/status-udpxy.html") );
-        */
     }
+#endif
 
     free(buf);
     return rc;
@@ -1081,8 +1083,15 @@ process_command( int new_sockfd, struct server_ctx* ctx )
         }
         else {
             send_http_response( new_sockfd, 503, "Client limit reached" );
-            (void)tmfprintf( g_flog, "Client limit [%d] has been reached.\n",
-                    ctx->clmax);
+            (void)tmfprintf( g_flog, "Client limit [%d] has been reached.\n",ctx->clmax);
+#ifdef DROPATFULL
+	    /* this temp workaround, must replace by garbage collector in future */
+            (void)tmfprintf( g_flog, "May be clients freez?? Drop all clients.\n");
+    	    (void)report_status( new_sockfd, ctx, RESTART_OPTIONS );
+
+    	    terminate_all_clients( ctx );
+    	    wait_all( ctx );
+#endif
         }
     }
     else if( 0 == strncmp( ctx->rq.cmd, CMD_STATUS, sizeof(ctx->rq.cmd) ) ) {
