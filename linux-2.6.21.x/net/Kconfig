@@ -69,7 +69,7 @@ source "net/netlabel/Kconfig"
 endif # if INET
 
 config NET_SFHASH
-	bool "Use SuperFast hash w3 instead jhash_w3"
+	bool "Use SuperFast hash instead jhash"
 	default y
 
 config NETWORK_SECMARK
