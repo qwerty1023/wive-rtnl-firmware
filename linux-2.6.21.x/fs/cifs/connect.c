@@ -396,9 +396,11 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 		iov.iov_len = 4;
 		smb_msg.msg_control = NULL;
 		smb_msg.msg_controllen = 0;
+		pdu_length = 4; /* enough to get RFC1001 header */
+incomplete_rcv:
 		length =
 		    kernel_recvmsg(csocket, &smb_msg,
-				 &iov, 1, 4, 0 /* BB see socket.h flags */);
+				&iov, 1, pdu_length, 0 /* BB other flags? */);
 
 		if (server->tcpStatus == CifsExiting) {
 			break;
@@ -412,7 +414,10 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			msleep(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
 				tcpStatus CifsNeedReconnect if server hung */
-			continue;
+			if (pdu_length < 4)
+				goto incomplete_rcv;
+			else
+				continue;
 		} else if (length <= 0) {
 			if (server->tcpStatus == CifsNew) {
 				cFYI(1, ("tcp session abend after SMBnegprot"));
@@ -433,13 +438,11 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 			wake_up(&server->response_q);
 			continue;
 		} else if (length < 4) {
-			cFYI(1,
-			    ("Frame under four bytes received (%d bytes long)",
+			cFYI(1, ("less than four bytes received (%d bytes)",
 			      length));
-			cifs_reconnect(server);
-			csocket = server->ssocket;
-			wake_up(&server->response_q);
-			continue;
+			pdu_length -= length;
+			msleep(1);
+			goto incomplete_rcv;
 		}
 
 		/* The right amount was read from socket - 4 bytes */
@@ -542,6 +545,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
                                               allowing socket to clear and app 
 					      threads to set tcpStatus
 					      CifsNeedReconnect if server hung*/
+				length = 0;
 				continue;
 			} else if (length <= 0) {
 				cERROR(1,("Received no data, expecting %d",
