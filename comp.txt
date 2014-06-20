@@ -1,0 +1,32 @@
+﻿Начиная с коммита http://gitorious.org...2fee1db4cd8aa63
+(gitignore add aclocal.m4 and remove files)
+перестала собираться прошивка 2T2R-USB-IPV6 (причем 2T2R собирается нормально). Валится на libiconv
+в /opt/Wive-RTNL/lib/libiconv/libcharset не хватает папки autoconf.
+создаем /opt/Wive-RTNL/lib/libiconv/libcharset/autoconf
+проскакиваем дальше и валимся на /opt/Wive-RTNL/user/samba3
+Эту проблему решил добавив:
+/opt/Wive-RTNL/user/samba3/source/m4/aclocal.m4
+/opt/Wive-RTNL/user/samba3/source/lib/talloc/aclocal.m4
+/opt/Wive-RTNL/user/samba3/source/lib/tdb/aclocal.m4
+/opt/Wive-RTNL/user/samba3/source/lib/ldb/aclocal.m4
+/opt/Wive-RTNL/user/samba3/source/lib/replace/aclocal.m4
+из предыдущего коммита.
+Запускаем /opt/Wive-RTNL/user/samba3/DoConfigure.sh
+Запускаем /opt/Wive-RTNL/*clear
+Всё, после этих манипуляций прошивка собирается до конца
+
+
+apt-get install libtool, gcc, g++, cpp, texinfo, libmpc-dev, libgmp-dev, libmpfr-dev, zlib1g-dev
+
+apt-get install bison
+
+apt-get install flex
+
+apt-get install gperf
+
+apt-get install gawk
+
+
+А собрать бут проще не куда make clean && make menuconfig && make в директории с сырцами бута
+
+apt-get install ncurses-dev
