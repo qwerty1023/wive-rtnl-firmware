@@ -11,9 +11,6 @@ PPP_REMOTE="$5"
 PPP_IPPARAM="$6"
 PPP_NUM=`echo $PPP_IFACE | sed 's/[^0-65535]//g'`
 
-# get some variables
-eval `nvram_buf_get 2860 RemoteSSH RemoteSSHPort RemoteFTP FtpPort`
-
 # disable forward
 echo 0 > "/proc/sys/net/ipv4/conf/$PPP_IFACE/forwarding"
 if [ "$radvdEnabled" = "1" ] && [ -f "/proc/sys/net/ipv6/conf/$PPP_IFACE/forwarding" ]; then
@@ -25,25 +22,16 @@ iptables -D l2tpsrvfwd -i $PPP_IFACE -j ACCEPT > /dev/null 2>&1
 iptables -D l2tpsrvfwd -o $PPP_IFACE -j ACCEPT > /dev/null 2>&1
 iptables -D POSTROUTING -t nat ! -o $PPP_IFACE -j MASQUERADE > /dev/null 2>&1
 
-# allow udpxy for l2tp clients
-if [ "$UDPXYMode" != "0" ]; then
-    iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $UDPXYPort -j ACCEPT
-fi
+# udpxy
+iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $UDPXYPort -j ACCEPT > /dev/null 2>&1
 
-# allow SSH for l2tp clients
-if [ "$RemoteSSH" != "0" ]; then
-    iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $RemoteSSHPort -j ACCEPT
-fi
+# SSH
+iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $RemoteSSHPort -j ACCEPT > /dev/null 2>&1
 
-# allow FTP for l2tp clients
-if [ "$RemoteFTP" != "0" ]; then
-    iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $FtpPort -j ACCEPT
-fi
+# FTP
+iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $FtpPort -j ACCEPT > /dev/null 2>&1
 
-# allow DNS for l2tp clients
-iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p udp --dport 53 -j ACCEPT
-
-# add low prio route to client network
-ip route replace default dev $PPP_IFACE metric 100$PPP_NUM via $PPP_REMOTE > /dev/null 2>&1
+# DNS
+iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p udp --dport 53 -j ACCEPT > /dev/null 2>&1
 
 export PPP_IFACE PPP_TTY PPP_SPEED PPP_LOCAL PPP_REMOTE PPP_IPPARAM
