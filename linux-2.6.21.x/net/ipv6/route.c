@@ -239,12 +239,6 @@ static __inline__ int rt6_check_expired(const struct rt6_info *rt)
 		time_after(jiffies, rt->rt6i_expires));
 }
 
-static inline int rt6_need_strict(struct in6_addr *daddr)
-{
-	return (ipv6_addr_type(daddr) &
-		(IPV6_ADDR_MULTICAST | IPV6_ADDR_LINKLOCAL));
-}
-
 /*
  *	Route lookup. Any table->tb6_lock is implied.
  */
@@ -965,11 +959,13 @@ static void ip6_link_failure(struct sk_buff *skb)
 
 	rt = (struct rt6_info *) skb->dst;
 	if (rt) {
-		if (rt->rt6i_flags&RTF_CACHE) {
-			dst_set_expires(&rt->u.dst, 0);
-			rt->rt6i_flags |= RTF_EXPIRES;
-		} else if (rt->rt6i_node && (rt->rt6i_flags & RTF_DEFAULT))
+		if (rt->rt6i_flags & RTF_CACHE) {
+			dst_hold(&rt->u.dst);
+			if (ip6_del_rt(rt))
+				dst_free(&rt->u.dst);
+		} else if (rt->rt6i_node && (rt->rt6i_flags & RTF_DEFAULT)) {
 			rt->rt6i_node->fn_sernum = -1;
+		}
 	}
 }
 

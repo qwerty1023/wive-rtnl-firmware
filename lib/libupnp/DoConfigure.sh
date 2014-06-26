@@ -9,14 +9,20 @@ ZLIB=$LIBDIR/include_shared
 LIBSSL=$FIRMROOT/user/openssl
 
 if [ ! -f $APROOTDIR/configure ]; then
-    autoreconf
+    autoreconf -fi
     autoconf
 fi
 if [ ! -f $APROOTDIR/Makefile.in ]; then
+    automake --add-missing
     automake
 fi
 
-CONFOPTS="--host=mipsel-linux --build=i686-pc-linux-gnu"
+HBUILD=`uname -m`-pc-linux-gnu
+HTARGET=mipsel-linux
+
+#arch options
+CONFOPTS="--host=$HTARGET --target=$HTARGET --build=$HBUILD"
+
 CONFOPTS="$CONFOPTS --disable-dependency-tracking"
 CONFOPTS="$CONFOPTS --disable-samples --disable-debug --without-documentation"
 CONFOPTS="$CONFOPTS --enable-shared --enable-static"
