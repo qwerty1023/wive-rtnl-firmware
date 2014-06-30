@@ -113,7 +113,7 @@ function selectModemType(form)
 	
 	// Display mode-dependent elements
 	displayElement( 'modem_dialn_row', gsm_on);
-	
+	displayElement( 'modem_apn_row', gsm_on);
 }	
 
 function bodyOnLoad(form)
