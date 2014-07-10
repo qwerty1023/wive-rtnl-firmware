@@ -1,4 +1,6 @@
 CFLAGS += -DHAVE_CONFIG_H
+CFLAGS += -ffunction-sections -fdata-sections
+LDFLAGS += -Wl,--gc-sections
 
 SUBDIRS = libfuse-lite src
 

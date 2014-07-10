@@ -9,11 +9,19 @@ if [ ! -f $APROOTDIR/configure ]; then
     sh ./autogen.sh
 fi
 if [ ! -f $APROOTDIR/Makefile.in ]; then
-    autoreconf
+    autoreconf -fi
+    automake --add-missing
     automake
 fi
 
-./configure --host=mipsel-linux --build=i686-pc-linux-gnu \
+HBUILD=`uname -m`-pc-linux-gnu
+HTARGET=mipsel-linux
+
+#arch options
+CONFOPTS="--host=$HTARGET --target=$HTARGET --build=$HBUILD"
+
+
+./configure $CONFOPTS \
 	    --prefix=$APROOTDIR/filesystem \
 	    --disable-cli --disable-mac --disable-nls --disable-utp \
 	    --without-gtk \

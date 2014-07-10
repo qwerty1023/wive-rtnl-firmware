@@ -8,9 +8,16 @@ if [ ! -f $APROOTDIR/configure ]; then
     autoconf
 fi
 if [ ! -f $APROOTDIR/Makefile.in ]; then
+    automake --add-missing
     automake
 fi
 
-CONFOPTS="--host=mipsel-linux --prefix=$APROOTDIR/filesystem"
+HBUILD=`uname -m`-pc-linux-gnu
+HTARGET=mipsel-linux
+
+#arch options
+CONFOPTS="--host=$HTARGET --target=$HTARGET --build=$HBUILD"
+
+CONFOPTS="$CONFOPTS --prefix=$APROOTDIR/filesystem"
 
 ./configure $CONFOPTS

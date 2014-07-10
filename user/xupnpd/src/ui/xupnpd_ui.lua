@@ -460,7 +460,7 @@ function ui_upload()
                 local pls=m3u.parse(tfname)
 
                 if pls then
-                    if os.execute(string.format('mv "%s" "%s"',tfname,cfg.playlists_path))==0 then
+                    if os.execute(string.format('mv "%s" "%s"',tfname,cfg.playlists_path..fname))==0 then
                         core.sendevent('reload')
                         http.send('<h3>OK</h3>')
                     else

@@ -1505,8 +1505,8 @@ static int lua_http_compile_template(lua_State* L)
     if(!dfp)
     {
         fclose(sfp);
-        return 0;
-    }
+    return 0;
+}
 
     int rc=lua_tmpl_process(L,sfp,dfp);
 
@@ -1784,11 +1784,11 @@ static int lua_http_sendurl(lua_State* L)
         {
             ssize_t nn=write(dfd,tmp+ll,n-ll);
             if(!nn || nn==(ssize_t)-1)
-                break;
-            else
+            break;
+        else
                 ll+=nn;
         }
-        alarm(core::http_timeout);
+            alarm(core::http_timeout);
     }
 
     alarm(0);

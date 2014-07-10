@@ -11,13 +11,15 @@ if [ ! -f $APROOTDIR/Makefile.in ]; then
     cp -f $APROOTDIR/Makefile.in.tmpl $APROOTDIR/Makefile.in
 fi
 
-CONFOPTS="--host=mipsel-linux"
+HBUILD=`uname -m`-pc-linux-gnu
+HTARGET=mipsel-linux
+
+#arch options
+CONFOPTS="--host=$HTARGET --target=$HTARGET --build=$HBUILD"
+
 CONFOPTS="$CONFOPTS --prefix=$APROOTDIR/filesystem"
 CONFOPTS="$CONFOPTS --enable-ipv6"
 CONFOPTS="$CONFOPTS --disable-smb"
 CONFOPTS="$CONFOPTS --without-smi --without-crypto"
-
-ac_cv_linux_vers="3"
-td_cv_buggygetaddrinfo="no"
 
 ./configure $CONFOPTS
