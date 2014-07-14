@@ -173,6 +173,16 @@
 		*(.kprobes.text)					\
 		VMLINUX_SYMBOL(__kprobes_text_end) = .;
 
+/* Section used for early init (in .S files) */
+#define HEAD_TEXT  *(.head.text)
+
+/* init and exit section handling */
+#define INIT_TEXT *(.init.text)
+#define INIT_DATA *(.init.data)
+#define EXIT_TEXT *(.exit.text)
+#define EXIT_DATA *(.exit.data)
+
+
 		/* DWARF debug sections.
 		Symbols in the DWARF debugging sections are relative to
 		the beginning of the section so we begin them at 0.  */
