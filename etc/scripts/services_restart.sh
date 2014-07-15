@@ -60,9 +60,6 @@ if [ "$MODE" != "pppd" ] && [ "$MODE" != "dhcp" ]; then
     if [ -e /etc/init.d/lld2d ]; then
 	service lld2d restart
     fi
-    if [ -e /etc/init.d/transmission ]; then
-	service transmission restart
-    fi
     if [ -e /etc/init.d/minidlna ]; then
 	service minidlna restart
     fi
@@ -94,6 +91,9 @@ if [ "$MODE" = "pppd" ] || [ "$MODE" = "dhcp" ] || [ "$MODE" = "all" ] || [ "$vp
     service ddns restart
     service ntp restart
     service miniupnpd restart
+    if [ -e /etc/init.d/transmission ]; then
+	service transmission restart
+    fi
 fi
 
 # renew /etc/udhcpd.conf and restart dhcp server
