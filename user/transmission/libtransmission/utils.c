@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2009-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This file is licensed by the GPL version 2. Works owned by the
+ * Transmission project are granted a special exemption to clause 2 (b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -11,7 +14,7 @@
  #define _GNU_SOURCE /* glibc's string.h needs this to pick up memmem */
 #endif
 
-#if defined (XCODE_BUILD)
+#if defined (SYS_DARWIN)
  #define HAVE_GETPAGESIZE
  #define HAVE_ICONV_OPEN
  #define HAVE_MKDTEMP
@@ -46,7 +49,7 @@
  #include <w32api.h>
  #define WINVER WindowsXP /* freeaddrinfo (), getaddrinfo (), getnameinfo () */
  #include <direct.h> /* _getcwd () */
- #include <windows.h> /* Sleep (), GetSystemTimeAsFileTime () */
+ #include <windows.h> /* Sleep () */
 #endif
 
 #include "transmission.h"
@@ -77,41 +80,6 @@ tr_localtime_r (const time_t *_clock, struct tm *_result)
   if (p)
     * (_result) = *p;
   return p;
-#endif
-}
-
-int
-tr_gettimeofday (struct timeval * tv)
-{
-#ifdef _MSC_VER
-#define DELTA_EPOCH_IN_MICROSECS 11644473600000000Ui64
-
-  FILETIME ft;
-  uint64_t tmp = 0;
-
-  if (tv == NULL)
-    {
-      errno = EINVAL;
-      return -1;
-    }
-
-  GetSystemTimeAsFileTime(&ft);
-  tmp |= ft.dwHighDateTime;
-  tmp <<= 32;
-  tmp |= ft.dwLowDateTime;
-  tmp /= 10; /* to microseconds */
-  tmp -= DELTA_EPOCH_IN_MICROSECS;
-
-  tv->tv_sec = tmp / 1000000UL;
-  tv->tv_usec = tmp % 1000000UL;
-
-  return 0;
-
-#undef DELTA_EPOCH_IN_MICROSECS
-#else
-
-  return gettimeofday (tv, NULL);
-
 #endif
 }
 
@@ -280,69 +248,19 @@ tr_loadFile (const char * path,
 char*
 tr_basename (const char * path)
 {
-#ifdef _MSC_VER
-
-  char fname[_MAX_FNAME], ext[_MAX_EXT];
-  if (_splitpath_s (path, NULL, 0, NULL, 0, fname, sizeof (fname), ext, sizeof (ext)) == 0)
-    {
-      const size_t tmpLen = strlen(fname) + strlen(ext) + 2;
-      char * const tmp = tr_malloc (tmpLen);
-      if (tmp != NULL)
-        {
-          if (_makepath_s (tmp, tmpLen, NULL, NULL, fname, ext) == 0)
-            return tmp;
-
-          tr_free (tmp);
-        }
-    }
-
-  return tr_strdup (".");
-
-#else
-
   char * tmp = tr_strdup (path);
   char * ret = tr_strdup (basename (tmp));
   tr_free (tmp);
   return ret;
-
-#endif
 }
 
 char*
 tr_dirname (const char * path)
 {
-#ifdef _MSC_VER
-
-  char drive[_MAX_DRIVE], dir[_MAX_DIR];
-  if (_splitpath_s (path, drive, sizeof (drive), dir, sizeof (dir), NULL, 0, NULL, 0) == 0)
-    {
-      const size_t tmpLen = strlen(drive) + strlen(dir) + 2;
-      char * const tmp = tr_malloc (tmpLen);
-      if (tmp != NULL)
-        {
-          if (_makepath_s (tmp, tmpLen, drive, dir, NULL, NULL) == 0)
-            {
-              size_t len = strlen(tmp);
-              while (len > 0 && (tmp[len - 1] == '/' || tmp[len - 1] == '\\'))
-                tmp[--len] = '\0';
-
-              return tmp;
-            }
-
-          tr_free (tmp);
-        }
-    }
-
-  return tr_strdup (".");
-
-#else
-
   char * tmp = tr_strdup (path);
   char * ret = tr_strdup (dirname (tmp));
   tr_free (tmp);
   return ret;
-
-#endif
 }
 
 char*
@@ -729,7 +647,7 @@ tr_time_msec (void)
 {
   struct timeval tv;
 
-  tr_gettimeofday (&tv);
+  gettimeofday (&tv, NULL);
   return (uint64_t) tv.tv_sec * 1000 + (tv.tv_usec / 1000);
 }
 

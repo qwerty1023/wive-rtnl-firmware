@@ -37,11 +37,10 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 TESTS = bitfield-test$(EXEEXT) blocklist-test$(EXEEXT) \
-	clients-test$(EXEEXT) crypto-test$(EXEEXT) \
-	history-test$(EXEEXT) json-test$(EXEEXT) magnet-test$(EXEEXT) \
-	metainfo-test$(EXEEXT) move-test$(EXEEXT) \
+	clients-test$(EXEEXT) history-test$(EXEEXT) json-test$(EXEEXT) \
+	magnet-test$(EXEEXT) metainfo-test$(EXEEXT) move-test$(EXEEXT) \
 	peer-msgs-test$(EXEEXT) quark-test$(EXEEXT) \
-	rename-test$(EXEEXT) rpc-test$(EXEEXT) session-test$(EXEEXT) \
+	rename-test$(EXEEXT) rpc-test$(EXEEXT) test-peer-id$(EXEEXT) \
 	tr-getopt-test$(EXEEXT) utils-test$(EXEEXT) \
 	variant-test$(EXEEXT)
 noinst_PROGRAMS = $(am__EXEEXT_1)
@@ -92,11 +91,10 @@ am_libtransmission_a_OBJECTS = announcer.$(OBJEXT) \
 	webseed.$(OBJEXT) wildmat.$(OBJEXT)
 libtransmission_a_OBJECTS = $(am_libtransmission_a_OBJECTS)
 am__EXEEXT_1 = bitfield-test$(EXEEXT) blocklist-test$(EXEEXT) \
-	clients-test$(EXEEXT) crypto-test$(EXEEXT) \
-	history-test$(EXEEXT) json-test$(EXEEXT) magnet-test$(EXEEXT) \
-	metainfo-test$(EXEEXT) move-test$(EXEEXT) \
+	clients-test$(EXEEXT) history-test$(EXEEXT) json-test$(EXEEXT) \
+	magnet-test$(EXEEXT) metainfo-test$(EXEEXT) move-test$(EXEEXT) \
 	peer-msgs-test$(EXEEXT) quark-test$(EXEEXT) \
-	rename-test$(EXEEXT) rpc-test$(EXEEXT) session-test$(EXEEXT) \
+	rename-test$(EXEEXT) rpc-test$(EXEEXT) test-peer-id$(EXEEXT) \
 	tr-getopt-test$(EXEEXT) utils-test$(EXEEXT) \
 	variant-test$(EXEEXT)
 PROGRAMS = $(noinst_PROGRAMS)
@@ -124,12 +122,6 @@ clients_test_DEPENDENCIES = $(am__DEPENDENCIES_1)
 clients_test_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(clients_test_LDFLAGS) $(LDFLAGS) -o $@
-am_crypto_test_OBJECTS = crypto-test.$(OBJEXT) $(am__objects_1)
-crypto_test_OBJECTS = $(am_crypto_test_OBJECTS)
-crypto_test_DEPENDENCIES = $(am__DEPENDENCIES_1)
-crypto_test_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(crypto_test_LDFLAGS) $(LDFLAGS) -o $@
 am_history_test_OBJECTS = history-test.$(OBJEXT) $(am__objects_1)
 history_test_OBJECTS = $(am_history_test_OBJECTS)
 history_test_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -185,12 +177,12 @@ rpc_test_DEPENDENCIES = $(am__DEPENDENCIES_1)
 rpc_test_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(rpc_test_LDFLAGS) $(LDFLAGS) -o $@
-am_session_test_OBJECTS = session-test.$(OBJEXT) $(am__objects_1)
-session_test_OBJECTS = $(am_session_test_OBJECTS)
-session_test_DEPENDENCIES = $(am__DEPENDENCIES_1)
-session_test_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
+am_test_peer_id_OBJECTS = test-peer-id.$(OBJEXT) $(am__objects_1)
+test_peer_id_OBJECTS = $(am_test_peer_id_OBJECTS)
+test_peer_id_DEPENDENCIES = $(am__DEPENDENCIES_1)
+test_peer_id_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
-	$(session_test_LDFLAGS) $(LDFLAGS) -o $@
+	$(test_peer_id_LDFLAGS) $(LDFLAGS) -o $@
 am_tr_getopt_test_OBJECTS = tr-getopt-test.$(OBJEXT) $(am__objects_1)
 tr_getopt_test_OBJECTS = $(am_tr_getopt_test_OBJECTS)
 tr_getopt_test_DEPENDENCIES = $(am__DEPENDENCIES_1)
@@ -235,22 +227,22 @@ am__v_GEN_ = $(am__v_GEN_@AM_DEFAULT_V@)
 am__v_GEN_0 = @echo "  GEN   " $@;
 SOURCES = $(libtransmission_a_SOURCES) $(bitfield_test_SOURCES) \
 	$(blocklist_test_SOURCES) $(clients_test_SOURCES) \
-	$(crypto_test_SOURCES) $(history_test_SOURCES) \
-	$(json_test_SOURCES) $(magnet_test_SOURCES) \
-	$(metainfo_test_SOURCES) $(move_test_SOURCES) \
-	$(peer_msgs_test_SOURCES) $(quark_test_SOURCES) \
-	$(rename_test_SOURCES) $(rpc_test_SOURCES) \
-	$(session_test_SOURCES) $(tr_getopt_test_SOURCES) \
-	$(utils_test_SOURCES) $(variant_test_SOURCES)
+	$(history_test_SOURCES) $(json_test_SOURCES) \
+	$(magnet_test_SOURCES) $(metainfo_test_SOURCES) \
+	$(move_test_SOURCES) $(peer_msgs_test_SOURCES) \
+	$(quark_test_SOURCES) $(rename_test_SOURCES) \
+	$(rpc_test_SOURCES) $(test_peer_id_SOURCES) \
+	$(tr_getopt_test_SOURCES) $(utils_test_SOURCES) \
+	$(variant_test_SOURCES)
 DIST_SOURCES = $(libtransmission_a_SOURCES) $(bitfield_test_SOURCES) \
 	$(blocklist_test_SOURCES) $(clients_test_SOURCES) \
-	$(crypto_test_SOURCES) $(history_test_SOURCES) \
-	$(json_test_SOURCES) $(magnet_test_SOURCES) \
-	$(metainfo_test_SOURCES) $(move_test_SOURCES) \
-	$(peer_msgs_test_SOURCES) $(quark_test_SOURCES) \
-	$(rename_test_SOURCES) $(rpc_test_SOURCES) \
-	$(session_test_SOURCES) $(tr_getopt_test_SOURCES) \
-	$(utils_test_SOURCES) $(variant_test_SOURCES)
+	$(history_test_SOURCES) $(json_test_SOURCES) \
+	$(magnet_test_SOURCES) $(metainfo_test_SOURCES) \
+	$(move_test_SOURCES) $(peer_msgs_test_SOURCES) \
+	$(quark_test_SOURCES) $(rename_test_SOURCES) \
+	$(rpc_test_SOURCES) $(test_peer_id_SOURCES) \
+	$(tr_getopt_test_SOURCES) $(utils_test_SOURCES) \
+	$(variant_test_SOURCES)
 HEADERS = $(noinst_HEADERS)
 ETAGS = etags
 CTAGS = ctags
@@ -301,6 +293,7 @@ GREP = @GREP@
 GTK_CFLAGS = @GTK_CFLAGS@
 GTK_LIBS = @GTK_LIBS@
 GTK_MINIMUM = @GTK_MINIMUM@
+HAVE_CXX = @HAVE_CXX@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -589,9 +582,6 @@ blocklist_test_LDFLAGS = ${apps_ldflags}
 clients_test_SOURCES = clients-test.c $(TEST_SOURCES)
 clients_test_LDADD = ${apps_ldadd}
 clients_test_LDFLAGS = ${apps_ldflags}
-crypto_test_SOURCES = crypto-test.c $(TEST_SOURCES)
-crypto_test_LDADD = ${apps_ldadd}
-crypto_test_LDFLAGS = ${apps_ldflags}
 history_test_SOURCES = history-test.c $(TEST_SOURCES)
 history_test_LDADD = ${apps_ldadd}
 history_test_LDFLAGS = ${apps_ldflags}
@@ -616,9 +606,9 @@ peer_msgs_test_LDFLAGS = ${apps_ldflags}
 rpc_test_SOURCES = rpc-test.c $(TEST_SOURCES)
 rpc_test_LDADD = ${apps_ldadd}
 rpc_test_LDFLAGS = ${apps_ldflags}
-session_test_SOURCES = session-test.c $(TEST_SOURCES)
-session_test_LDADD = ${apps_ldadd}
-session_test_LDFLAGS = ${apps_ldflags}
+test_peer_id_SOURCES = test-peer-id.c $(TEST_SOURCES)
+test_peer_id_LDADD = ${apps_ldadd}
+test_peer_id_LDFLAGS = ${apps_ldflags}
 tr_getopt_test_SOURCES = tr-getopt-test.c $(TEST_SOURCES)
 tr_getopt_test_LDADD = ${apps_ldadd}
 tr_getopt_test_LDFLAGS = ${apps_ldflags}
@@ -690,9 +680,6 @@ blocklist-test$(EXEEXT): $(blocklist_test_OBJECTS) $(blocklist_test_DEPENDENCIES
 clients-test$(EXEEXT): $(clients_test_OBJECTS) $(clients_test_DEPENDENCIES) $(EXTRA_clients_test_DEPENDENCIES) 
 	@rm -f clients-test$(EXEEXT)
 	$(AM_V_CCLD)$(clients_test_LINK) $(clients_test_OBJECTS) $(clients_test_LDADD) $(LIBS)
-crypto-test$(EXEEXT): $(crypto_test_OBJECTS) $(crypto_test_DEPENDENCIES) $(EXTRA_crypto_test_DEPENDENCIES) 
-	@rm -f crypto-test$(EXEEXT)
-	$(AM_V_CCLD)$(crypto_test_LINK) $(crypto_test_OBJECTS) $(crypto_test_LDADD) $(LIBS)
 history-test$(EXEEXT): $(history_test_OBJECTS) $(history_test_DEPENDENCIES) $(EXTRA_history_test_DEPENDENCIES) 
 	@rm -f history-test$(EXEEXT)
 	$(AM_V_CCLD)$(history_test_LINK) $(history_test_OBJECTS) $(history_test_LDADD) $(LIBS)
@@ -720,9 +707,9 @@ rename-test$(EXEEXT): $(rename_test_OBJECTS) $(rename_test_DEPENDENCIES) $(EXTRA
 rpc-test$(EXEEXT): $(rpc_test_OBJECTS) $(rpc_test_DEPENDENCIES) $(EXTRA_rpc_test_DEPENDENCIES) 
 	@rm -f rpc-test$(EXEEXT)
 	$(AM_V_CCLD)$(rpc_test_LINK) $(rpc_test_OBJECTS) $(rpc_test_LDADD) $(LIBS)
-session-test$(EXEEXT): $(session_test_OBJECTS) $(session_test_DEPENDENCIES) $(EXTRA_session_test_DEPENDENCIES) 
-	@rm -f session-test$(EXEEXT)
-	$(AM_V_CCLD)$(session_test_LINK) $(session_test_OBJECTS) $(session_test_LDADD) $(LIBS)
+test-peer-id$(EXEEXT): $(test_peer_id_OBJECTS) $(test_peer_id_DEPENDENCIES) $(EXTRA_test_peer_id_DEPENDENCIES) 
+	@rm -f test-peer-id$(EXEEXT)
+	$(AM_V_CCLD)$(test_peer_id_LINK) $(test_peer_id_OBJECTS) $(test_peer_id_LDADD) $(LIBS)
 tr-getopt-test$(EXEEXT): $(tr_getopt_test_OBJECTS) $(tr_getopt_test_DEPENDENCIES) $(EXTRA_tr_getopt_test_DEPENDENCIES) 
 	@rm -f tr-getopt-test$(EXEEXT)
 	$(AM_V_CCLD)$(tr_getopt_test_LINK) $(tr_getopt_test_OBJECTS) $(tr_getopt_test_LDADD) $(LIBS)
@@ -752,7 +739,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clients-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/clients.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/completion.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crypto-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/crypto.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/fdlimit.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/handshake.Po@am__quote@
@@ -786,9 +772,9 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpc-server.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpc-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/rpcimpl.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/session-test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/session.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stats.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/test-peer-id.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/torrent-ctor.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/torrent-magnet.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/torrent.Po@am__quote@

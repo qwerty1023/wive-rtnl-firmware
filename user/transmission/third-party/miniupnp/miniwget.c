@@ -1,8 +1,8 @@
-/* $Id: miniwget.c,v 1.61 2014/02/05 17:27:48 nanard Exp $ */
+/* $Id: miniwget.c,v 1.56 2012/05/01 16:16:08 nanard Exp $ */
 /* Project : miniupnp
  * Website : http://miniupnp.free.fr/
  * Author : Thomas Bernard
- * Copyright (c) 2005-2014 Thomas Bernard
+ * Copyright (c) 2005-2012 Thomas Bernard
  * This software is subject to the conditions detailed in the
  * LICENCE file provided in this distribution. */
 
@@ -36,9 +36,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <net/if.h>
 #include <netdb.h>
 #define closesocket close
+/* defining MINIUPNPC_IGNORE_EINTR enable the ignore of interruptions
+ * during the connect() call */
+#define MINIUPNPC_IGNORE_EINTR
 #endif /* #else _WIN32 */
 #if defined(__sun) || defined(sun)
 #define MIN(x,y) (((x)<(y))?(x):(y))
@@ -48,10 +50,6 @@
 #include "miniwget.h"
 #include "connecthostport.h"
 #include "receivedata.h"
-
-#ifndef MAXHOSTNAMELEN
-#define MAXHOSTNAMELEN 64
-#endif
 
 /*
  * Read a HTTP response from a socket.
@@ -84,7 +82,7 @@ getHTTPResponse(int s, int * size)
 	chunksize_buf[0] = '\0';
 	chunksize_buf_index = 0;
 
-	while((n = receivedata(s, buf, 2048, 5000, NULL)) > 0)
+	while((n = receivedata(s, buf, 2048, 5000)) > 0)
 	{
 		if(endofheaders == 0)
 		{
@@ -159,7 +157,7 @@ getHTTPResponse(int s, int * size)
 							chunked = 1;
 						}
 					}
-					while((i < (int)header_buf_used) && (header_buf[i]=='\r' || header_buf[i] == '\n'))
+					while(header_buf[i]=='\r' || header_buf[i] == '\n')
 						i++;
 					linestart = i;
 					colon = linestart;
@@ -291,7 +289,7 @@ static void *
 miniwget3(const char * host,
           unsigned short port, const char * path,
           int * size, char * addr_str, int addr_str_len,
-          const char * httpversion, unsigned int scope_id)
+          const char * httpversion)
 {
 	char buf[2048];
     int s;
@@ -301,7 +299,7 @@ miniwget3(const char * host,
 	void * content;
 
 	*size = 0;
-	s = connecthostport(host, port, scope_id);
+	s = connecthostport(host, port);
 	if(s < 0)
 		return NULL;
 
@@ -394,27 +392,22 @@ miniwget3(const char * host,
 static void *
 miniwget2(const char * host,
 		  unsigned short port, const char * path,
-		  int * size, char * addr_str, int addr_str_len,
-          unsigned int scope_id)
+		  int * size, char * addr_str, int addr_str_len)
 {
 	char * respbuffer;
 
-#if 1
-	respbuffer = miniwget3(host, port, path, size,
-	                       addr_str, addr_str_len, "1.1", scope_id);
-#else
-	respbuffer = miniwget3(host, port, path, size,
-	                       addr_str, addr_str_len, "1.0", scope_id);
+	respbuffer = miniwget3(host, port, path, size, addr_str, addr_str_len, "1.1");
+/*
+	respbuffer = miniwget3(host, port, path, size, addr_str, addr_str_len, "1.0");
 	if (*size == 0)
 	{
 #ifdef DEBUG
 		printf("Retrying with HTTP/1.1\n");
 #endif
 		free(respbuffer);
-		respbuffer = miniwget3(host, port, path, size,
-		                       addr_str, addr_str_len, "1.1", scope_id);
+		respbuffer = miniwget3(host, port, path, size, addr_str, addr_str_len, "1.1");
 	}
-#endif
+*/
 	return respbuffer;
 }
 
@@ -431,10 +424,7 @@ miniwget2(const char * host,
  * Return values :
  *    0 - Failure
  *    1 - Success         */
-int
-parseURL(const char * url,
-         char * hostname, unsigned short * port,
-         char * * path, unsigned int * scope_id)
+int parseURL(const char * url, char * hostname, unsigned short * port, char * * path)
 {
 	char * p1, *p2, *p3;
 	if(!url)
@@ -450,43 +440,7 @@ parseURL(const char * url,
 	if(*p1 == '[')
 	{
 		/* IP v6 : http://[2a00:1450:8002::6a]/path/abc */
-		char * scope;
-		scope = strchr(p1, '%');
 		p2 = strchr(p1, ']');
-		if(p2 && scope && scope < p2 && scope_id) {
-			/* parse scope */
-#ifdef IF_NAMESIZE
-			char tmp[IF_NAMESIZE];
-			int l;
-			scope++;
-			/* "%25" is just '%' in URL encoding */
-			if(scope[0] == '2' && scope[1] == '5')
-				scope += 2;	/* skip "25" */
-			l = p2 - scope;
-			if(l >= IF_NAMESIZE)
-				l = IF_NAMESIZE - 1;
-			memcpy(tmp, scope, l);
-			tmp[l] = '\0';
-			*scope_id = if_nametoindex(tmp);
-			if(*scope_id == 0) {
-				*scope_id = (unsigned int)strtoul(tmp, NULL, 10);
-			}
-#else
-			/* under windows, scope is numerical */
-			char tmp[8];
-			int l;
-			scope++;
-			/* "%25" is just '%' in URL encoding */
-			if(scope[0] == '2' && scope[1] == '5')
-				scope += 2;	/* skip "25" */
-			l = p2 - scope;
-			if(l >= sizeof(tmp))
-				l = sizeof(tmp) - 1;
-			memcpy(tmp, scope, l);
-			tmp[l] = '\0';
-			*scope_id = (unsigned int)strtoul(tmp, NULL, 10);
-#endif
-		}
 		p3 = strchr(p1, '/');
 		if(p2 && p3)
 		{
@@ -536,26 +490,22 @@ parseURL(const char * url,
 	return 1;
 }
 
-void *
-miniwget(const char * url, int * size, unsigned int scope_id)
+void * miniwget(const char * url, int * size)
 {
 	unsigned short port;
 	char * path;
 	/* protocol://host:port/chemin */
 	char hostname[MAXHOSTNAMELEN+1];
 	*size = 0;
-	if(!parseURL(url, hostname, &port, &path, &scope_id))
+	if(!parseURL(url, hostname, &port, &path))
 		return NULL;
 #ifdef DEBUG
-	printf("parsed url : hostname='%s' port=%hu path='%s' scope_id=%u\n",
-	       hostname, port, path, scope_id);
+	printf("parsed url : hostname='%s' port=%hu path='%s'\n", hostname, port, path);
 #endif
-	return miniwget2(hostname, port, path, size, 0, 0, scope_id);
+	return miniwget2(hostname, port, path, size, 0, 0);
 }
 
-void *
-miniwget_getaddr(const char * url, int * size,
-                 char * addr, int addrlen, unsigned int scope_id)
+void * miniwget_getaddr(const char * url, int * size, char * addr, int addrlen)
 {
 	unsigned short port;
 	char * path;
@@ -564,12 +514,11 @@ miniwget_getaddr(const char * url, int * size,
 	*size = 0;
 	if(addr)
 		addr[0] = '\0';
-	if(!parseURL(url, hostname, &port, &path, &scope_id))
+	if(!parseURL(url, hostname, &port, &path))
 		return NULL;
 #ifdef DEBUG
-	printf("parsed url : hostname='%s' port=%hu path='%s' scope_id=%u\n",
-	       hostname, port, path, scope_id);
+	printf("parsed url : hostname='%s' port=%hu path='%s'\n", hostname, port, path);
 #endif
-	return miniwget2(hostname, port, path, size, addr, addrlen, scope_id);
+	return miniwget2(hostname, port, path, size, addr, addrlen);
 }
 

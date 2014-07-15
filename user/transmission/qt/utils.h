@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2009-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  *
  * $Id$
  */
@@ -20,47 +23,42 @@
 
 class Utils: public QObject
 {
-    Q_OBJECT
+        Q_OBJECT
 
-  public:
-    Utils () {}
-    virtual ~Utils () {}
+    public:
+        Utils( ) { }
+        virtual ~Utils( ) { }
 
-  public:
-    static QString remoteFileChooser (QWidget * parent, const QString& title, const QString& myPath, bool dir, bool local);
-    static QIcon guessMimeIcon (const QString& filename);
-    // Test if string is UTF-8 or not
-    static bool isValidUtf8  (const char *s);
+    public:
+        static QString remoteFileChooser( QWidget * parent, const QString& title, const QString& myPath, bool dir, bool local );
+        static const QIcon& guessMimeIcon( const QString& filename );
+        // Test if string is UTF-8 or not
+        static bool isValidUtf8 ( const char *s );
 
-    static QString removeTrailingDirSeparator (const QString& path);
+        // meh
+        static void toStderr( const QString& qstr );
 
-    // meh
-    static void toStderr (const QString& qstr);
+        ///
+        /// URLs
+        ///
 
-    ///
-    /// URLs
-    ///
+        static bool isMagnetLink( const QString& s ) { return s.startsWith( QString::fromUtf8( "magnet:?" ) ); }
 
-    static bool isMagnetLink (const QString& s)
-    {
-      return s.startsWith (QString::fromUtf8 ("magnet:?"));
-    }
+        static bool isHexHashcode( const QString& s )
+        {
+            if( s.length() != 40 ) return false;
+            foreach( QChar ch, s ) if( !isxdigit( ch.unicode() ) ) return false;
+            return true;
+        }
 
-    static bool isHexHashcode (const QString& s)
-    {
-      if (s.length() != 40)
-        return false;
-      foreach (QChar ch, s) if (!isxdigit (ch.unicode())) return false;
-      return true;
-    }
+        static bool isUriWithSupportedScheme( const QString& s )
+        {
+            static const QString ftp = QString::fromUtf8( "ftp://" );
+            static const QString http = QString::fromUtf8( "http://" );
+            static const QString https = QString::fromUtf8( "https://" );
+            return s.startsWith(http) || s.startsWith(https) || s.startsWith(ftp);
+        }
 
-    static bool isUriWithSupportedScheme (const QString& s)
-    {
-      static const QString ftp = QString::fromUtf8 ("ftp://");
-      static const QString http = QString::fromUtf8 ("http://");
-      static const QString https = QString::fromUtf8 ("https://");
-      return s.startsWith(http) || s.startsWith(https) || s.startsWith(ftp);
-    }
 };
 
 #endif

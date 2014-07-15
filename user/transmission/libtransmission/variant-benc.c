@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2008-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This file is licensed by the GPL version 2. Works owned by the
+ * Transmission project are granted a special exemption to clause 2 (b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -84,42 +87,32 @@ tr_bencParseStr (const uint8_t  * buf,
                  const uint8_t ** setme_str,
                  size_t *         setme_strlen)
 {
-  const void * end;
   size_t len;
-  char * ulend;
-  const uint8_t * strbegin;
-  const uint8_t * strend;
+  const void * end;
+  char * endptr;
 
   if (buf >= bufend)
-    goto err;
+    return EILSEQ;
 
   if (!isdigit (*buf))
-    goto err;
+    return EILSEQ;
 
   end = memchr (buf, ':', bufend - buf);
   if (end == NULL)
-    goto err;
+    return EILSEQ;
 
   errno = 0;
-  len = strtoul ((const char*)buf, &ulend, 10);
-  if (errno || ulend != end)
-    goto err;
+  len = strtoul ((const char*)buf, &endptr, 10);
+  if (errno || endptr != end)
+    return EILSEQ;
 
-  strbegin = (const uint8_t*)end + 1;
-  strend = strbegin + len;
-  if ((strend<strbegin) || (strend>bufend))
-    goto err;
+  if ((const uint8_t*)end + 1 + len > bufend)
+    return EILSEQ;
 
   *setme_end = (const uint8_t*)end + 1 + len;
   *setme_str = (const uint8_t*)end + 1;
   *setme_strlen = len;
   return 0;
-
-err:
-  *setme_end = NULL;
-  *setme_str = NULL;
-  *setme_strlen= 0;
-  return EILSEQ;
 }
 
 static tr_variant*
@@ -304,7 +297,7 @@ saveStringFunc (const tr_variant * v, void * evbuf)
   size_t len;
   const char * str;
   tr_variantGetStr (v, &str, &len);
-  evbuffer_add_printf (evbuf, "%"TR_PRIuSIZE":", len);
+  evbuffer_add_printf (evbuf, "%zu:", len);
   evbuffer_add (evbuf, str, len);
 }
 

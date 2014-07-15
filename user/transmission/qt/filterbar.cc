@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2012-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU Public License v2 or v3 licenses,
- * or any future license endorsed by Mnemosyne LLC.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  *
  * $Id$
  */
@@ -587,7 +590,7 @@ FilterBar :: recount ()
 {
   QAbstractItemModel * model = myActivityCombo->model ();
 
-  int torrentsPerMode[FilterMode::NUM_MODES] = {};
+  int torrentsPerMode[FilterMode::NUM_MODES] = { };
   myFilter.countTorrentsPerMode (torrentsPerMode);
 
   for (int row=0, n=model->rowCount (); row<n; ++row)

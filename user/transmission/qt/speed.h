@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2009-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  *
  * $Id$
  */
@@ -19,7 +22,7 @@ class Speed
     Speed (int Bps): _Bps (Bps) {}
 
   public:
-    Speed (): _Bps (0) {}
+    Speed (): _Bps (0) { }
     double KBps () const;
     int Bps () const { return _Bps; }
     bool isZero () const { return _Bps == 0; }

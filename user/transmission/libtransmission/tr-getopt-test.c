@@ -1,12 +1,3 @@
-/*
- * This file Copyright (C) 2013-2014 Mnemosyne LLC
- *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
- *
- * $Id$
- */
-
 #include "transmission.h"
 #include "tr-getopt.h"
 
@@ -59,8 +50,8 @@ test_no_options (void)
   int argc = 1;
   const char * argv[] = { "/some/path/tr-getopt-test" };
   int expected_n = 0;
-  int expected_c[] = { 0 };
-  const char * expected_optarg[] = { NULL };
+  int expected_c[] = { };
+  const char * expected_optarg[] = { };
   return run_test (argc, argv, expected_n, expected_c, expected_optarg);
 }
 

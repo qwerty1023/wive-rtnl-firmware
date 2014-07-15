@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2010-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This file is licensed by the GPL version 2. Works owned by the
+ * Transmission project are granted a special exemption to clause 2 (b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -446,7 +449,7 @@ tr_realMakeMetaInfo (tr_metainfo_builder * builder)
   tr_variantFree (&top);
   if (builder->abortFlag)
     builder->result = TR_MAKEMETA_CANCELLED;
-  builder->isDone = true;
+  builder->isDone = 1;
 }
 
 /***
@@ -503,12 +506,10 @@ tr_makeMetaInfo (tr_metainfo_builder   * builder,
                  const tr_tracker_info * trackers,
                  int                     trackerCount,
                  const char            * comment,
-                 bool                    isPrivate)
+                 int                     isPrivate)
 {
   int i;
   tr_lock * lock;
-
-  assert (tr_isBool (isPrivate));
 
   /* free any variables from a previous run */
   for (i=0; i<builder->trackerCount; ++i)
@@ -518,9 +519,9 @@ tr_makeMetaInfo (tr_metainfo_builder   * builder,
   tr_free (builder->outputFile);
 
   /* initialize the builder variables */
-  builder->abortFlag = false;
+  builder->abortFlag = 0;
   builder->result = 0;
-  builder->isDone = false;
+  builder->isDone = 0;
   builder->pieceIndex = 0;
   builder->trackerCount = trackerCount;
   builder->trackers = tr_new0 (tr_tracker_info, builder->trackerCount);

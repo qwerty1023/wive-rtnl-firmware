@@ -1,12 +1,3 @@
-/*
- * This file Copyright (C) 2013-2014 Mnemosyne LLC
- *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
- *
- * $Id$
- */
-
 #include <assert.h>
 #include <stdio.h>
 
@@ -352,7 +343,7 @@ libttest_zero_torrent_populate (tr_torrent * tor, bool complete)
 
   for (i=0; i<tor->info.fileCount; ++i)
     {
-      int err;
+      int rv;
       uint64_t j;
       FILE * fp;
       char * path;
@@ -376,11 +367,8 @@ libttest_zero_torrent_populate (tr_torrent * tor, bool complete)
 
       path = tr_torrentFindFile (tor, i);
       assert (path != NULL);
-      err = errno;
-      errno = 0;
-      stat (path, &sb);
-      assert (errno == 0);
-      errno = err; 
+      rv = stat (path, &sb);
+      assert (rv == 0);
       tr_free (path);
     }
 
