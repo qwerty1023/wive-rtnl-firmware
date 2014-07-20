@@ -36,6 +36,7 @@
 #include <linux/sockios.h>
 #include <linux/jiffies.h>
 #include <linux/times.h>
+#include <linux/pkt_sched.h>
 #include <linux/net.h>
 #include <linux/in.h>
 #include <linux/in6.h>
@@ -1105,7 +1106,7 @@ static int mld_xmarksources(struct ifmcaddr6 *pmc, int nsrcs,
 			if (psf->sf_count[MCAST_INCLUDE] ||
 			    pmc->mca_sfcount[MCAST_EXCLUDE] !=
 			    psf->sf_count[MCAST_EXCLUDE])
-				continue;
+				break;
 			if (ipv6_addr_equal(&srcs[i], &psf->sf_addr)) {
 				scount++;
 				break;
@@ -1191,8 +1192,7 @@ int igmp6_event_query(struct sk_buff *skb)
 		int switchback;
 		/* MLDv1 router present */
 
-		/* Translate milliseconds to jiffies */
-		max_delay = (ntohs(hdr->icmp6_maxdelay)*HZ)/1000;
+		max_delay = msecs_to_jiffies(ntohs(hdr->icmp6_maxdelay));
 
 		switchback = (idev->mc_qrv + 1) * max_delay;
 		idev->mc_v1_seen = jiffies + switchback;
@@ -1211,9 +1211,7 @@ int igmp6_event_query(struct sk_buff *skb)
 			return -EINVAL;
 		}
 		mlh2 = (struct mld2_query *)skb_transport_header(skb);
-		max_delay = (MLDV2_MRC(ntohs(mlh2->mrc))*HZ)/1000;
-		if (!max_delay)
-			max_delay = 1;
+		max_delay = max(msecs_to_jiffies(MLDV2_MRC(ntohs(mlh2->mrc))), 1UL);
 		idev->mc_maxdelay = max_delay;
 		if (mlh2->qrv)
 			idev->mc_qrv = mlh2->qrv;
@@ -1410,6 +1408,7 @@ static struct sk_buff *mld_newpack(struct net_device *dev, int size)
 	if (!skb)
 		return NULL;
 
+	skb->priority = TC_PRIO_CONTROL;
 	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 
 	if (ipv6_get_lladdr(dev, &addr_buf, IFA_F_TENTATIVE)) {
@@ -1783,6 +1782,7 @@ static void igmp6_send(struct in6_addr *addr, struct net_device *dev, int type)
 		return;
 	}
 
+	skb->priority = TC_PRIO_CONTROL;
 	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 
 	if (ipv6_get_lladdr(dev, &addr_buf, IFA_F_TENTATIVE)) {
