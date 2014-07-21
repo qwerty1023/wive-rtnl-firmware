@@ -1454,6 +1454,21 @@ out_kfree_skb:
 	}						\
 }
 
+/*
+ * Returns true if either:
+ *	1. skb has frag_list and the device doesn't support FRAGLIST, or
+ *	2. skb is fragmented and the device does not support SG, or if
+ *	   at least one of fragments is in highmem and device does not
+ *	   support DMA from it.
+ */
+static inline int skb_needs_linearize(struct sk_buff *skb,
+				      struct net_device *dev)
+{
+	return ((skb_shinfo(skb)->frag_list != NULL) && !(dev->features & NETIF_F_FRAGLIST)) ||
+	       (skb_shinfo(skb)->nr_frags && (!(dev->features & NETIF_F_SG) ||
+					      illegal_highdma(dev, skb)));
+}
+
 /**
  *	dev_queue_xmit - transmit a buffer
  *	@skb: buffer to transmit
@@ -1490,18 +1505,8 @@ int dev_queue_xmit(struct sk_buff *skb)
 	if (netif_needs_gso(dev, skb))
 		goto gso;
 
-	if (skb_shinfo(skb)->frag_list &&
-	    !(dev->features & NETIF_F_FRAGLIST) &&
-	    __skb_linearize(skb))
-		goto out_kfree_skb;
-
-	/* Fragmented skb is linearized if device does not support SG,
-	 * or if at least one of fragments is in highmem and device
-	 * does not support DMA from it.
-	 */
-	if (skb_shinfo(skb)->nr_frags &&
-	    (!(dev->features & NETIF_F_SG) || illegal_highdma(dev, skb)) &&
-	    __skb_linearize(skb))
+	/* Convert a paged skb to linear, if required */
+	if (skb_needs_linearize(skb, dev) && __skb_linearize(skb))
 		goto out_kfree_skb;
 
 	/* If packet is not checksummed and device does not support
@@ -1830,6 +1835,7 @@ int FASTPATH netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
 	struct net_device *orig_dev;
+	struct net_device *master;
 	struct net_device *null_or_orig;
 	int ret = NET_RX_DROP;
 	__be16 type;
@@ -1846,13 +1852,14 @@ int FASTPATH netif_receive_skb(struct sk_buff *skb)
 
 	null_or_orig = NULL;
 	orig_dev = skb->dev;
-	if (orig_dev->master) {
+	master = ACCESS_ONCE(orig_dev->master);
+	if (master) {
 #ifdef CONFIG_BONDING
 		if (skb_bond_should_drop(skb))
 			null_or_orig = orig_dev; /* deliver only exact match */
 		else
 #endif
-			skb->dev = orig_dev->master;
+			skb->dev = master;
 	}
 
 	__get_cpu_var(netdev_rx_stat).total++;
@@ -2357,7 +2364,7 @@ out_dev:
 #define dev_proc_init() 0
 #endif	/* CONFIG_PROC_FS */
 
-
+#ifdef CONFIG_BONDING
 /**
  *	netdev_set_master	-	set up master/slave pair
  *	@slave: slave device
@@ -2395,6 +2402,7 @@ int netdev_set_master(struct net_device *slave, struct net_device *master)
 	rtmsg_ifinfo(RTM_NEWLINK, slave, IFF_SLAVE);
 	return 0;
 }
+#endif
 
 /**
  *	dev_set_promiscuity	- update promiscuity count on a device
@@ -2409,7 +2417,7 @@ int netdev_set_master(struct net_device *slave, struct net_device *master)
  */
 int dev_set_promiscuity(struct net_device *dev, int inc)
 {
-	unsigned short old_flags = dev->flags;
+	unsigned int old_flags = dev->flags;
 
 	dev->flags |= IFF_PROMISC;
 	dev->promiscuity += inc;
@@ -2458,7 +2466,7 @@ int dev_set_promiscuity(struct net_device *dev, int inc)
 
 int dev_set_allmulti(struct net_device *dev, int inc)
 {
-	unsigned short old_flags = dev->flags;
+	unsigned int old_flags = dev->flags;
 
 	dev->flags |= IFF_ALLMULTI;
 	dev->allmulti += inc;
@@ -2506,10 +2514,10 @@ unsigned dev_get_flags(const struct net_device *dev)
 	return flags;
 }
 
-int dev_change_flags(struct net_device *dev, unsigned flags)
+int dev_change_flags(struct net_device *dev, unsigned int flags)
 {
-	int ret, changes;
-	int old_flags = dev->flags;
+	int ret;
+	unsigned int changes, old_flags = dev->flags;
 
 	/*
 	 *	Set the flags on our device.
@@ -3111,6 +3119,9 @@ int register_netdevice(struct net_device *dev)
 	set_bit(__LINK_STATE_PRESENT, &dev->state);
 
 	dev->next = NULL;
+
+	linkwatch_init_dev(dev);
+
 	dev_init_scheduler(dev);
 	write_lock_bh(&dev_base_lock);
 	*dev_tail = dev;
@@ -3706,7 +3717,9 @@ EXPORT_SYMBOL(dev_set_mtu);
 EXPORT_SYMBOL(dev_set_mac_address);
 EXPORT_SYMBOL(free_netdev);
 EXPORT_SYMBOL(netdev_boot_setup_check);
+#ifdef CONFIG_BONDING
 EXPORT_SYMBOL(netdev_set_master);
+#endif
 EXPORT_SYMBOL(netdev_state_change);
 EXPORT_SYMBOL(netif_receive_skb);
 EXPORT_SYMBOL(netif_rx);
