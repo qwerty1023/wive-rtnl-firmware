@@ -89,7 +89,7 @@ start() {
     		iptables -A servicelimit $STATE_NEW -p tcp -m multiport --dport 20,$FtpPort -j ACCEPT
 	    fi
 	fi
-	if [ "$upnpEnabled" = "1" ] && [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
+	if [ "$upnpEnabled" = "1" ] && [ "$ROUTE_MODE" = "on" ]; then
 	    $LOG "upnp"
 	    iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp --dport 8666 -j ACCEPT
 	    # not safe fix me later
@@ -130,9 +130,9 @@ start() {
 	    $LOG "udpxy"
 	    if [ "$UDPXYMode" = "1" ]; then
     		iptables -A servicelimit -i $lan_if $STATE_NEW -p tcp --dport $UDPXYPort -j ACCEPT
-	     if [ "$Lan2Enabled" = "1" ]; then
-    		iptables -A servicelimit -i $lan2_if $STATE_NEW -p tcp --dport $UDPXYPort -j ACCEPT
-	     fi
+		if [ "$Lan2Enabled" = "1" ]; then
+		    iptables -A servicelimit -i $lan2_if $STATE_NEW -p tcp --dport $UDPXYPort -j ACCEPT
+		fi
 	    elif [ "$UDPXYMode" = "2" ]; then
     		iptables -A servicelimit $STATE_NEW -p tcp --dport $UDPXYPort -j ACCEPT
 	    fi
@@ -171,13 +171,11 @@ start() {
 	    # Incoming peers
 	    iptables -A servicelimit -p tcp --dport $TransInPort -j ACCEPT
 	fi
-	if [ "$WANPingFilter" = "0" ]; then
-	    if [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
-    		$LOG "icmp - drop ping from wan $wan_if"
-    		iptables -A servicelimit -i $wan_if -p icmp --icmp-type echo-request -j DROP
-		if [ "$PPP_CONNECT" = "on" ]; then
-    		    iptables -A servicelimit -i ppp+ -p icmp --icmp-type echo-request -j DROP
-		fi
+	if [ "$WANPingFilter" = "0" ] && [ "$ROUTE_MODE" = "on" ]; then
+    	    $LOG "icmp drop ping from wan $wan_if"
+    	    iptables -A servicelimit -i $wan_if -p icmp --icmp-type echo-request -j DROP
+	    if [ "$PPP_CONNECT" = "on" ] && [ "$real_wan_if" != "" ]; then
+    	        iptables -A servicelimit -i $real_wan_if -p icmp --icmp-type echo-request -j DROP
 	    fi
 	else
 	    $LOG "icmp - allow ping from wan $wan_if"
@@ -188,7 +186,7 @@ start() {
 	# allow all others icmp messages (mtu probing and others)
         iptables -A servicelimit  -p icmp ! --icmp-type echo-request -j ACCEPT
 ###########################################VPN-RULES##########################################
-	if [ "$vpnEnabled" = "on" ] || [ "$l2tp_srv_enabled" = "1" ]; then
+	if [ "$PPP_CONNECT" = "on" ] || [ "$l2tp_srv_enabled" = "1" ]; then
 	    if [ "$vpnType" = "1" ]; then
 		$LOG "Add vpnfilter rules for PPTP"
 		iptables -A servicelimit -p gre -j ACCEPT
@@ -205,7 +203,7 @@ start() {
 	    fi
 	fi
 ###########################################FORWARD#######################################
-	if [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
+	if [ "$ROUTE_MODE" = "on" ]; then
 	    $LOG "Set forward rules"
 	    # ipt_account need first rules in FORWARD
 	    if [ "$ipt_account" = "1" ]; then
@@ -274,7 +272,7 @@ start() {
 	    fi
 	fi
 ###########################################QOS-SIMPLE######################################
-	if [ -f /etc/qos_firewall ] && [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
+	if [ -f /etc/qos_firewall ] && [ "$ROUTE_MODE" = "on" ]; then
 	    if [ "$simple_qos" = "1" ] || [ "$QoSEnable" != "0" ]; then
 		$LOG "Add QoS rules"
 		/etc/qos_firewall
@@ -287,8 +285,8 @@ start() {
 	    if [ -f /etc/portforward ] && [ "$PortForwardEnable" = "1" ]; then
 		if [ "$IPPortFilterEnable" != "1" ] && [ ! -f /etc/macipfilter ]; then
 		    iptables -A FORWARD -i $wan_if -o $lan_if -d $lan_ipaddr/$lan_netmask -j ACCEPT
-		    if [ "$vpnEnabled" = "on" ] && [ "$vpnNAT" != "off" ] && [ "$vpnType" != "6" ]; then
-			iptables -A FORWARD -i ppp+ -o $lan_if -d $lan_ipaddr/$lan_netmask -j ACCEPT
+		    if [ "$PPP_CONNECT" = "on" ] && [ "$real_wan_if" != "" ]; then
+			iptables -A FORWARD -i $real_wan_if -o $lan_if -d $lan_ipaddr/$lan_netmask -j ACCEPT
 		    fi
 		fi
 		if  [ "$wan_ipaddr" != "" ]; then
@@ -297,7 +295,7 @@ start() {
 		fi
 	    fi
 	    #######################NAT##################################
-	    if [ "$OperationMode" != "0" ] && [ "$natEnabled" = "1" ] && [ "$vpnPurePPPOE" != "1" ] && [ "$ApCliBridgeOnly" != "1" ]; then
+	    if [ "$ROUTE_MODE" = "on" ] && [ "$natEnabled" = "1" ]; then
 		if [ "$OperationMode" != "4" ]; then
 		    # lan gw/wireless client/apcli mode NAT
 		    if  [ "$use_snat" = "1" ]; then
@@ -337,7 +335,7 @@ start() {
 ############################################OTHERS########################################
 	if [ "$natEnabled" = "1" ] || [ "$vpnNAT" != "off" ]; then
 	    ################################UPNPRULES######################################
-	    if [ "$upnpEnabled" = "1" ] && [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
+	    if [ "$upnpEnabled" = "1" ] && [ "$ROUTE_MODE" = "on" ]; then
 		$LOG "Add base upnp rules"
 		# nat rules
     		iptables -t nat -N MINIUPNPD
@@ -373,7 +371,7 @@ start() {
 		# all packets join to DMZ
     		iptables -t nat -A PREROUTING -j DMZ
 	    fi
-    	    if [ "$vpnEnabled" = "on" ] || [ "$l2tp_srv_enabled" = "1" ]; then
+    	    if [ "$PPP_CONNECT" = "on" ] || [ "$l2tp_srv_enabled" = "1" ]; then
 		# filter VPN transport packets
         	if [ "$vpnType" = "1" ]; then
 		    # pptp
@@ -389,7 +387,7 @@ start() {
 	    fi
 	    # nat loopback for DMZ
 	    if [ "$DMZNATLoopback" = "1" ] && [ "$wan_ipaddr" != "" -o "$real_wan_ipaddr" != "" ]; then
-		if [ "$vpnNAT" != "off" ] && [ "$real_wan_ipaddr" != "" ]; then
+		if [ "$vpnNAT" != "off" ] && [ "$real_wan_if" != "" ] && [ "$real_wan_ipaddr" != "" ]; then
 		    iptables -t nat -A DMZ -i $lan_if -d $real_wan_ipaddr -j DNAT --to-destination $DMZIPAddress
 		    iptables -t nat -A DMZ -i $real_wan_if -d $real_wan_ipaddr -j DNAT --to-destination $DMZIPAddress
 		else
@@ -443,18 +441,24 @@ get_param() {
 	    dhcpEnabled ipt_account upnpEnabled igmpEnabled xupnpd SmbEnabled TransmissionEnabled TransRPCPort TransInPort TransAccess snmpd \
 	    parproutedEnabled PrinterSrvEnabled chilli_net vpnType vpnNAT l2tp_srv_enabled MODEMENABLED store_ttl store_ttl_mcast`
 
+    # use for route mode detect
+    if [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
+	ROUTE_MODE="on"
+    else
+	ROUTE_MODE="off"
+    fi
+
     # if ppp enabled and not pure pppoe mode (type6 is lanauth not real ppp)
     if [ "$MODEMENABLED" = "1" ] || [ "$vpnEnabled" = "on" -a "$vpnType" != "6" ]; then
 	PPP_CONNECT="on"
     else
 	PPP_CONNECT="off"
     fi
-
     # if wan ip not get
     if [ "$wan_ipaddr" = "" ]; then
 	use_snat=0
     fi
-    # In pppoe pure mode no need add MASQ rules to localnet
+    # in pppoe pure mode no need add MASQ rules to uplink localnet
     if [ "$vpnPurePPPOE" = "1" ]; then
 	natEnabled=0
     fi
