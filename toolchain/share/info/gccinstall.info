@@ -2529,10 +2529,6 @@ makers.
    * SCO OpenServer/Unixware.
 
    * Solaris 2 (SPARC, Intel):
-        * Sunfreeware
-
-        * Blastwave
-
         * OpenCSW
 
         * TGCware
@@ -4486,81 +4482,81 @@ Node: Building80037
 Node: Testing95522
 Node: Final install103394
 Node: Binaries108708
-Node: Specific110220
-Ref: alpha-x-x110730
-Ref: alpha-dec-osf51111219
-Ref: amd64-x-solaris210111744
-Ref: arm-x-eabi111847
-Ref: avr112058
-Ref: bfin112698
-Ref: cr16112940
-Ref: cris113355
-Ref: dos114171
-Ref: epiphany-x-elf114494
-Ref: x-x-freebsd114599
-Ref: h8300-hms116436
-Ref: hppa-hp-hpux116788
-Ref: hppa-hp-hpux10119159
-Ref: hppa-hp-hpux11119572
-Ref: x-x-linux-gnu125231
-Ref: ix86-x-linux125424
-Ref: ix86-x-solaris29125737
-Ref: ix86-x-solaris210126516
-Ref: ia64-x-linux127707
-Ref: ia64-x-hpux128477
-Ref: x-ibm-aix129032
-Ref: iq2000-x-elf135895
-Ref: lm32-x-elf136035
-Ref: lm32-x-uclinux136139
-Ref: m32c-x-elf136267
-Ref: m32r-x-elf136369
-Ref: m68k-x-x136471
-Ref: m68k-x-uclinux137509
-Ref: mep-x-elf137755
-Ref: microblaze-x-elf137865
-Ref: mips-x-x137984
-Ref: mips-sgi-irix5140380
-Ref: mips-sgi-irix6140460
-Ref: moxie-x-elf140647
-Ref: powerpc-x-x140694
-Ref: powerpc-x-darwin140899
-Ref: powerpc-x-elf141393
-Ref: powerpc-x-linux-gnu141478
-Ref: powerpc-x-netbsd141573
-Ref: powerpc-x-eabisim141661
-Ref: powerpc-x-eabi141787
-Ref: powerpcle-x-elf141863
-Ref: powerpcle-x-eabisim141955
-Ref: powerpcle-x-eabi142088
-Ref: rl78-x-elf142171
-Ref: rx-x-elf142277
-Ref: s390-x-linux142476
-Ref: s390x-x-linux142548
-Ref: s390x-ibm-tpf142635
-Ref: x-x-solaris2142766
-Ref: sparc-x-x147529
-Ref: sparc-sun-solaris2148031
-Ref: sparc-sun-solaris210150785
-Ref: sparc-x-linux151161
-Ref: sparc64-x-solaris2151386
-Ref: sparcv9-x-solaris2152039
-Ref: c6x-x-x152126
-Ref: tilegx-*-linux152217
-Ref: tilepro-*-linux152336
-Ref: x-x-vxworks152457
-Ref: x86-64-x-x153979
-Ref: x86-64-x-solaris210154307
-Ref: xtensa-x-elf154969
-Ref: xtensa-x-linux155640
-Ref: windows155981
-Ref: x-x-cygwin157918
-Ref: x-x-interix158471
-Ref: x-x-mingw32158780
-Ref: older159006
-Ref: elf161123
-Node: Old161381
-Node: Configurations164518
-Node: GNU Free Documentation License168059
-Node: Concept Index193206
+Node: Specific110176
+Ref: alpha-x-x110686
+Ref: alpha-dec-osf51111175
+Ref: amd64-x-solaris210111700
+Ref: arm-x-eabi111803
+Ref: avr112014
+Ref: bfin112654
+Ref: cr16112896
+Ref: cris113311
+Ref: dos114127
+Ref: epiphany-x-elf114450
+Ref: x-x-freebsd114555
+Ref: h8300-hms116392
+Ref: hppa-hp-hpux116744
+Ref: hppa-hp-hpux10119115
+Ref: hppa-hp-hpux11119528
+Ref: x-x-linux-gnu125187
+Ref: ix86-x-linux125380
+Ref: ix86-x-solaris29125693
+Ref: ix86-x-solaris210126472
+Ref: ia64-x-linux127663
+Ref: ia64-x-hpux128433
+Ref: x-ibm-aix128988
+Ref: iq2000-x-elf135851
+Ref: lm32-x-elf135991
+Ref: lm32-x-uclinux136095
+Ref: m32c-x-elf136223
+Ref: m32r-x-elf136325
+Ref: m68k-x-x136427
+Ref: m68k-x-uclinux137465
+Ref: mep-x-elf137711
+Ref: microblaze-x-elf137821
+Ref: mips-x-x137940
+Ref: mips-sgi-irix5140336
+Ref: mips-sgi-irix6140416
+Ref: moxie-x-elf140603
+Ref: powerpc-x-x140650
+Ref: powerpc-x-darwin140855
+Ref: powerpc-x-elf141349
+Ref: powerpc-x-linux-gnu141434
+Ref: powerpc-x-netbsd141529
+Ref: powerpc-x-eabisim141617
+Ref: powerpc-x-eabi141743
+Ref: powerpcle-x-elf141819
+Ref: powerpcle-x-eabisim141911
+Ref: powerpcle-x-eabi142044
+Ref: rl78-x-elf142127
+Ref: rx-x-elf142233
+Ref: s390-x-linux142432
+Ref: s390x-x-linux142504
+Ref: s390x-ibm-tpf142591
+Ref: x-x-solaris2142722
+Ref: sparc-x-x147485
+Ref: sparc-sun-solaris2147987
+Ref: sparc-sun-solaris210150741
+Ref: sparc-x-linux151117
+Ref: sparc64-x-solaris2151342
+Ref: sparcv9-x-solaris2151995
+Ref: c6x-x-x152082
+Ref: tilegx-*-linux152173
+Ref: tilepro-*-linux152292
+Ref: x-x-vxworks152413
+Ref: x86-64-x-x153935
+Ref: x86-64-x-solaris210154263
+Ref: xtensa-x-elf154925
+Ref: xtensa-x-linux155596
+Ref: windows155937
+Ref: x-x-cygwin157874
+Ref: x-x-interix158427
+Ref: x-x-mingw32158736
+Ref: older158962
+Ref: elf161079
+Node: Old161337
+Node: Configurations164474
+Node: GNU Free Documentation License168015
+Node: Concept Index193162
 
 End Tag Table
