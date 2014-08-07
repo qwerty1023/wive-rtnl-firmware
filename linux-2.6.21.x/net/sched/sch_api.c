@@ -293,6 +293,7 @@ static u32 qdisc_alloc_handle(struct net_device *dev)
 		autohandle += TC_H_MAKE(0x10000U, 0);
 		if (autohandle == TC_H_MAKE(TC_H_ROOT, 0))
 			autohandle = TC_H_MAKE(0x80000000U, 0);
+		cond_resched();
 	} while	(qdisc_lookup(dev, autohandle) && --i > 0);
 
 	return i>0 ? autohandle : 0;
@@ -772,6 +773,7 @@ static int tc_fill_qdisc(struct sk_buff *skb, struct Qdisc *q, u32 clid,
 	unsigned char	 *b = skb->tail;
 	struct gnet_dump d;
 
+	cond_resched();
 	nlh = NLMSG_NEW(skb, pid, seq, event, sizeof(*tcm), flags);
 	tcm = NLMSG_DATA(nlh);
 	tcm->tcm_family = AF_UNSPEC;
@@ -1007,6 +1009,7 @@ static int tc_fill_tclass(struct sk_buff *skb, struct Qdisc *q,
 	struct gnet_dump d;
 	struct Qdisc_class_ops *cl_ops = q->ops->cl_ops;
 
+	cond_resched();
 	nlh = NLMSG_NEW(skb, pid, seq, event, sizeof(*tcm), flags);
 	tcm = NLMSG_DATA(nlh);
 	tcm->tcm_family = AF_UNSPEC;
