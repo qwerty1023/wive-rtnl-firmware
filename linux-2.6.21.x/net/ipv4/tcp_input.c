@@ -866,24 +866,20 @@ static void tcp_init_metrics(struct sock *sk)
 		tp->mdev_max = tp->rttvar = max(tp->mdev, tcp_rto_min(sk));
 	}
 	tcp_set_rto(sk);
-	if (inet_csk(sk)->icsk_rto < TCP_TIMEOUT_INIT && !tp->rx_opt.saw_tstamp)
-		goto reset;
-cwnd:
+	if (inet_csk(sk)->icsk_rto < TCP_TIMEOUT_INIT && !tp->rx_opt.saw_tstamp) {
+reset:
+		/* Play conservative. If timestamps are not
+		 * supported, TCP will fail to recalculate correct
+		 * rtt, if initial rto is too small. FORGET ALL AND RESET!
+		 */
+		if (!tp->rx_opt.saw_tstamp && tp->srtt) {
+			tp->srtt = 0;
+			tp->mdev = tp->mdev_max = tp->rttvar = TCP_TIMEOUT_INIT;
+			inet_csk(sk)->icsk_rto = TCP_TIMEOUT_INIT;
+		}
+	}
 	tp->snd_cwnd = tcp_init_cwnd(tp, dst);
 	tp->snd_cwnd_stamp = tcp_time_stamp;
-	return;
-
-reset:
-	/* Play conservative. If timestamps are not
-	 * supported, TCP will fail to recalculate correct
-	 * rtt, if initial rto is too small. FORGET ALL AND RESET!
-	 */
-	if (!tp->rx_opt.saw_tstamp && tp->srtt) {
-		tp->srtt = 0;
-		tp->mdev = tp->mdev_max = tp->rttvar = TCP_TIMEOUT_INIT;
-		inet_csk(sk)->icsk_rto = TCP_TIMEOUT_INIT;
-	}
-	goto cwnd;
 }
 
 static void tcp_update_reordering(struct sock *sk, const int metric,
@@ -1409,9 +1405,16 @@ static void tcp_enter_frto_loss(struct sock *sk, int allowed_segments, int flag)
 			TCP_SKB_CB(skb)->sacked &= ~(TCPCB_LOST|TCPCB_SACKED_RETRANS);
 		}
 
-		/* Don't lost mark skbs that were fwd transmitted after RTO */
-		if (!(TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_ACKED) &&
-		    !after(TCP_SKB_CB(skb)->end_seq, tp->frto_highmark)) {
+		/* Marking forward transmissions that were made after RTO lost
+		 * can cause unnecessary retransmissions in some scenarios,
+		 * SACK blocks will mitigate that in some but not in all cases.
+		 * We used to not mark them but it was causing break-ups with
+		 * receivers that do only in-order receival.
+		 *
+		 * TODO: we could detect presence of such receiver and select
+		 * different behavior per flow.
+		 */
+		if (!(TCP_SKB_CB(skb)->sacked & TCPCB_SACKED_ACKED)) {
 			TCP_SKB_CB(skb)->sacked |= TCPCB_LOST;
 			tp->lost_out += tcp_skb_pcount(skb);
 		}
@@ -1427,7 +1430,7 @@ static void tcp_enter_frto_loss(struct sock *sk, int allowed_segments, int flag)
 	tp->reordering = min_t(unsigned int, tp->reordering,
 					     sysctl_tcp_reordering);
 	tcp_set_ca_state(sk, TCP_CA_Loss);
-	tp->high_seq = tp->frto_highmark;
+	tp->high_seq = tp->snd_nxt;
 	TCP_ECN_queue_cwr(tp);
 
 	clear_all_retrans_hints(tp);
@@ -2738,10 +2741,10 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 	icsk->icsk_probes_out = 0;
 	tp->rcv_tstamp = tcp_time_stamp;
 	prior_packets = tp->packets_out;
+	prior_in_flight = tcp_packets_in_flight(tp);
+
 	if (!prior_packets)
 		goto no_queue;
-
-	prior_in_flight = tcp_packets_in_flight(tp);
 
 	/* See if we can take anything off of the retransmit queue. */
 	flag |= tcp_clean_rtx_queue(sk, &seq_rtt);
