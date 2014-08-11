@@ -269,6 +269,7 @@ function offloadModeSelect(form)
 {
 	var thresh = form.offloadMode.value;
 	displayElement('hwnat_threshold_row', (thresh == '2') || (thresh == '3'))
+	displayElement('wifihw_row', (thresh == '2') || (thresh == '3'))
 	displayElement('fastpath_row', (thresh == '1') || (thresh == '3'))
 	displayElement('nat_fastpath_row', (thresh == '1') || (thresh == '3'))
 	displayElement('route_fastpath_row', (thresh == '1') || (thresh == '3'))
@@ -388,7 +389,7 @@ function displayServiceStatus()
 	</select>
 </td>
 </tr>
-<tr>
+<tr id="wifihw_row">
 <td class="head">WiFi hardware nat offload</td>
 <td colspan="4">
 	<select name="hw_nat_wifiPT" class="half">
