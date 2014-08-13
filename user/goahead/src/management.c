@@ -6,6 +6,7 @@
 #include <linux/if.h>
 #include <ctype.h>
 #include <errno.h>
+#include <sys/time.h>
 
 #include "utils.h"
 #include "helpers.h"
@@ -20,7 +21,50 @@
 #define COMMAND_MAX	1024
 static char system_command[COMMAND_MAX];
 
+static long long WANRxByteDataPrev, WANTxByteDataPrev;
+static long long WANRxClockPrev, WANTxClockPrev;
+
 static unsigned long int prevTotal = 0, prevBusy = 0;
+
+long long time_msec (void)
+{
+  struct timeval tv;
+
+  gettimeofday (&tv, NULL);
+  return (long long) tv.tv_sec * 1000 + (tv.tv_usec / 1000);
+}
+
+void calcSpeed(char * strBuf, long long traffByteCur, long long traffBytePrev, long long clockCur, long long clockPrev)
+{
+long long traff = traffByteCur - traffBytePrev;
+long long clockCount = clockCur - clockPrev;
+long long scaleFactor;
+
+double p1;
+
+if (!(traff < 0) && (clockCount > 0))
+{
+	scaleFactor = (traff * 1000) / clockCount;
+
+	if (scaleFactor > (unsigned long long)1048575)
+	{
+		//show in MB/s
+		p1=((double)traff * 1000) / (double)1048576 / (double)clockCount ;
+		snprintf(strBuf, 16, "%.1f MB/s", p1);
+	}
+	else
+	{
+		//show in kB/s
+		p1=((double)traff * 1000) / (double)1024 / (double)clockCount;
+		snprintf(strBuf, 16, "%.1f kB/s", p1);
+	}
+}
+else
+{
+	strcpy(strBuf, "n/a");
+}
+
+}
 
 void scale(char_t * strBuf, long long data)
 {
@@ -410,10 +454,17 @@ static long long getIfStatistic(char *interface, int type)
 
 int getWANRxByteASP(int eid, webs_t wp, int argc, char_t **argv)
 {
-	char_t buf[32];
+	char_t buf[32], buf2[32];
+	long long curClock = time_msec();
 	long long data = getIfStatistic(getWanIfName(), RXBYTE);
-	scale(buf, data);	
-	websWrite(wp, T("%s"), buf);
+
+	scale(buf, data);
+
+	calcSpeed(buf2, data, WANRxByteDataPrev, curClock, WANRxClockPrev);
+	WANRxByteDataPrev = data;
+	WANRxClockPrev = curClock;
+
+	websWrite(wp, T("%s (%s)"), buf, buf2);
 	return 0;
 }
 
@@ -428,10 +479,17 @@ int getWANRxPacketASP(int eid, webs_t wp, int argc, char_t **argv)
 
 int getWANTxByteASP(int eid, webs_t wp, int argc, char_t **argv)
 {
-	char_t buf[32];
+	char_t buf[32], buf2[32];
+	long long curClock = time_msec();
 	long long data = getIfStatistic(getWanIfName(), TXBYTE);
+
 	scale(buf, data);
-	websWrite(wp, T("%s"), buf);
+
+	calcSpeed(buf2, data, WANTxByteDataPrev, curClock, WANTxClockPrev);
+	WANTxByteDataPrev = data;
+	WANTxClockPrev = curClock;
+
+	websWrite(wp, T("%s (%s)"), buf, buf2);
 	return 0;
 }
 

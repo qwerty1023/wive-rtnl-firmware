@@ -1217,18 +1217,18 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 #ifdef CONFIG_PPP_PREVENT_DROP_SESSION_ON_FULL_CPU_LOAD
 	    /* this is simple cpu based policer need for prevent drop session at high cpu load */
 	    if (ppp_cpu_load >= 1000) {
-		/* get cpu load */
-		curload = (cpload[0] + cpload[1]) >> 1;
-		curload = (curload + cpload[2]) >> 1;
-		curload = (curload + weighted_cpuload(0)) >> 1;
-		cpload[0] = cpload[1];
-		cpload[1] = cpload[2];
-		cpload[2] = curload;
+			/* get cpu load */
+			curload = (cpload[0] + cpload[1]) >> 1;
+			curload = (curload + cpload[2]) >> 1;
+			curload = (curload + weighted_cpuload(0)) >> 1;
+			cpload[0] = cpload[1];
+			cpload[1] = cpload[2];
+			cpload[2] = curload;
 
-		/* drop if load high in current interval */
-		if (curload > ppp_cpu_load) {
-			goto drop2;      /* drop packet ... */
-		}
+			/* drop if load high in current interval */
+			if (curload > ppp_cpu_load) {
+					goto drop2;      /* drop packet ... */
+			}
 	    }
 #endif
 #ifdef CONFIG_RALINK_GPIO_LED_VPN
