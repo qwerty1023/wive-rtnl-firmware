@@ -31,7 +31,7 @@ fi
     service dnsserver reload
 
 ##########################################################
-# Need restart this servieces only:			 #
+# Need restart this services only:			 #
 # 1) if call not from ip-up				 #
 # 2) if call not from dhcp script			 #
 ##########################################################
