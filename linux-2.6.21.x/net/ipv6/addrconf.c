@@ -556,17 +556,6 @@ ipv6_add_addr(struct inet6_dev *idev, const struct in6_addr *addr, int pfxlen,
 	ifa->cstamp = ifa->tstamp = jiffies;
 
 	ifa->rt = rt;
-
-	/*
-	 * part one of RFC 4429, section 3.3
-	 * We should not configure an address as
-	 * optimistic if we do not yet know the link
-	 * layer address of our nexhop router
-	 */
-
-	if (rt->rt6i_nexthop == NULL)
-		ifa->flags &= ~IFA_F_OPTIMISTIC;
-
 	ifa->idev = idev;
 	in6_dev_hold(idev);
 	/* For caller */
@@ -1436,7 +1425,6 @@ static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 	switch (dev->type) {
 	case ARPHRD_ETHER:
 	case ARPHRD_FDDI:
-	case ARPHRD_IEEE802_TR:
 		return addrconf_ifid_eui48(eui, dev);
 	case ARPHRD_ARCNET:
 		return addrconf_ifid_arcnet(eui, dev);
@@ -2258,7 +2246,6 @@ static void addrconf_dev_config(struct net_device *dev)
 
 	if ((dev->type != ARPHRD_ETHER) &&
 	    (dev->type != ARPHRD_FDDI) &&
-	    (dev->type != ARPHRD_IEEE802_TR) &&
 	    (dev->type != ARPHRD_ARCNET) &&
 	    (dev->type != ARPHRD_INFINIBAND) &&
 	    (dev->type != ARPHRD_TUNNEL6)) {
