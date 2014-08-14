@@ -50,7 +50,7 @@ if (!(traff < 0) && (clockCount > 0))
 	{
 		//show in MB/s
 		p1=((double)traff * 1000) / (double)1048576 / (double)clockCount ;
-		snprintf(strBuf, 16, "%.1f MB/s", p1);
+		snprintf(strBuf, 16, "%.2f MB/s", p1);
 	}
 	else
 	{
@@ -464,7 +464,7 @@ int getWANRxByteASP(int eid, webs_t wp, int argc, char_t **argv)
 	WANRxByteDataPrev = data;
 	WANRxClockPrev = curClock;
 
-	websWrite(wp, T("%s (%s)"), buf, buf2);
+	websWrite(wp, T("%s  (%s)"), buf, buf2);
 	return 0;
 }
 
@@ -489,7 +489,7 @@ int getWANTxByteASP(int eid, webs_t wp, int argc, char_t **argv)
 	WANTxByteDataPrev = data;
 	WANTxClockPrev = curClock;
 
-	websWrite(wp, T("%s (%s)"), buf, buf2);
+	websWrite(wp, T("%s  (%s)"), buf, buf2);
 	return 0;
 }
 
