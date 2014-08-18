@@ -197,7 +197,7 @@ if [ "$CONFIG_RT_3052_ESW" != "" ]; then
     configs_system_vlans
     if [ ! -f /var/run/goahead.pid ]; then
 	######################################################################
-	# workaroud for dir-300NRU and some devices
+	# workaroud for dir-300NRU and some ithers devices
 	# with not correct configured from uboot
 	# need only start boot
 	######################################################################

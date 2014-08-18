@@ -1779,7 +1779,7 @@ static void ap_assoc_info_debugshow(
 		assoc_ht_info_debugshow(pAd, pEntry, HTCapability_Len, pHTCapability);
 
 		DBGPRINT(RT_DEBUG_TRACE, ("\n%s - Update AP OperaionMode=%d , fAnyStationIsLegacy=%d, fAnyStation20Only=%d, fAnyStationNonGF=%d\n\n",
-					sAssoc, 
+					sAssoc,
 					pAd->CommonCfg.AddHTInfo.AddHtInfo2.OperaionMode, 
 					pAd->MacTab.fAnyStationIsLegacy,
 					pAd->MacTab.fAnyStation20Only, 

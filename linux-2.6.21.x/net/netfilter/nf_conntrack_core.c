@@ -13,6 +13,7 @@
 
 #include <linux/types.h>
 #include <linux/netfilter.h>
+#include <linux/netfilter_ipv6.h>
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/proc_fs.h>
@@ -143,8 +144,10 @@ static inline unsigned int is_local_svc(u_int8_t protonm)
 	    and mark as interested by ALG  for correct tracking this */
 	switch (protonm) {
 	    case IPPROTO_IPIP:
+#if defined(CONFIG_IPV6) && defined(RA_HW_NAT_IPV6)
 #ifndef CONFIG_HNAT_V2
 	    case IPPROTO_IPV6:
+#endif
 #endif
 	    case IPPROTO_ICMP:
 	    case IPPROTO_GRE:
@@ -1121,8 +1124,14 @@ nf_conntrack_in(int pf, unsigned int hooknum, struct sk_buff **pskb)
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	/*
 	 * skip ALG and some proto from hardware offload
-	 */
-	if (pf == PF_INET && hooknum != NF_IP_LOCAL_OUT && FOE_ALG(*pskb) == 0 && (skip_offload || is_local_svc(protonum))) {
+	 * hw_nat v2 need correct check v6 packets for exclude (nf_conntrack_in called by ipv6_conntrack_in with pf == PF_INET6)
+	 * hw_nat v1 not correct support v6 offload - allways skip it by is_local_svc */
+#if defined(CONFIG_IPV6) && defined(RA_HW_NAT_IPV6)
+	if (((pf == PF_INET && hooknum != NF_IP_LOCAL_OUT) || (pf == PF_INET6 && hooknum != NF_IP6_LOCAL_OUT))
+#else
+	if (pf == PF_INET && hooknum != NF_IP_LOCAL_OUT
+#endif
+	    && FOE_ALG(*pskb) == 0 && (skip_offload || is_local_svc(protonum))) {
 	    if (IS_SPACE_AVAILABLED(*pskb) && IS_MAGIC_TAG_VALID(*pskb))
 		FOE_ALG(*pskb)=1;
 	}

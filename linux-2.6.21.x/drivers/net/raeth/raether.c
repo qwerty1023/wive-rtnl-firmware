@@ -47,16 +47,33 @@
 #include "../../../net/nat/hw_nat/ra_nat.h"
 #endif
 
+#ifdef CONFIG_PSEUDO_SUPPORT
+static unsigned long wan_prev_jiffies;
 #ifdef CONFIG_RALINK_GPIO_LED_WAN
 #include <linux/ralink_gpio.h>
 ralink_gpio_led_info wan_led;
 extern int ralink_gpio_led_set(ralink_gpio_led_info wan_led);
-static unsigned long wan_prev_jiffies;
+#endif
 #endif
 
 #ifdef CONFIG_RAETH_DHCP_TOUCH
 /* for auto lease renew at cable connect */
 extern int send_sigusr_dhcpc;
+#ifdef CONFIG_PSEUDO_SUPPORT
+#ifdef CONFIG_RTL8367M
+#include "../rtl8367m/rtk_types.h"
+typedef enum rtk_port_linkStatus_e
+{
+    PORT_LINKDOWN = 0,
+    PORT_LINKUP,
+    PORT_LINKSTATUS_END
+} rtk_port_linkStatus_t;
+
+extern rtk_api_ret_t asic_status_link_ports_wan(rtk_port_linkStatus_t *pLinkStatus);
+static int old_wan_port_link;
+static void rtl_link_status_changed(void);
+#endif
+#endif
 #endif
 
 #ifdef CONFIG_VLAN_8021Q_DOUBLE_TAG
@@ -170,6 +187,10 @@ extern char const *nvram_get(int index, char *name);
 
 #if defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_RT5350)
 static void rt305x_esw_init(void);
+#elif defined(CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_MT7620)
+static void rt_gsw_init(void);
+#elif defined(CONFIG_RALINK_RT6855A)
+static void rt6855A_gsw_init(void);
 #endif
 
 #ifndef CONFIG_RAETH_DISABLE_TX_TIMEO
@@ -1028,6 +1049,12 @@ static int rt2880_eth_send(struct net_device* dev, struct sk_buff *skb, int gmac
 #ifdef CONFIG_PSEUDO_SUPPORT
 		if (gmac_no == 2) {
 			if (ei_local->PseudoDev != NULL) {
+#if defined(CONFIG_RAETH_DHCP_TOUCH) && defined(CONFIG_RTL8367M)
+				/* check wan status changed every try send pkts
+			         * this work as ondemand wan check for touch userspace if link down
+				*/
+				rtl_link_status_changed();
+#endif
 				pAd = netdev_priv(ei_local->PseudoDev);
 				pAd->stat.tx_errors++;
 			}
@@ -1041,13 +1068,19 @@ static int rt2880_eth_send(struct net_device* dev, struct sk_buff *skb, int gmac
 	if (gmac_no == 2) {
 		if (ei_local->PseudoDev != NULL) {
 			pAd = netdev_priv(ei_local->PseudoDev);
+			if ((jiffies - wan_prev_jiffies) >= (HZ>>4)) {
 #ifdef CONFIG_RALINK_GPIO_LED_WAN
-			if ((jiffies - wan_prev_jiffies) >= (HZ>>3)) {
 			    /* blink led */
 			    ralink_gpio_led_set(wan_led);
+#endif
+#if defined(CONFIG_RAETH_DHCP_TOUCH) && defined(CONFIG_RTL8367M)
+			    /* check wan status changed every try send pkts
+			     * this work as ondemand wan check for touch userspace if link down
+			    */
+			    rtl_link_status_changed();
+#endif
 			    wan_prev_jiffies = jiffies;
 			}
-#endif
 			pAd->stat.tx_packets++;
 			pAd->stat.tx_bytes += length;
 		}
@@ -1473,7 +1506,6 @@ static struct net_device_stats *ra_get_stats(struct net_device *dev)
 }
 
 #ifdef CONFIG_RAETH_DHCP_TOUCH
-#if defined (CONFIG_RT_3052_ESW)
 void kill_sig_workq(struct work_struct *work)
 {
 	struct file *fp;
@@ -1503,9 +1535,7 @@ void kill_sig_workq(struct work_struct *work)
 	    }
 	}
 	filp_close(fp, NULL);
-
 }
-#endif
 #endif
 
 ///////////////////////////////////////////////////////////////////
@@ -1747,10 +1777,64 @@ static irqreturn_t FASTPATH ei_interrupt(int irq, void *dev_id, struct pt_regs *
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_RTL8367M
+static void rtl_link_status_changed()
+{
+#ifdef CONFIG_RAETH_DHCP_TOUCH
+    static rtk_port_linkStatus_t wan_port_link;
+    int32 retVal;
+    struct file *fp;
+    char pid[8];
+    struct task_struct *p = NULL;
+
+    /* if set 9 - Disable touch dhcp */
+    if (send_sigusr_dhcpc == 9)
+        return;
+
+    /* get status */
+    retVal = asic_status_link_ports_wan(&wan_port_link);
+    if (retVal != 0)
+	return;
+
+    /* current status is up */
+    if (wan_port_link == PORT_LINKUP) {
+	/* is status changed */
+	if(wan_port_link != old_wan_port_link) {
+	    /* send SIGUSR1 to dhcp client
+	     * read udhcpc pid from file, and send signal  USR2,USR1 to get a new IP
+	    */
+	    printk("RTL: Link WAN Status Changed. Call DHCP client.");
+	    fp = filp_open("/var/run/udhcpc.pid", O_RDONLY, 0);
+	    if (IS_ERR(fp))
+		return;
+
+	    if (fp->f_op && fp->f_op->read) {
+		if (fp->f_op->read(fp, pid, 8, &fp->f_pos) > 0) {
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
+		    p = pid_task(find_get_pid(simple_strtoul(pid, NULL, 10)),  PIDTYPE_PID);
+#else
+		    p = find_task_by_pid(simple_strtoul(pid, NULL, 10));
+#endif
+
+		    if (NULL != p) {
+			send_sig(SIGUSR1, p, 0);
+		    }
+		}
+	    }
+	    filp_close(fp, NULL);
+	}
+	old_wan_port_link=PORT_LINKUP;
+    } else if (wan_port_link == PORT_LINKDOWN)
+	old_wan_port_link=PORT_LINKDOWN;
+#endif
+}
+#endif
+
 #if defined (CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A) || \
     defined(CONFIG_RALINK_MT7620)
 static void esw_link_status_changed(int port_no, void *dev_id)
 {
+#ifdef CONFIG_RAETH_DHCP_TOUCH
     unsigned long reg_val;
     struct net_device *dev = (struct net_device *) dev_id;
     END_DEVICE *ei_local = netdev_priv(dev);
@@ -1758,19 +1842,18 @@ static void esw_link_status_changed(int port_no, void *dev_id)
     reg_val = *((volatile u32 *)(RALINK_ETH_SW_BASE+ 0x3008 + (port_no*0x100)));
 
     if(reg_val & 0x1) {
-	printk("ESW: Link Status Changed - Port%d Link UP\n", port_no);
-#if defined (CONFIG_WAN_AT_P0)
-	if(port_no==0) {
+	if(port_no == send_sigusr_dhcpc) {
 	    schedule_work(&ei_local->kill_sig_wq);
-	}
-#elif defined (CONFIG_WAN_AT_P4)
-	if(port_no==4) {
-	    schedule_work(&ei_local->kill_sig_wq);
-	}
-#endif
+	    printk("ESW: Link WAN Status Changed - Port%d Link UP\n", port_no);
+	} else
+	    printk("ESW: Link Status Changed - Port%d Link UP\n", port_no);
     } else {
-	printk("ESW: Link Status Changed - Port%d Link Down\n", port_no);
+	if(port_no == send_sigusr_dhcpc)
+	    printk("ESW: Link WAN Status Changed - Port%d Link Down\n", port_no);
+	else
+	    printk("ESW: Link Status Changed - Port%d Link Down\n", port_no);
     }
+#endif
 }
 #endif
 
@@ -1785,15 +1868,12 @@ static irqreturn_t esw_interrupt(int irq, void *dev_id)
 #else
 	static unsigned long stat;
 	unsigned long stat_curr;
-#endif
-
 #ifdef CONFIG_RAETH_DHCP_TOUCH
 	int port_offset;
 #endif
-
+#endif
 	struct net_device *dev = (struct net_device *) dev_id;
 	END_DEVICE *ei_local = netdev_priv(dev);
-
 
 	spin_lock_irqsave(&(ei_local->page_lock), flags);
 	reg_int_val = (*((volatile u32 *)(ESW_ISR))); //Interrupt Status Register
@@ -1823,7 +1903,7 @@ static irqreturn_t esw_interrupt(int irq, void *dev_id)
 	    sysRegWrite(ESW_AISR, acl_int_val);
 	}
 
-#else // not RT6855
+#else /* not RT6855 */
 	if (reg_int_val & PORT_ST_CHG) {
 		stat_curr = *((volatile u32 *)(RALINK_ETH_SW_BASE+0x80));
 #ifdef CONFIG_RAETH_DHCP_TOUCH
@@ -1851,7 +1931,7 @@ out:
 		stat = stat_curr;
 	}
 
-#endif // defined(CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A)//
+#endif /* defined(CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A) */
 
 	sysRegWrite(ESW_ISR, reg_int_val);
 
@@ -3158,23 +3238,18 @@ static int ei_open(struct net_device *dev)
 	INIT_WORK(&ei_local->kill_sig_wq, kill_sig_workq);
 #endif
 	err = request_irq(SURFBOARDINT_ESW, esw_interrupt, IRQF_DISABLED, "Ralink_ESW", dev);
-
 	if (err)
 	    return err;
 #endif // CONFIG_RT_3052_ESW //
-
-
 #ifdef DELAY_INT
 	sysRegWrite(DLY_INT_CFG, DELAY_INT_INIT);
     	sysRegWrite(FE_INT_ENABLE, FE_INT_DLY_INIT);
 #else
     	sysRegWrite(FE_INT_ENABLE, FE_INT_ALL);
 #endif
-
 #ifndef CONFIG_RAETH_DISABLE_TX_TIMEO
  	INIT_WORK(&ei_local->reset_task, ei_reset_task);
 #endif
-
 #ifdef WORKQUEUE_BH
 #ifndef CONFIG_RAETH_NAPI
  	INIT_WORK(&ei_local->rx_wq, ei_receive_workq);
@@ -3201,7 +3276,6 @@ static int ei_open(struct net_device *dev)
         netif_poll_enable(dev);
 #endif
 #endif
-
 	spin_unlock_irqrestore(&(ei_local->page_lock), flags);
 #ifdef CONFIG_PSEUDO_SUPPORT
 	if(ei_local->PseudoDev==NULL)
@@ -3363,7 +3437,7 @@ void rt6855A_eth_gpio_reset(void)
 #endif
 
 #if defined(CONFIG_RALINK_RT6855A)
-void rt6855A_gsw_init(void)
+static void rt6855A_gsw_init(void)
 {
 	u32 phy_val=0;
 	u32 rev=0;
@@ -3510,7 +3584,7 @@ void rt6855A_gsw_init(void)
 #endif
 
 #if defined(CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_MT7620)
-void rt_gsw_init(void)
+static void rt_gsw_init(void)
 {
 #if defined (CONFIG_P4_MAC_TO_PHY_MODE) || defined (CONFIG_P5_MAC_TO_PHY_MODE)
 	u32 phy_val=0;
