@@ -26,6 +26,11 @@ noconfig_targets := menuconfig config oldconfig randconfig \
 	release tags TAGS
 TOPDIR=./
 
+# for safe cleanup
+ifndef ROOTDIR
+ROOTDIR=..
+endif
+
 include Rules.mak
 
 -include $(LINUX_CONFIG)
@@ -201,7 +206,7 @@ else
 endif
 
 finished: shared
-	rm -f $(ROOTDIR)/lib/include_shared/config.h
+	$(RM) -f $(ROOTDIR)/lib/include_shared/config.h
 	$(SECHO)
 	$(SECHO) Finally finished compiling ...
 	$(SECHO)
@@ -210,7 +215,7 @@ include/bits/uClibc_config.h: .config
 	@if [ ! -x ./extra/config/conf ] ; then \
 	    $(MAKE) -C extra/config conf; \
 	fi;
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf -o extra/Configs/Config.in
 
@@ -259,7 +264,7 @@ headers: include/bits/uClibc_config.h
 	$(SHELL_SET_X); \
 	TOPDIR=. CC="$(CC)" /bin/sh extra/scripts/gen_bits_syscall_h.sh > include/bits/sysnum.h.new; \
 	if cmp include/bits/sysnum.h include/bits/sysnum.h.new >/dev/null 2>&1; then \
-		$(RM) include/bits/sysnum.h.new; \
+		$(RM) $(ROOTDIR)/lib/include/bits/sysnum.h.new; \
 	else \
 		mv -f include/bits/sysnum.h.new include/bits/sysnum.h; \
 	fi
@@ -394,7 +399,7 @@ endif
 	# Ugh!!! Remember that libdl.a and libdl_pic.a are different.  Since
 	# libdl is pretty small, and not likely to benefit from mklibs.py and
 	# similar, lets just remove libdl_pic.a and avoid the issue
-	rm -f $(PREFIX)$(DEVEL_PREFIX)lib/libdl_pic.a
+	$(RM) -f $(PREFIX)$(DEVEL_PREFIX)lib/libdl_pic.a
 endif
 
 
@@ -452,27 +457,27 @@ extra/config/mconf:
 	$(MAKE) -C extra/config ncurses mconf
 
 menuconfig: extra/config/mconf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/mconf extra/Configs/Config.in
 
 config: extra/config/conf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf extra/Configs/Config.in
 
 oldconfig: extra/config/conf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf -o extra/Configs/Config.in
 
 randconfig: extra/config/conf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf -r extra/Configs/Config.in
 
 allyesconfig: extra/config/conf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf -y extra/Configs/Config.in
 	sed -i -e "s/^DODEBUG=.*/# DODEBUG is not set/" .config
@@ -483,12 +488,12 @@ allyesconfig: extra/config/conf
 	@./extra/config/conf -o extra/Configs/Config.in
 
 allnoconfig: extra/config/conf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf -n extra/Configs/Config.in
 
 defconfig: extra/config/conf
-	$(RM) -rf include/bits
+	$(RM) -rf $(ROOTDIR)/lib/include/bits
 	$(INSTALL) -d include/bits
 	@./extra/config/conf -d extra/Configs/Config.in
 
@@ -519,8 +524,11 @@ ifeq ($(CONFIG_LIB_LIBGMP_FORCE),y)
 	-$(MAKE) -C libgmp clean
 endif
 	-$(RM) -f libc/obj.* headers lib_diff
-	-$(RM) -rf tmp lib include/bits libc/tmp _install lib_optim
+	-$(RM) -rf tmp include/bits libc/tmp _install lib_optim
+	-$(RM) -rf $(ROOTDIR)/lib/lib
 	-$(RM) -rf $(ROOTDIR)/lib/include_shared
+	-$(RM) -rf $(ROOTDIR)/lib/include/linux
+	-$(RM) -rf $(ROOTDIR)/lib/include/asm*
 	-find $(ROOTDIR)/lib \( -name \*.o -o -name \*.a -o -name \*.so* -o -name core -o -name .\#\* \) -exec $(RM) {} \;
 	@set -e; \
 	for i in `(cd $(TOPDIR)/libc/sysdeps/linux/common/sys; ls *.h)` ; do \
@@ -531,24 +539,12 @@ endif
 			$(RM) include/sys/$$i; \
 		done; \
 	fi;
-	@$(RM) include/linux include/asm*
 	@if [ -d libc/sysdeps/linux/$(TARGET_ARCH) ]; then		\
 	    $(MAKE) -C libc/sysdeps/linux/$(TARGET_ARCH) clean;		\
 	fi;
 
 distclean: clean
 	$(RM) -f .config .config.old .config.cmd
-
-release: distclean
-	cd ..;					\
-	$(RM) -rf uClibc-$(VERSION);		\
-	cp -dRf uClibc uClibc-$(VERSION);	\
-	find uClibc-$(VERSION)/ -type f		\
-	    -name .\#* -exec $(RM) -rf {} \; ;	\
-	find uClibc-$(VERSION)/ -type d		\
-	    -name .svn -exec $(RM) -rf {} \; ;	\
-						\
-	tar -cvzf uClibc-$(VERSION).tar.gz uClibc-$(VERSION)/;
 endif
 
 check:

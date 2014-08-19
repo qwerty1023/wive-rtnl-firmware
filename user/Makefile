@@ -3,19 +3,18 @@
 #
 
 .EXPORT_ALL_VARIABLES:
-.PHONY: config all romfs clean
+.PHONY: all romfs clean
 
 #
 # Include architecture specific build rules.
 #
 
 UCLINUX_BUILD_USER=1
-
--include $(ARCH_CONFIG)
 -include $(LINUX_CONFIG)
 -include $(CONFIG_CONFIG)
--include ../vendors/Ralink/RT3052/config.arch
+-include $(ARCH_CONFIG)
 
+# for safe cleanup
 ifndef ROOTDIR
 ROOTDIR=..
 endif
@@ -31,7 +30,7 @@ export $(LDFLAGS)
 
 #for all cleanap
 SUBDIRS_APP =  goahead iptables miniupnp rt2880_app wpa_supplicant ethtool
-SUBDIRS_APP += igmpproxy lldt ppp strace wsc_upnp busybox inadyn pppoe-relay udpxy xl2tpd
+SUBDIRS_APP += igmpproxy lldt ppp strace wsc_upnp busybox inadyn udpxy xl2tpd
 SUBDIRS_APP += 802.1x dnsmasq gdbserver iproute2 wive-utils kabinet radvd wireless_tools zebra dropbear
 SUBDIRS_APP += ntfs-3g p910nd transmission openssl samba samba3 cdp-tools xupnpd e2fsprogs minidlna
 #
@@ -54,7 +53,6 @@ dir_$(CONFIG_USER_IPTABLES_IP6TABLES)       += iptables
 dir_$(CONFIG_USER_CDP)			    += cdp-tools
 dir_$(CONFIG_USER_LLTD)			    += lldt
 dir_$(CONFIG_USER_INADYN)                   += inadyn
-dir_$(CONFIG_USER_OPENSSL)	   	    += openssl
 dir_$(CONFIG_USER_WPA_SUPPLICANT)	    += wpa_supplicant
 dir_$(CONFIG_USER_802_1X)		    += 802.1x
 dir_$(CONFIG_USER_DNSMASQ)                  += dnsmasq
@@ -62,7 +60,6 @@ dir_$(CONFIG_USER_DROPBEAR)                 += dropbear
 dir_$(CONFIG_USER_TC)                  	    += iproute2
 dir_$(CONFIG_USER_PPPD)                	    += ppp
 dir_$(CONFIG_USER_XL2TPD)		    += xl2tpd
-dir_$(CONFIG_USER_PPPPOE_RELAY)             += pppoe-relay
 dir_$(CONFIG_USER_PARPROUTED)		    += parprouted
 dir_$(CONFIG_USER_IGMP_PROXY)               += igmpproxy
 dir_$(CONFIG_USER_ETHTOOL)                  += ethtool
@@ -98,7 +95,7 @@ dir_$(CONFIG_RT2880_APP)		    += rt2880_app
 dir_$(CONFIG_USER_BUSYBOX_BUSYBOX)          += busybox
 dir_$(CONFIG_USER_GOAHEAD_HTTPD)	    += goahead
 
-all: config
+all:
 	CC=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-gcc ; \
 	GCC=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-gcc ; \
 	CXX=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-g++ ; \
@@ -109,48 +106,37 @@ all: config
 	RANLIB=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-ranlib ; \
 	STRIP=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-strip ;
 ifeq ($(CONFIG_USER_OPENSSL),y)
-	# ">>>>>>>>>>>>>>>> CONFIGURE SSL NEEDED  <<<<<<<<<<<<<<<<<<<<<<"
-	if [ ! -f openssl/libssl.so ]; then  cd openssl ; ./Configure RT2880 no-ripemd; $(MAKE) ; cd .. ; fi
+	# ">>>>>>>>>>>>>>>> CONFIGURE AND BUILD SSL <<<<<<<<<<<<<<<<<<<<<<<"
+	if [ ! -e openssl/libssl.so ]; then  cd openssl ; ./Configure RT2880 no-ripemd; $(MAKE) -j1 ; cd .. ; fi
+	if [ -e openssl/libssl.so ]; then  cp -fap openssl/*.so* $(ROOTDIR)/lib/lib ; cp -fapv openssl/*.a $(ROOTDIR)/lib/lib ; fi
+	if [ -e openssl/libssl.so ]; then  $(RM) -rf $(ROOTDIR)/lib/include_shared/openssl ; cp -faprL openssl/include/* $(ROOTDIR)/lib/include_shared ; fi
 endif
-	# ">>>>>>>>>>>>>>>> CONFIGURE ALL NEEDED  <<<<<<<<<<<<<<<<<<<<<<"
+	# ">>>>>>>>>>>>>>>> CONFIGURE ALL USERSPASE  <<<<<<<<<<<<<<<<<<<<<<"
 	for i in $(dir_y) ; do \
 	    if [ -f "$$i/DoConfigure.sh" ]; then ( cd $$i; ./DoConfigure.sh || exit 1 ; cd .. ) || exit 1 ; fi \
 	done
-	# ">>>>>>>>>>>>>>>>  MAKE USERSPACE  <<<<<<<<<<<<<<<<<<<<<<"
+	# ">>>>>>>>>>>>>>>> MAKE USERSPACE  <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
 	for i in $(dir_y) ; do \
-	    if [ -d "$$i" ]; then ( cd $$i; make -j$(HOST_NCPU) || exit 1 ; cd .. ) || exit 1 ; fi \
+	    if [ -d "$$i" ]; then ( cd $$i; $(MAKE) -j$(HOST_NCPU) || exit 1 ; cd .. ) || exit 1 ; fi \
 	done
 
-#
-# add directory dependancies here
-#
-.PHONY: $(sort $(dir_y))
-
-$(sort $(dir_y)):  config
-	[ ! -d "$@" ] || ( touch $@/.sgbuilt_user && $(MAKE) -C $@ ) || exit $$?
-
-%_only:
-	touch $(@:_only=)/.sgbuilt_user && $(MAKE) -C $(@:_only=)
-
-%_clean:
-	$(MAKE) -C $(@:_clean=) clean; rm -f $(@:_clean=)/.sgbuilt_user; true
-
 romfs:
+ifeq ($(CONFIG_USER_OPENSSL),y)
+	if [ -e openssl/libssl.so ]; then  cd openssl ; $(MAKE) romfs ; cd .. ; fi
+endif
 	for i in $(sort $(dir_y)) ; do \
 		[ ! -d $$i ] || $(MAKE) -C $$i romfs || exit $$? ; \
 	done
 
 clean:
-	# ">>>>>>>>>>>>>>>> START CLEANUP <<<<<<<<<<<<<<<<<<<<<<"
-	-for i in $(dir_v) $(sort $(dir_y) $(dir_n) $(dir_)) ; do \
-		$(MAKE) -C $$i clean ; \
-		rm -f $$i/.sgbuilt_user; \
-	done
-	# ">>>>>>>>>>>>>>>> FULL CLEANUP  <<<<<<<<<<<<<<<<<<<<<<"
-	-for i in $(sort $(dir_y) $(dir_n) $(dir_)) ; do [ ! -d $$i ] || $(MAKE) -C $$i mrproper; done
-	-for i in $(sort $(dir_y) $(dir_n) $(dir_)) ; do [ ! -d $$i ] || $(MAKE) -C $$i dist-clean; done
-	-for i in $(sort $(dir_y) $(dir_n) $(dir_)) ; do [ ! -d $$i ] || $(MAKE) -C $$i distclean; done
-	-@set -e; for i in $(SUBDIRS_APP); do $(MAKE) -C $$i clean; rm -rf $$i/filesystem/*; done
+	# ">>>>>>>>>>>>>>>> START FULL CLEANUP  <<<<<<<<<<<<<<<<<<<<<<"
+	-for i in $(sort $(dir_y) $(dir_n) $(dir_)) ; do [ ! -d $$i ] || \
+	    ($(MAKE) -C $$i clean; \
+	     $(MAKE) -C $$i dist-clean; \
+	     $(MAKE) -C $$i distclean; \
+	     $(MAKE) -C $$i mrproper) \
+	    done
+	-for i in $(SUBDIRS_APP); do $(MAKE) -C $$i clean; $(RM) -rf $(ROOTDIR)/user/$$i/filesystem/*; done
 
 web:
 	$(MAKE) -C goahead all

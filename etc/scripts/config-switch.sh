@@ -22,23 +22,35 @@ start_sw_config() {
     ##########################################################################
     if [ -f /proc/rt2880/gmac ]; then
 	PROC="/proc/rt2880/gmac"
+	SWITCH_MODE=1
     elif [ -f /proc/rt3052/gmac ]; then
 	PROC="/proc/rt3052/gmac"
+	SWITCH_MODE=2
     elif [ -f /proc/rt3352/gmac ]; then
 	PROC="/proc/rt3352/gmac"
+	SWITCH_MODE=2
     elif [ -f /proc/rt5350/gmac ]; then
 	PROC="/proc/rt5350/gmac"
+	SWITCH_MODE=2
     elif [ -f /proc/rt2883/gmac ]; then
 	PROC="/proc/rt2883/gmac"
+	SWITCH_MODE=2
     elif [ -f /proc/rt3883/gmac ]; then
 	PROC="/proc/rt3883/gmac"
+	SWITCH_MODE=2
     elif [ -f /proc/rt6855/gmac ]; then
 	PROC="/proc/rt6855/gmac"
+	SWITCH_MODE=3
     elif [ -f /proc/rt63365/gmac ]; then
 	PROC="/proc/rt63365/gmac"
+	SWITCH_MODE=3
+    elif [ -f /proc/mt7620/gmac ]; then
+	PROC="/proc/mt7620/gmac"
+	SWITCH_MODE=3
     else
 	$LOG "No switch in system!!!"
 	PROC=
+	SWITCH_MODE=
     fi
 
     ##########################################################################
@@ -192,10 +204,9 @@ start_sw_config
 ##############################################################################
 # Internal 3052 ESW
 ##############################################################################
-if [ "$CONFIG_RT_3052_ESW" != "" ]; then
-    SWITCH_MODE=2
+if [ "$CONFIG_RT_3052_ESW" != "" ] && [ "$SWITCH_MODE" != "" ]; then
     configs_system_vlans
-    if [ ! -f /var/run/goahead.pid ]; then
+    if [ ! -f /var/run/goahead.pid ] && [ "$CONFIG_RALINK_RT3052" != "" ]; then
 	######################################################################
 	# workaroud for dir-300NRU and some ithers devices
 	# with not correct configured from uboot

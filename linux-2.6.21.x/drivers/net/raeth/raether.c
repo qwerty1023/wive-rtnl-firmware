@@ -1867,7 +1867,7 @@ static irqreturn_t esw_interrupt(int irq, void *dev_id)
 	unsigned long acl_int_val;
 #else
 	static unsigned long stat;
-	unsigned long stat_curr;
+	unsigned long stat_curr, stat_print;
 #ifdef CONFIG_RAETH_DHCP_TOUCH
 	int port_offset;
 #endif
@@ -1918,10 +1918,11 @@ static irqreturn_t esw_interrupt(int irq, void *dev_id)
 		    port_offset=29-send_sigusr_dhcpc; //ports offset is 25..29 = 4..0
 		    if ((stat & (1<<port_offset)) || !(stat_curr & (1<<port_offset)))
 		    {
-			    RAETH_PRINT(KERN_INFO "RT305x_ESW: Link Status Changed\n");
+			    stat_print=(stat_curr & 0x3E000000) >> 25;
+			    printk(KERN_INFO "RT305x_ESW: Link Status Changed (0x%lx)\n", stat_print);
 			    goto out;
 		    }
-		    printk(KERN_INFO "RT305x_ESW: WAN Port Link Status Changed\n");
+		    printk(KERN_INFO "RT305x_ESW: WAN Port Link Up\n");
 		}
 
 		/* send SIGUSR1 to dhcp client */

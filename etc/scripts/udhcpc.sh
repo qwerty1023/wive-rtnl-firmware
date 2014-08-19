@@ -69,10 +69,9 @@ case "$1" in
 	service vpnhelper stop_safe
 	# Workaround for infinite OFFER wait
 	if [ "$OperationMode" != "2" ] && [ "$dhcpSwReset" = "1" ]; then
-	    if [ "$CONFIG_RT_3052_ESW" != "" ]; then
-		# Reset switch to uplink touch
+	    if [ "$CONFIG_RT_3052_ESW" != "" ] && [ "$RALINK_MT7620" = "" ]; then
 		$LOG "Restart WAN switch port."
-		/etc/scripts/config-vlan.sh WWWWW
+		/etc/scripts/config-vlan.sh 2 WWWWW
 	    fi
 	elif [ "$OperationMode" = "2" ] || [ "$OperationMode" = "3" ]; then
 	    # Try reconnect at lease failed
