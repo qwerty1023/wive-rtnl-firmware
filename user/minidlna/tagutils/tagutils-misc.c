@@ -34,7 +34,7 @@ typedef enum {
 #ifdef HAVE_ICONV
 static iconv_result
 do_iconv(const char* to_ces, const char* from_ces,
-	 const char *inbuf,  size_t inbytesleft,
+	 ICONV_CONST char *inbuf,  size_t inbytesleft,
 	 char *outbuf_orig, size_t outbytesleft_orig)
 {
 	size_t rc;
@@ -190,7 +190,12 @@ vc_scan(struct song_metadata *psong, const char *comment, const size_t length)
 	{
 		if( strncasecmp(comment, "LYRICS=", 7) != 0 )
 		{
-			DPRINTF(E_WARN, L_SCANNER, "Vorbis %.*s too long [%s]\n", (index(comment, '=')-comment), comment, psong->path);
+			const char *eq = strchr(comment, '=');
+			int len = 8;
+			if (eq)
+				len = eq - comment;
+			DPRINTF(E_WARN, L_SCANNER, "Vorbis %.*s too long [%s]\n",
+				len, comment, psong->path);
 		}
 		return;
 	}

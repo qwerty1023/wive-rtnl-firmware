@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # if app not exist
-if [ ! -f /bin/minidlna ] || [ ! -d /proc/bus/usb ]; then
+if [ ! -f /bin/minidlnad ] || [ ! -d /proc/bus/usb ]; then
     exit 0
 fi
 
@@ -15,7 +15,7 @@ web_wait
 # include wait to web full load
 . /etc/scripts/start_wait.sh
 
-LOG="logger -t minidlna"
+LOG="logger -t minidlnad"
 
 SCAN_OPT=""
 
@@ -27,38 +27,38 @@ start() {
 	# wait to web full load
 	start_wait
 
-	# if need kill minidlna
-	pid=`pidof minidlna`
+	# if need kill minidlnad
+	pid=`pidof minidlnad`
 	if [ "$pid" != "" ]; then
-	    $LOG "Stop minidlna."
-	    killall -q minidlna
+	    $LOG "Stop minidlnad."
+	    killall -q minidlnad
 	    sleep 2
 	    #kill if not stopped
-	    killall -q -SIGKILL minidlna
+	    killall -q -SIGKILL minidlnad
         fi
 
 	gen_config
 
-	$LOG "Start minidlna."
+	$LOG "Start minidlnad."
 	if [ "$public" = "" ]; then
 	    $LOG "Disc not mounted... minidlna cant start!"
 	    exit 0
 	fi
 
-	/bin/minidlna $SCAN_OPT
+	/bin/minidlnad $SCAN_OPT
       ) & # send to background
     fi
 }
 
 stop() {
-	# if need kill minidlna
-	pid=`pidof minidlna`
+	# if need kill minidlnad
+	pid=`pidof minidlnad`
 	if [ "$pid" != "" ]; then
-	    $LOG "Stop minidlna."
-	    killall -q minidlna
+	    $LOG "Stop minidlnad."
+	    killall -q minidlnad
 	    sleep 2
 	    #kill if not stopped
-	    killall -q -SIGKILL minidlna
+	    killall -q -SIGKILL minidlnad
         fi
 }
 

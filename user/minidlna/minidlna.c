@@ -65,6 +65,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <pthread.h>
+#include <limits.h>
 #include <libgen.h>
 #include <pwd.h>
 
@@ -302,14 +303,17 @@ open_db(sqlite3 **sq3)
 	return new_db;
 }
 
+//#define MD_CHECK_MP 1
+
 static void
 check_db(sqlite3 *db, int new_db, pid_t *scanner_pid)
 {
-	struct media_dir_s *media_path = NULL;
 	char cmd[PATH_MAX*2];
+	int ret;
+#ifdef MD_CHECK_MP
+	struct media_dir_s *media_path = NULL;
 	char **result;
 	int i, rows = 0;
-	int ret;
 
 	if (!new_db)
 	{
@@ -345,19 +349,26 @@ check_db(sqlite3 *db, int new_db, pid_t *scanner_pid)
 		}
 		sqlite3_free_table(result);
 	}
-
+#endif
 	ret = db_upgrade(db);
-	if (ret != 0)
+	if ((ret != 0) || (GETFLAG(UPDATE_SCAN_MASK)))
 	{
+		if (ret != 0)
+		{
+#ifdef MD_CHECK_MP
 rescan:
+#endif
 		if (ret < 0)
 			DPRINTF(E_WARN, L_GENERAL, "Creating new database at %s/files.db\n", db_path);
+#ifdef MD_CHECK_MP
 		else if (ret == 1)
 			DPRINTF(E_WARN, L_GENERAL, "New media_dir detected; rescanning...\n");
 		else if (ret == 2)
 			DPRINTF(E_WARN, L_GENERAL, "Removed media_dir detected; rescanning...\n");
+#endif
 		else
-			DPRINTF(E_WARN, L_GENERAL, "Database version mismatch; need to recreate...\n");
+			DPRINTF(E_WARN, L_GENERAL, "Database version mismatch (%d=>%d); need to recreate...\n",
+				ret, DB_VERSION);
 		sqlite3_close(db);
 
 		snprintf(cmd, sizeof(cmd), "rm -rf %s/files.db %s/art_cache", db_path, db_path);
@@ -367,6 +378,7 @@ rescan:
 		open_db(&db);
 		if (CreateDatabase() != 0)
 			DPRINTF(E_FATAL, L_GENERAL, "ERROR: Failed to create sqlite database!  Exiting...\n");
+		}
 #if USE_FORK
 		scanning = 1;
 		sqlite3_close(db);
@@ -424,7 +436,7 @@ writepidfile(const char *fname, int pid, uid_t uid)
 		if (uid > 0)
 		{
 			if (chown(dir, uid, -1) != 0)
-				DPRINTF(E_WARN, L_GENERAL, "Unable to change pidfile ownership: %s\n",
+				DPRINTF(E_WARN, L_GENERAL, "Unable to change pidfile %s ownership: %s\n",
 					dir, strerror(errno));
 		}
 	}
@@ -440,19 +452,26 @@ writepidfile(const char *fname, int pid, uid_t uid)
 	if (fprintf(pidfile, "%d\n", pid) <= 0)
 	{
 		DPRINTF(E_ERROR, L_GENERAL, 
-			"Unable to write to pidfile %s: %s\n", fname);
+			"Unable to write to pidfile %s: %s\n", fname, strerror(errno));
 		ret = -1;
 	}
 	if (uid > 0)
 	{
 		if (fchown(fileno(pidfile), uid, -1) != 0)
-			DPRINTF(E_WARN, L_GENERAL, "Unable to change pidfile ownership: %s\n",
-				pidfile, strerror(errno));
+			DPRINTF(E_WARN, L_GENERAL, "Unable to change pidfile %s ownership: %s\n",
+				fname, strerror(errno));
 	}
 
 	fclose(pidfile);
 
 	return ret;
+}
+
+static int strtobool(const char *str)
+{
+	return ((strcasecmp(str, "yes") == 0) ||
+		(strcasecmp(str, "true") == 0) ||
+		(atoi(str) == 1));
 }
 
 /* init phase :
@@ -649,15 +668,15 @@ init(int argc, char **argv)
 			log_level = ary_options[i].value;
 			break;
 		case UPNPINOTIFY:
-			if ((strcmp(ary_options[i].value, "yes") != 0) && !atoi(ary_options[i].value))
+			if (!strtobool(ary_options[i].value))
 				CLEARFLAG(INOTIFY_MASK);
 			break;
 		case ENABLE_TIVO:
-			if ((strcmp(ary_options[i].value, "yes") == 0) || atoi(ary_options[i].value))
+			if (strtobool(ary_options[i].value))
 				SETFLAG(TIVO_MASK);
 			break;
 		case ENABLE_DLNA_STRICT:
-			if ((strcmp(ary_options[i].value, "yes") == 0) || atoi(ary_options[i].value))
+			if (strtobool(ary_options[i].value))
 				SETFLAG(DLNA_STRICT_MASK);
 			break;
 		case ROOT_CONTAINER:
@@ -682,7 +701,8 @@ init(int argc, char **argv)
 				runtime_vars.root_container = IMAGE_ID;
 				break;
 			default:
-				DPRINTF(E_ERROR, L_GENERAL, "Invalid root container! [%s]\n",
+				runtime_vars.root_container = ary_options[i].value;
+				DPRINTF(E_WARN, L_GENERAL, "Using arbitrary root container [%s]\n",
 					ary_options[i].value);
 				break;
 			}
@@ -709,6 +729,10 @@ init(int argc, char **argv)
 			break;
 		case MAX_CONNECTIONS:
 			runtime_vars.max_connections = atoi(ary_options[i].value);
+			break;
+		case MERGE_MEDIA_DIRS:
+			if (strtobool(ary_options[i].value))
+				SETFLAG(MERGE_MEDIA_DIRS_MASK);
 			break;
 		default:
 			DPRINTF(E_ERROR, L_GENERAL, "Unknown option in file %s\n",
@@ -837,6 +861,9 @@ init(int argc, char **argv)
 			SETFLAG(SYSTEMD_MASK);
 			break;
 #endif
+		case 'U':
+			SETFLAG(UPDATE_SCAN_MASK);
+			break;
 		case 'V':
 			printf("Version " MINIDLNA_VERSION "\n");
 			exit(0);
@@ -870,6 +897,7 @@ init(int argc, char **argv)
 #ifdef __linux__
 			"\t-S changes behaviour for systemd\n"
 #endif
+			"\t-U starts an update scan\n"
 			"\t-V print the version number\n",
 			argv[0], pidfilename);
 		return 1;
@@ -912,7 +940,7 @@ init(int argc, char **argv)
 
 	if (process_check_if_running(pidfilename) < 0)
 	{
-		DPRINTF(E_ERROR, L_GENERAL, "MiniDLNA is already running. EXITING.\n");
+		DPRINTF(E_ERROR, L_GENERAL, SERVER_NAME " is already running. EXITING.\n");
 		return 1;
 	}	
 
@@ -1055,8 +1083,6 @@ main(int argc, char **argv)
 		tivo_bcast.sin_addr.s_addr = htonl(getBcastAddress());
 		tivo_bcast.sin_port = htons(2190);
 	}
-	else
-		sbeacon = -1;
 #endif
 
 	reload_ifaces(0);
@@ -1102,7 +1128,7 @@ main(int argc, char **argv)
 					timeout.tv_usec = lastnotifytime.tv_usec - timeofday.tv_usec;
 			}
 #ifdef TIVO_SUPPORT
-			if (GETFLAG(TIVO_MASK))
+			if (sbeacon >= 0)
 			{
 				if (timeofday.tv_sec >= (lastbeacontime.tv_sec + beacon_interval))
 				{
