@@ -264,14 +264,10 @@ romfs.subdirs:
 
 .PHONY: modules_install
 modules_install:
-	#----------------------------STRIP-AND-INSTALL_MODULES----------------------------------
+	#----------------------------INSTALL_MODULES----------------------------------
 	. $(LINUXDIR)/.config; if [ "$$CONFIG_MODULES" = "y" ]; then \
 		[ -d $(ROMFSDIR)/lib/modules ] || mkdir -p $(ROMFSDIR)/lib/modules; \
 		$(MAKEARCH_KERNEL) -C $(LINUXDIR) INSTALL_MOD_PATH=$(ROMFSDIR) DEPMOD="../user/busybox/examples/depmod.pl" modules_install; \
-		rm -f $(ROMFSDIR)/lib/modules/*/build; \
-		rm -f $(ROMFSDIR)/lib/modules/*/source; \
-		find $(ROMFSDIR)/lib/modules -type f -name '*.ko' | xargs -r $(STRIP) $(STRIPOPT); \
-		find $(ROMFSDIR)/lib/modules -type f -name '*.ko' -print -print | xargs -n2 -r $(OBJCOPY) $(STRIPOPT); \
 	fi
 
 .PHONY: romfs.post
@@ -280,6 +276,8 @@ romfs.post:
 	find $(ROOTDIR)/toolchain/lib -type f -name 'libgcc_s*so*' -exec cp -vfap {} $(ROMFSDIR)/lib/ \;
 	######################CLEANUP##########################
 	-find $(ROMFSDIR)/. -name CVS | xargs -r rm -rf
+	-rm -f $(ROMFSDIR)/lib/modules/*/build
+	-rm -f $(ROMFSDIR)/lib/modules/*/source
 	-rm -fr $(ROOTDIR)/dev
 	#################STRIP_APPS_LIB_ROMFS##################
 	./strip.sh
