@@ -75,7 +75,7 @@ void SyncMtrTbl(void)
 	} else if (PostRuleFound) {
 		PpeSetPostMtrEbl(1);
 	} else {
-		printk("MTR Table All Empty!\n");
+		NAT_PRINT("MTR Table All Empty!\n");
 	}
 }
 
@@ -225,15 +225,16 @@ void PpeSetPreMtrEbl(uint32_t PreMtrEbl)
 
 	/* Pre-Meter engine for unicast/multicast/broadcast flow */
 	if (PreMtrEbl == 1) {
-		PpeFlowSet |= (BIT_FUC_PREM | BIT_FMC_PREM | BIT_FBC_PREM);
-#if defined(CONFIG_RA_HW_NAT_IPV6)
+		PpeFlowSet |= (BIT_FUC_PREM);
+#if defined (CONFIG_RA_HW_NAT_IPV6)
 		PpeFlowSet |= (BIT_IPV6_PE_EN);
 #endif
 	} else {
 		PpeFlowSet &= ~(BIT_FUC_PREM | BIT_FMC_PREM | BIT_FBC_PREM);
-#if defined(CONFIG_RA_HW_NAT_IPV6)
+#if defined (CONFIG_RA_HW_NAT_IPV6)
 		PpeFlowSet &= ~(BIT_IPV6_PE_EN);
 #endif
+		PpeRstPreMtrPtr();
 	}
 
 	RegWrite(PPE_FLOW_SET, PpeFlowSet);
@@ -288,15 +289,17 @@ void PpeSetPostMtrEbl(uint32_t PostMtrEbl)
 
 	/* Post-Meter engine for unicast/multicast/broadcast flow */
 	if (PostMtrEbl == 1) {
-		PpeFlowSet |= BIT_FUC_POSM | BIT_FMC_POSM | BIT_FBC_POSM;
-#if defined(CONFIG_RA_HW_NAT_IPV6)
+		PpeFlowSet |= (BIT_FUC_POSM);
+#if defined (CONFIG_RA_HW_NAT_IPV6)
 		PpeFlowSet |= (BIT_IPV6_PE_EN);
 #endif
 	} else {
 		PpeFlowSet &= ~(BIT_FUC_POSM | BIT_FMC_POSM | BIT_FBC_POSM);
-#if defined(CONFIG_RA_HW_NAT_IPV6)
+#if defined (CONFIG_RA_HW_NAT_IPV6)
 		PpeFlowSet &= ~(BIT_IPV6_PE_EN);
 #endif
+		PpeRstPostMtrPtr();
+
 	}
 
 	RegWrite(PPE_FLOW_SET, PpeFlowSet);
@@ -361,10 +364,8 @@ void PpeInsMtrTbl(MtrPlcyNode * node)
 
 	RegWrite(METER_BASE + node->MgNum * 4, MtrEntry);
 
-	printk("Meter Table Base=%08X Offset=%d\n", METER_BASE,
-	       node->MgNum * 4);
-	printk("%08X: %08X\n", METER_BASE + node->MgNum * 4, MtrEntry);
-
+	NAT_DEBUG("Meter Table Base=%08X Offset=%d\n", METER_BASE, node->MgNum * 4);
+	NAT_DEBUG("%08X: %08X\n", METER_BASE + node->MgNum * 4, MtrEntry);
 }
 
 int PpeGetFreeMtrGrp(void)
@@ -400,10 +401,9 @@ void inline PpeInsMtrEntry(void *Rule, enum MtrType Type)
 		Index = PpeGetPostMtrEnd();
 	}
 
-	printk("Policy Table Base=%08X Offset=%d\n", POLICY_TBL_BASE,
-	       Index * 8);
-	printk("%08X: %08X\n", POLICY_TBL_BASE + Index * 8, *p);
-	printk("%08X: %08X\n", POLICY_TBL_BASE + Index * 8 + 4, *(p + 1));
+	NAT_DEBUG("\nPolicy Table Base=0x%08X Offset=0x%04X\n", POLICY_TBL_BASE, Index * 8);
+	NAT_DEBUG("%08X: %08X\n", POLICY_TBL_BASE + Index * 8, *p);
+	NAT_DEBUG("%08X: %08X\n", POLICY_TBL_BASE + Index * 8 + 4, *(p + 1));
 
 	RegWrite(POLICY_TBL_BASE + Index * 8, *p);	/* Low bytes */
 	RegWrite(POLICY_TBL_BASE + Index * 8 + 4, *(p + 1));	/* High bytes */

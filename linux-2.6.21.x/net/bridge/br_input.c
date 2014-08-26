@@ -43,7 +43,7 @@ static int br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 }
 
 /* note: already called with rcu_read_lock (preempt_disabled) */
-int br_handle_frame_finish(struct sk_buff *skb)
+int FASTPATHNET br_handle_frame_finish(struct sk_buff *skb)
 {
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
 	struct net_bridge_port *p = rcu_dereference(skb->dev->br_port);
@@ -87,6 +87,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	if (is_broadcast_ether_addr(dest))
 		skb2 = skb;
 	else if (is_multicast_ether_addr(dest)) {
+		br->statistics.multicast++;
 #ifdef CONFIG_BRIDGE_IGMP_REPORT_NO_FLOODING
 		if (dest[0] != 0x01 || dest[1] != 0x00 || dest[2] != 0x5e || (dest[3] > 0x7f))
 			goto no_igmp;
@@ -111,7 +112,6 @@ int br_handle_frame_finish(struct sk_buff *skb)
 		}
 no_igmp:
 #endif
-		br->statistics.multicast++;
 		skb2 = skb;
 	} else if ((dst = __br_fdb_get(br, dest)) && dst->is_local) {
 		skb2 = skb;
@@ -166,7 +166,7 @@ static inline bool is_link_local_ether_addr(const u8 *addr)
  * Return NULL if skb is handled
  * note: already called with rcu_read_lock (preempt_disabled)
  */
-struct sk_buff *br_handle_frame(struct net_bridge_port *p, struct sk_buff *skb)
+struct FASTPATHNET sk_buff *br_handle_frame(struct net_bridge_port *p, struct sk_buff *skb)
 {
     const unsigned char *dest = eth_hdr(skb)->h_dest;
 

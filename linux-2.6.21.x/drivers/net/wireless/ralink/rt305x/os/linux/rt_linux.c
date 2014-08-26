@@ -841,29 +841,20 @@ void announce_802_3_packet(
 #endif // CONFIG_RT2880_BRIDGING_ONLY //
 
 #if !defined(CONFIG_RA_NAT_NONE)
-#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
-       FOE_MAGIC_TAG(pRxPkt)= FOE_MAGIC_WLAN;
-#endif // defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE) //
-
 	/*
 	  * ra_sw_nat_hook_rx return 1 --> continue
 	  * ra_sw_nat_hook_rx return 0 --> FWD & without netif_rx
 	 */
 
 	if(ra_sw_nat_hook_rx != NULL) {
-		unsigned int flags;
-
 		pRxPkt->protocol = eth_type_trans(pRxPkt, pRxPkt->dev);
-		RTMP_IRQ_LOCK(&pAd->page_lock, flags);
-
+		FOE_MAGIC_TAG(pRxPkt) = FOE_MAGIC_EXTIF;
 		if(ra_sw_nat_hook_rx(pRxPkt))
 			netif_rx(pRxPkt);
-
-		RTMP_IRQ_UNLOCK(&pAd->page_lock, flags);
 	} else
 #else
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-		FOE_AI(pRxPkt)=UN_HIT;
+		FOE_AI_UNHIT(pRxPkt);
 #endif // defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE) //
 #endif // !defined(CONFIG_RA_NAT_NONE) //
 #endif // RTMP_RBUS_SUPPORT //

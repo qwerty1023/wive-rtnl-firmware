@@ -66,11 +66,10 @@ static int ipv4_print_tuple(struct seq_file *s,
 			  NIPQUAD(tuple->dst.u3.ip));
 }
 
-/* Returns new sk_buff, or NULL */
 #ifndef CONFIG_BCM_NAT
 static
 #endif
-int FASTPATH nf_ct_ipv4_gather_frags(struct sk_buff *skb, u_int32_t user)
+int FASTPATHNET nf_ct_ipv4_gather_frags(struct sk_buff *skb, u_int32_t user)
 {
 	int err;
 
@@ -80,8 +79,10 @@ int FASTPATH nf_ct_ipv4_gather_frags(struct sk_buff *skb, u_int32_t user)
 	err = ip_defrag(skb, user);
 	local_bh_enable();
 
-	if (!err)
+	if (!err) {
 		ip_send_check(ip_hdr(skb));
+		skb->ignore_df = 1;
+	}
 
 	return err;
 }
@@ -146,11 +147,8 @@ static unsigned int ipv4_conntrack_help(unsigned int hooknum,
 		return NF_ACCEPT;
 
 #if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-        if (IS_SPACE_AVAILABLED(*pskb) && IS_MAGIC_TAG_VALID(*pskb)) {
-                FOE_ALG(*pskb)=1;
-        }
+	FOE_ALG_MARK(*pskb);
 #endif
-
 	return help->helper->help(pskb,
 			skb_network_offset(*pskb) + ip_hdrlen(*pskb),
 			ct, ctinfo);

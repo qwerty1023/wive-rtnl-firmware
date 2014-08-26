@@ -127,7 +127,7 @@ static void skb_under_panic(struct sk_buff *skb, unsigned int sz, void *addr)
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
-struct sk_buff FASTPATH *__alloc_skb(unsigned int size, gfp_t gfp_mask,
+struct sk_buff FASTPATHNET *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone, int node)
 {
 	struct kmem_cache *cache;
@@ -342,7 +342,7 @@ static void skb_release_all(struct sk_buff *skb)
  *	always call kfree_skb
  */
 
-void FASTPATH __kfree_skb(struct sk_buff *skb)
+void FASTPATHNET __kfree_skb(struct sk_buff *skb)
 {
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	if(IS_MAGIC_TAG_VALID(skb) || (FOE_MAGIC_TAG(skb) == FOE_MAGIC_PPE))
@@ -359,7 +359,7 @@ void FASTPATH __kfree_skb(struct sk_buff *skb)
  *	Drop a reference to the buffer and free it if the usage count has
  *	hit zero.
  */
-void FASTPATH kfree_skb(struct sk_buff *skb)
+void FASTPATHNET kfree_skb(struct sk_buff *skb)
 {
 	if (unlikely(!skb))
 		return;
@@ -392,7 +392,7 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	C(data_len);
 	C(mac_len);
 	C(csum);
-	C(local_df);
+	C(ignore_df);
 	n->hdr_len = skb->nohdr ? skb_headroom(skb) : skb->hdr_len;
 	n->cloned = 1;
 	n->nohdr = 0;
@@ -506,7 +506,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	new->nh.raw	= old->nh.raw + offset;
 	new->mac.raw	= old->mac.raw + offset;
 	memcpy(new->cb, old->cb, sizeof(old->cb));
-	new->local_df	= old->local_df;
+	new->ignore_df	= old->ignore_df;
 	new->fclone	= SKB_FCLONE_UNAVAILABLE;
 	new->pkt_type	= old->pkt_type;
 	new->tstamp	= old->tstamp;

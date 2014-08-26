@@ -49,6 +49,7 @@
 #include "../../../net/nat/hw_nat/ra_nat.h"
 extern int (*ra_sw_nat_hook_rx)(struct sk_buff *skb);
 extern int (*ra_sw_nat_hook_tx)(struct sk_buff *skb, int gmac_no);
+extern int (*ra_sw_nat_hook_rs)(struct net_device *dev, int hold);
 #endif
 
 #define DRIVER_VERSION		"22-Aug-2005"
@@ -252,8 +253,8 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 	 /* ra_sw_nat_hook_rx return 1 --> continue
 	  * ra_sw_nat_hook_rx return 0 --> FWD & without netif_rx
 	  */
-	FOE_MAGIC_TAG(skb)= FOE_MAGIC_PCI;
-	FOE_AI(skb)=UN_HIT;
+	FOE_MAGIC_TAG(skb) = FOE_MAGIC_EXTIF;
+	FOE_AI_UNHIT(skb);
 	if(ra_sw_nat_hook_rx != NULL)
 	{
 		if(ra_sw_nat_hook_rx(skb)) {
@@ -1039,7 +1040,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
         /* add tx hook point*/
         if(ra_sw_nat_hook_tx != NULL) {
                 skb->data += 4; //pointer to DA
-                ra_sw_nat_hook_tx(skb, 1);
+                ra_sw_nat_hook_tx(skb, 0);
                 skb->data -= 4;
         }
 #endif
@@ -1200,7 +1201,12 @@ void usbnet_disconnect (struct usb_interface *intf)
 			dev->driver_info->description);
 
 	net = dev->net;
-	unregister_netdev (net);
+#if defined(CONFIG_RA_HW_NAT_PCI) && (defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE))
+        /* clear dstif table in hw_nat module */
+        if (ra_sw_nat_hook_rs != NULL)
+            ra_sw_nat_hook_rs(net, 0);
+#endif
+        unregister_netdev (net);
 
 	/* we don't hold rtnl here ... */
 	flush_scheduled_work ();
@@ -1271,12 +1277,6 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	 * bind() should set rx_urb_size in that case.
 	 */
 	dev->hard_mtu = net->mtu + net->hard_header_len;
-#if 0
-// dma_supported() is deeply broken on almost all architectures
-	// possible with some EHCI controllers
-	if (dma_supported (&udev->dev, DMA_64BIT_MASK))
-		net->features |= NETIF_F_HIGHDMA;
-#endif
 
 	net->change_mtu = usbnet_change_mtu;
 	net->get_stats = usbnet_get_stats;
@@ -1294,30 +1294,9 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		if (status < 0)
 			goto out1;
 
-#if defined(CONFIG_RA_HW_NAT_PCI) && (defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE))
 		/* always use ethX names for ifaces */
 		strcpy (net->name, "eth%d");
 		fake_usb_class.name = "usbeth%d";
-#else
-		// heuristic:  "usb%d" for links we know are two-host,
-		// else "eth%d" when there's reasonable doubt.  userspace
-		// can rename the link if it knows better.
-		if ((dev->driver_info->flags & FLAG_ETHER) != 0
-				&& (net->dev_addr [0] & 0x02) == 0)
-		{
-			/* Check wimax devices */
-			//printk("usbnet: VID = 0x%04x, PID = 0x%04x\n", xdev->descriptor.idVendor, xdev->descriptor.idProduct); 
-			if(((xdev->descriptor.idProduct == 0x7112) && (xdev->descriptor.idVendor == 0x0e8d)) || /* ZyXEL on MTK */
-			   ((xdev->descriptor.idProduct == 0x7708) && (xdev->descriptor.idVendor == 0x1076)) || ((xdev->descriptor.idProduct == 0xa4a2) && (xdev->descriptor.idVendor == 0x0525))) /* Yota Key */
-			{
-				strcpy (net->name, "wimax%d");
-				fake_usb_class.name = "usbwimax%d";
-			} else {
-				strcpy (net->name, "eth%d");
-				fake_usb_class.name = "usbeth%d";
-			}
-		}
-#endif
 
 		/* maybe the remote can't receive an Ethernet MTU */
 		if (net->mtu > (dev->hard_mtu - net->hard_header_len))
@@ -1363,10 +1342,16 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	// start as if the link is up
 	netif_device_attach (net);
-	
-	/* Register dev as class for mdev */	
+
+	/* Register dev as class for mdev */
 	usb_register_dev(udev, &fake_usb_class);
-	
+
+#if defined(CONFIG_RA_HW_NAT_PCI) && (defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE))
+        /* fill dstif table in hw_nat module */
+	if (ra_sw_nat_hook_rs != NULL)
+            ra_sw_nat_hook_rs(net, 1);
+#endif
+
 	return 0;
 
 out3:

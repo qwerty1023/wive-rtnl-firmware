@@ -21,14 +21,25 @@
 #include "util.h"
 #include "ra_nat.h"
 
-unsigned char bind_dir = BIDIRECTION;
-int DebugLevel = 0;
+#if defined (CONFIG_RA_HW_NAT_IPV6)
+extern int ipv6_offload;
+#endif
+extern uint16_t lan_vid;
+extern uint16_t wan_vid;
+extern uint32_t DebugLevel;
+
+#if !defined (CONFIG_HNAT_V2)
+int pre_acl_start_addr;
+int pre_ac_start_addr;
+int post_ac_start_addr;
+int pre_mtr_start_addr;
+int post_mtr_start_addr;
+#endif
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
 long HwNatIoctl(struct file *file, unsigned int cmd, unsigned long arg)
 #else
-int
-HwNatIoctl(struct inode *inode, struct file *filp,
+int HwNatIoctl(struct inode *inode, struct file *filp,
 	   unsigned int cmd, unsigned long arg)
 #endif
 {
@@ -51,7 +62,7 @@ HwNatIoctl(struct inode *inode, struct file *filp,
 		opt->result = FoeUnBindEntry(opt);
 		break;
 	case HW_NAT_INVALID_ENTRY:
-		opt->result = FoeDelEntryByNum(opt->entry_num);
+		opt->result = FoeDelEntry(opt);
 		break;
 	case HW_NAT_DUMP_ENTRY:
 		FoeDumpEntry(opt->entry_num);
@@ -64,7 +75,11 @@ HwNatIoctl(struct inode *inode, struct file *filp,
 	case HW_NAT_DEBUG:	/* For Debug */
 		DebugLevel = opt->debug;
 		break;
-#if !defined (CONFIG_HNAT_V2)
+#if defined (CONFIG_HNAT_V2)
+	case HW_NAT_GET_AC_CNT:
+		opt3->result = PpeGetAGCnt(opt3);
+		break;
+#else
 	case HW_NAT_DSCP_REMARK:
 		opt3->result = PpeSetDscpRemarkEbl(opt3->enable);
 		break;
@@ -112,10 +127,6 @@ HwNatIoctl(struct inode *inode, struct file *filp,
 				   opt4->pre_ac, opt4->post_meter,
 				   opt4->post_ac);
 		break;
-#else
-	case HW_NAT_GET_AC_CNT:
-		opt3->result = PpeGetAGCnt(opt3);
-		break;
 #endif
 	case HW_NAT_BIND_THRESHOLD:
 		opt4->result = PpeSetBindThreshold(opt4->bind_threshold);
@@ -138,7 +149,15 @@ HwNatIoctl(struct inode *inode, struct file *filp,
 				       opt4->foe_udp_dlta, opt4->foe_fin_dlta);
 		break;
 	case HW_NAT_BIND_DIRECTION:
-		bind_dir = opt->bind_dir;
+		opt4->result = HWNAT_FAIL;
+		break;
+	case HW_NAT_VLAN_ID:
+		wan_vid = opt4->wan_vid;
+		lan_vid = opt4->lan_vid;
+		opt4->result = HWNAT_SUCCESS;
+		break;
+	case HW_NAT_ALLOW_IPV6:
+		opt4->result = PpeSetAllowIPv6(opt4->foe_allow_ipv6);
 		break;
 	default:
 		break;
@@ -148,20 +167,18 @@ HwNatIoctl(struct inode *inode, struct file *filp,
 
 struct file_operations hw_nat_fops = {
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
-      unlocked_ioctl:HwNatIoctl,
+	unlocked_ioctl: HwNatIoctl,
 #else
-      ioctl:HwNatIoctl,
+	ioctl: HwNatIoctl,
 #endif
 };
 
 int PpeRegIoctlHandler(void)
 {
-
 	int result = 0;
 	result = register_chrdev(HW_NAT_MAJOR, HW_NAT_DEVNAME, &hw_nat_fops);
 	if (result < 0) {
-		NAT_PRINT(KERN_WARNING "hw_nat: can't get major %d\n",
-			  HW_NAT_MAJOR);
+		printk(KERN_WARNING "hw_nat: can't get major %d\n", HW_NAT_MAJOR);
 		return result;
 	}
 
@@ -172,20 +189,22 @@ int PpeRegIoctlHandler(void)
 	return 0;
 }
 
-
 void PpeUnRegIoctlHandler(void)
 {
 	unregister_chrdev(HW_NAT_MAJOR, HW_NAT_DEVNAME);
 }
 
 #if defined (CONFIG_HNAT_V2)
-int32_t PpeGetAGCnt(struct hwnat_ac_args * opt3)
+int PpeGetAGCnt(struct hwnat_ac_args * opt3)
 {
-
-        opt3->ag_pkt_cnt = RegRead(AC_BASE + opt3->ag_index * 8);       /* Low bytes */
-        opt3->ag_byte_cnt = RegRead(AC_BASE + opt3->ag_index * 8 + 4);  /* High bytes */
-
-        return HWNAT_SUCCESS;
+#if defined (CONFIG_RALINK_MT7620)
+	opt3->ag_byte_cnt = RegRead(AC_BASE + opt3->ag_index * 8);     /* Low bytes */
+	opt3->ag_pkt_cnt = RegRead(AC_BASE + opt3->ag_index * 8 + 4);  /* High bytes */
+#elif defined (CONFIG_RALINK_MT7621)
+	opt3->ag_byte_cnt = RegRead(AC_BASE + opt3->ag_index * 16);     /* 64bit bytes cnt */
+	opt3->ag_pkt_cnt = RegRead(AC_BASE + opt3->ag_index * 16 + 8);  /* 32bites packet cnt */
+#endif
+	return HWNAT_SUCCESS;
 }
 #else
 int PpeSetDscpRemarkEbl(uint32_t enable)
@@ -466,32 +485,60 @@ int PpeSetSchWeight(uint8_t W0, uint8_t W1, uint8_t W2, uint8_t W3)
 	return HWNAT_SUCCESS;
 }
 
+void PpeRstPreAclPtr(void)
+{
+	RegModifyBits(PPE_PRE_ACL, 0, 0, 9);
+	RegModifyBits(PPE_PRE_ACL, 0, 16, 9);
+}
+
+void PpeRstPreAcPtr(void)
+{
+	RegModifyBits(PPE_PRE_AC, pre_ac_start_addr, 0, 9);
+	RegModifyBits(PPE_PRE_AC, pre_ac_start_addr, 16, 9);
+}
+
+void PpeRstPostAcPtr(void)
+{
+	RegModifyBits(PPE_POST_AC, post_ac_start_addr, 0, 9);
+	RegModifyBits(PPE_POST_AC, post_ac_start_addr, 16, 9);
+}
+
+void PpeRstPreMtrPtr(void)
+{
+	RegModifyBits(PPE_PRE_MTR, pre_mtr_start_addr, 0, 9);
+	RegModifyBits(PPE_PRE_MTR, pre_mtr_start_addr, 16, 9);
+}
+
+void PpeRstPostMtrPtr(void)
+{
+	RegModifyBits(PPE_POST_MTR, post_mtr_start_addr, 0, 9);
+	RegModifyBits(PPE_POST_MTR, post_mtr_start_addr, 16, 9);
+}
+
 int
 PpeSetRuleSize(uint16_t pre_acl, uint16_t pre_meter, uint16_t pre_ac,
 	       uint16_t post_meter, uint16_t post_ac)
 {
-
+	pre_acl_start_addr  = 0;
+	pre_mtr_start_addr  = 0 + pre_acl;
+	pre_ac_start_addr   = 0 + pre_acl + pre_meter;
+	post_mtr_start_addr = 0 + pre_acl + pre_meter + pre_ac;
+	post_ac_start_addr  = 0 + pre_acl + pre_meter + pre_ac + post_meter;
+	  
 	/* Set Pre ACL Table */
-	RegModifyBits(PPE_PRE_ACL, 0, 0, 9);
-	RegModifyBits(PPE_PRE_ACL, 0, 16, 9);
-
-	/* Set Pre AC Table */
-	RegModifyBits(PPE_PRE_AC, 0 + pre_acl, 0, 9);
-	RegModifyBits(PPE_PRE_AC, 0 + pre_acl, 16, 9);
-
-	/* Set Post AC Table */
-	RegModifyBits(PPE_POST_AC, 0 + pre_acl + pre_meter, 0, 9);
-	RegModifyBits(PPE_POST_AC, 0 + pre_acl + pre_meter, 16, 9);
+	PpeRstPreAclPtr();
 
 	/* Set Pre MTR Table */
-	RegModifyBits(PPE_PRE_MTR, 0 + pre_acl + pre_meter + pre_ac, 0, 9);
-	RegModifyBits(PPE_PRE_MTR, 0 + pre_acl + pre_meter + pre_ac, 16, 9);
+	PpeRstPreMtrPtr();
+	
+	/* Set Pre AC Table */
+	PpeRstPreAcPtr();
 
 	/* Set Post MTR Table */
-	RegModifyBits(PPE_POST_MTR,
-		      0 + pre_acl + pre_meter + pre_ac + post_meter, 0, 9);
-	RegModifyBits(PPE_POST_MTR,
-		      0 + pre_acl + pre_meter + pre_ac + post_meter, 16, 9);
+	PpeRstPostMtrPtr();
+	
+	/* Set Post AC Table */
+	PpeRstPostAcPtr();
 
 	return HWNAT_SUCCESS;
 }
@@ -555,3 +602,35 @@ int PpeSetBindLifetime(uint16_t tcp_life, uint16_t udp_life, uint16_t fin_life)
 	return HWNAT_SUCCESS;
 }
 
+int PpeSetAllowIPv6(uint8_t allow_ipv6)
+{
+#if defined (CONFIG_RA_HW_NAT_IPV6)
+	uint32_t PpeFlowSet = RegRead(PPE_FLOW_SET);
+
+	if (allow_ipv6) {
+		ipv6_offload = 1;
+#if defined (CONFIG_HNAT_V2)
+		PpeFlowSet |= (BIT_IPV4_DSL_EN | BIT_IPV6_6RD_EN | BIT_IPV6_3T_ROUTE_EN | BIT_IPV6_5T_ROUTE_EN);
+//		PpeFlowSet |= (BIT_IPV6_HASH_FLAB); // flow label
+		PpeFlowSet |= (BIT_IPV6_HASH_GREK);
+#else
+		PpeFlowSet |= (BIT_IPV6_FOE_EN);
+#endif
+	} else {
+		ipv6_offload = 0;
+#if defined (CONFIG_HNAT_V2)
+		PpeFlowSet &= ~(BIT_IPV4_DSL_EN | BIT_IPV6_6RD_EN | BIT_IPV6_3T_ROUTE_EN | BIT_IPV6_5T_ROUTE_EN);
+		PpeFlowSet &= ~(BIT_IPV6_HASH_FLAB);
+		PpeFlowSet &= ~(BIT_IPV6_HASH_GREK);
+#else
+		PpeFlowSet &= ~(BIT_IPV6_FOE_EN);
+#endif
+	}
+
+	RegWrite(PPE_FLOW_SET, PpeFlowSet);
+
+	return HWNAT_SUCCESS;
+#else
+	return HWNAT_FAIL;
+#endif
+}

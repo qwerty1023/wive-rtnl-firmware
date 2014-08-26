@@ -36,7 +36,7 @@ void MacReverse(uint8_t * Mac)
 	}
 }
 
-#ifdef HWNAT_DEBUG
+#if defined (CONFIG_RA_HW_NAT_DEBUG)
 int GetNext(char *src, int separator, char *dest)
 {
 	char *c;
@@ -135,7 +135,7 @@ void RegModifyBits(uint32_t Addr, uint32_t Data, uint32_t Offset, uint32_t Len)
 
 	Value = RegRead(Addr);
 	Value &= ~Mask;
-	Value |= (Data << Offset) & Mask;
+	Value |= (Data << Offset) & Mask;;
 
 	RegWrite(Addr, Value);
 }

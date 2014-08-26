@@ -248,7 +248,7 @@ inline int ip_output(struct sk_buff *skb)
 			    !(IPCB(skb)->flags & IPSKB_REROUTED));
 }
 
-int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
+int ip_queue_xmit(struct sk_buff *skb)
 {
 	struct sock *sk = skb->sk;
 	struct inet_sock *inet = inet_sk(sk);
@@ -304,7 +304,7 @@ packet_routed:
 	iph = (struct iphdr *) skb_push(skb, sizeof(struct iphdr) + (opt ? opt->optlen : 0));
 	*((__be16 *)iph) = htons((4 << 12) | (5 << 8) | (inet->tos & 0xff));
 	iph->tot_len = htons(skb->len);
-	if (ip_dont_fragment(sk, &rt->u.dst) && !ipfragok)
+	if (ip_dont_fragment(sk, &rt->u.dst) && !skb->ignore_df)
 		iph->frag_off = htons(IP_DF);
 	else
 		iph->frag_off = 0;
@@ -330,9 +330,8 @@ packet_routed:
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	FOE_MAGIC_TAG(skb) = 0;
-	FOE_AI(skb) = UN_HIT;
+	FOE_AI_UNHIT(skb);
 #endif
-
 	return NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		       dst_output);
 
@@ -395,7 +394,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 
 	iph = skb->nh.iph;
 
-	if (unlikely(((iph->frag_off & htons(IP_DF)) && !skb->local_df) ||
+	if (unlikely(((iph->frag_off & htons(IP_DF)) && !skb->ignore_df) ||
 		     (IPCB(skb)->frag_max_size &&
 		      IPCB(skb)->frag_max_size > dst_mtu(&rt->u.dst)))) {
 		IP_INC_STATS(IPSTATS_MIB_FRAGFAILS);
@@ -1229,10 +1228,10 @@ int ip_push_pending_frames(struct sock *sk)
 	 * how transforms change size of the packet, it will come out.
 	 */
 	if (inet->pmtudisc < IP_PMTUDISC_DO)
-		skb->local_df = 1;
+		skb->ignore_df = 1;
 
 	/* DF bit is set when we want to see DF on outgoing frames.
-	 * If local_df is set too, we still allow to fragment this frame
+	 * If ignore_df is set too, we still allow to fragment this frame
 	 * locally. */
 	if (inet->pmtudisc >= IP_PMTUDISC_DO ||
 	    (skb->len <= dst_mtu(&rt->u.dst) &&
@@ -1269,7 +1268,7 @@ int ip_push_pending_frames(struct sock *sk)
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	FOE_MAGIC_TAG(skb) = 0;
-	FOE_AI(skb) = UN_HIT;
+	FOE_AI_UNHIT(skb);
 #endif
 
 	/* Netfilter gets whole the not fragmented skb. */

@@ -97,12 +97,12 @@ static int rt2880_eth_recv(struct net_device* dev);
 #ifdef CONFIG_RAETH_MODULE
 extern int (*ra_sw_nat_hook_rx)(struct sk_buff *skb);
 extern int (*ra_sw_nat_hook_tx)(struct sk_buff *skb, int gmac_no);
-extern void (*ra_sw_nat_hook_rs) (uint32_t Ebl);
+extern int (*ra_sw_nat_hook_rs) (struct net_device *dev, int hold);
 #else
 /* if raeth build in static mode - move hw_nat hook to driver ode from external stub */
 int (*ra_sw_nat_hook_rx) (struct sk_buff * skb) = NULL;
 int (*ra_sw_nat_hook_tx) (struct sk_buff * skb, int gmac_no) = NULL;
-void (*ra_sw_nat_hook_rs) (uint32_t Ebl) = NULL;
+int (*ra_sw_nat_hook_rs) (struct net_device *dev, int hold) = NULL;
 
 EXPORT_SYMBOL(ra_sw_nat_hook_rx);
 EXPORT_SYMBOL(ra_sw_nat_hook_tx);
@@ -381,12 +381,11 @@ static int ei_set_mac2_addr(struct net_device *dev, void *p)
 static void set_fe_pdma_glo_cfg(void)
 {
         int pdma_glo_cfg=0;
-#if defined (CONFIG_RALINK_RT2880) || defined(CONFIG_RALINK_RT2883) || \
-    defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT3883)
+#if defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT3883)
         int fe_glo_cfg=0;
 #endif
 
-#if defined (CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A) 
+#if defined (CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A)
 	pdma_glo_cfg = (TX_WB_DDONE | RX_DMA_EN | TX_DMA_EN | PDMA_BT_SIZE_32DWORDS);
 #elif defined (CONFIG_RALINK_MT7620)
 	pdma_glo_cfg = (TX_WB_DDONE | RX_DMA_EN | TX_DMA_EN | PDMA_BT_SIZE_16DWORDS);
@@ -404,8 +403,7 @@ static void set_fe_pdma_glo_cfg(void)
 	sysRegWrite(PDMA_GLO_CFG, pdma_glo_cfg);
 
 	/* only the following chipset need to set it */
-#if defined (CONFIG_RALINK_RT2880) || defined(CONFIG_RALINK_RT2883) || \
-    defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT3883)
+#if defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT3883)
 	//set 1us timer count in unit of clock cycle
 	fe_glo_cfg = sysRegRead(FE_GLO_CFG);
 	fe_glo_cfg &= ~(0xff << 8); //clear bit8-bit15
@@ -605,7 +603,7 @@ static void forward_config(struct net_device *dev)
  *	The register affects QOS correctness in frame engine!
  */
 
-#if defined(CONFIG_RALINK_RT2883) || defined(CONFIG_RALINK_RT3883)
+#if defined(CONFIG_RALINK_RT3883)
 	sysRegWrite(PSE_FQ_CFG, cpu_to_le32(INIT_VALUE_OF_RT2883_PSE_FQ_CFG));
 #elif defined(CONFIG_RALINK_RT3352) || defined(CONFIG_RALINK_RT5350) ||  \
       defined(CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A) || \
@@ -690,7 +688,6 @@ static int fe_pdma_init(struct net_device *dev)
 
 	printk("\nphy_tx_ring1 = %08x, tx_ring1 = %p, size: %d bytes\n", ei_local->phy_tx_ring1, ei_local->tx_ring1, sizeof(struct PDMA_txdesc));
 
-#if ! defined (CONFIG_RALINK_RT2880)
 	fe_tx_desc_init(dev, 2, 3, 1);
 	if (ei_local->tx_ring2 == NULL) {
 		printk("RAETH: tx ring2 allocation failed\n");
@@ -707,7 +704,6 @@ static int fe_pdma_init(struct net_device *dev)
 
 	printk("\nphy_tx_ring3 = %08x, tx_ring3 = %p, size: %d bytes\n", ei_local->phy_tx_ring3, ei_local->tx_ring3, sizeof(struct PDMA_txdesc));
 
-#endif // CONFIG_RALINK_RT2880 //
 #else
 	for (i=0;i<NUM_TX_DESC;i++){
 		ei_local->skb_free[i]=0;
@@ -1135,9 +1131,9 @@ static int rt_get_skb_header(struct sk_buff *skb, void **iphdr, void **tcph,
 #endif // CONFIG_RAETH_LRO //
 
 #ifdef CONFIG_RAETH_NAPI
-static int rt2880_eth_recv(struct net_device* dev, int *work_done, int work_to_do)
+static int FASTPATHNET rt2880_eth_recv(struct net_device* dev, int *work_done, int work_to_do)
 #else
-static int rt2880_eth_recv(struct net_device* dev)
+static int FASTPATHNET rt2880_eth_recv(struct net_device* dev)
 #endif
 {
 	struct sk_buff	*skb, *rx_skb;
@@ -1318,9 +1314,9 @@ static int rt2880_eth_recv(struct net_device* dev)
 
 #if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
 		if(ra_sw_nat_hook_rx != NULL) {
-		FOE_MAGIC_TAG(rx_skb)=FOE_MAGIC_GE;
+		    FOE_MAGIC_TAG(rx_skb)=FOE_MAGIC_GE;
 		    *(uint32_t *)(FOE_INFO_START_ADDR(rx_skb)+2) = *(uint32_t *)&rx_ring[rx_dma_owner_idx].rxd_info4;
-		FOE_ALG(rx_skb) = 0;
+		    FOE_ALG(rx_skb) = 0;
 		}
 #endif
 
@@ -1550,9 +1546,9 @@ void kill_sig_workq(struct work_struct *work)
 
 #ifndef CONFIG_RAETH_NAPI
 #if defined (WORKQUEUE_BH) || defined (TASKLET_WORKQUEUE_SW)
-static void ei_receive_workq(struct work_struct *work)
+static void FASTPATHNET ei_receive_workq(struct work_struct *work)
 #else
-static void ei_receive(unsigned long unused)  // device structure
+static void FASTPATHNET ei_receive(unsigned long unused)  // device structure
 #endif // WORKQUEUE_BH //
 {
 	struct net_device *dev = dev_raether;
@@ -1662,9 +1658,9 @@ raeth_clean(struct net_device *netdev, int *budget)
  * RETURNS: N/A.
  */
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,21)
-static irqreturn_t FASTPATH ei_interrupt(int irq, void *dev_id)
+static irqreturn_t FASTPATHNET ei_interrupt(int irq, void *dev_id)
 #else
-static irqreturn_t FASTPATH ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t FASTPATHNET ei_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 #endif
 {
 #if !defined(CONFIG_RAETH_NAPI)
@@ -1778,9 +1774,9 @@ static irqreturn_t FASTPATH ei_interrupt(int irq, void *dev_id, struct pt_regs *
 }
 
 #ifdef CONFIG_RTL8367M
+#ifdef CONFIG_RAETH_DHCP_TOUCH
 static void rtl_link_status_changed()
 {
-#ifdef CONFIG_RAETH_DHCP_TOUCH
     static rtk_port_linkStatus_t wan_port_link;
     int32 retVal;
     struct file *fp;
@@ -1826,8 +1822,8 @@ static void rtl_link_status_changed()
 	old_wan_port_link=PORT_LINKUP;
     } else if (wan_port_link == PORT_LINKDOWN)
 	old_wan_port_link=PORT_LINKDOWN;
-#endif
 }
+#endif
 #endif
 
 #if defined (CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A) || \
@@ -1942,7 +1938,7 @@ out:
 
 #endif
 
-static int FASTPATH ei_start_xmit(struct sk_buff* skb, struct net_device *dev, int gmac_no)
+static int FASTPATHNET ei_start_xmit(struct sk_buff* skb, struct net_device *dev, int gmac_no)
 {
 	END_DEVICE *ei_local = netdev_priv(dev);
 	unsigned long flags;
@@ -1970,34 +1966,22 @@ static int FASTPATH ei_start_xmit(struct sk_buff* skb, struct net_device *dev, i
 	}
 #endif
 #ifndef CONFIG_RA_NAT_NONE
-/* bruce+
- */
-         if(ra_sw_nat_hook_tx!= NULL)
-         {
-	   spin_lock_irqsave(&ei_local->page_lock, flags);
-           if(ra_sw_nat_hook_tx(skb, gmac_no)==1){
-	   	spin_unlock_irqrestore(&ei_local->page_lock, flags);
-	   }else{
+	if(ra_sw_nat_hook_tx != NULL) {
+	    if(ra_sw_nat_hook_tx(skb, gmac_no) == 0) {
 	        kfree_skb(skb);
-	   	spin_unlock_irqrestore(&ei_local->page_lock, flags);
 	   	return 0;
-	   }
-         }
+	    }
+	}
 #endif
-
 #if defined(CONFIG_RA_CLASSIFIER) || defined(CONFIG_RA_CLASSIFIER_MODULE)
-		/* Qwert+
-		 */
-		if(ra_classifier_hook_tx!= NULL)
-		{
+	if(ra_classifier_hook_tx!= NULL) {
 #if defined(CONFIG_RALINK_EXTERNAL_TIMER)
-			ra_classifier_hook_tx(skb, (*((volatile u32 *)(0xB0000D08))&0x0FFFF));
+		ra_classifier_hook_tx(skb, (*((volatile u32 *)(0xB0000D08))&0x0FFFF));
 #else
-			ra_classifier_hook_tx(skb, read_c0_count());
+		ra_classifier_hook_tx(skb, read_c0_count());
 #endif
-		}
+	}
 #endif /* CONFIG_RA_CLASSIFIER */
-
 #if defined (CONFIG_RALINK_RT3052_MP2)
 	mcast_tx(skb);
 #endif
@@ -2192,7 +2176,7 @@ static int ei_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 #if defined (CONFIG_RALINK_RT3052) || defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_RT5350) || defined (CONFIG_RALINK_MT7620)
 	unsigned int offset = 0;
 #endif
-#if !defined (CONFIG_RALINK_RT3052) && !defined (CONFIG_RALINK_RT3883) && !defined (CONFIG_RALINK_RT2880)
+#if !defined (CONFIG_RALINK_RT3052) && !defined (CONFIG_RALINK_RT3883)
 	unsigned int value = 0;
 #endif
 	ra_mii_ioctl_data mii;
@@ -2663,7 +2647,7 @@ static int __init rather_probe(struct net_device *dev)
 	return 0;
 }
 
-static void ei_xmit_housekeeping(unsigned long unused)
+static void FASTPATHNET ei_xmit_housekeeping(unsigned long unused)
 {
     struct net_device *dev = dev_raether;
     END_DEVICE *ei_local = netdev_priv(dev);
@@ -3373,7 +3357,6 @@ static int ei_close(struct net_device *dev)
 	   dma_free_coherent(NULL, NUM_TX_DESC*sizeof(struct PDMA_txdesc), ei_local->tx_ring1, ei_local->phy_tx_ring1);
        }
 
-#if !defined (CONFIG_RALINK_RT2880)
        if (ei_local->tx_ring2 != NULL) {
 	   dma_free_coherent(NULL, NUM_TX_DESC*sizeof(struct PDMA_txdesc), ei_local->tx_ring2, ei_local->phy_tx_ring2);
        }
@@ -3381,7 +3364,6 @@ static int ei_close(struct net_device *dev)
        if (ei_local->tx_ring3 != NULL) {
 	   dma_free_coherent(NULL, NUM_TX_DESC*sizeof(struct PDMA_txdesc), ei_local->tx_ring3, ei_local->phy_tx_ring3);
        }
-#endif
 #endif
 	/* RX Ring */
 #ifdef CONFIG_32B_DESC

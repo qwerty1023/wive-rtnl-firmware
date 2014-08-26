@@ -133,11 +133,6 @@ extern void RaWdgReload(void);
 extern int WdgLoadValue;
 #endif
 
-#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
-#include "../net/nat/hw_nat/ra_nat.h"
-extern void (*ra_sw_nat_hook_rs) (uint32_t Ebl);
-#endif
-
 /*
  *	The list of packet types we will receive (as opposed to discard)
  *	and the routines to invoke.
@@ -903,14 +898,6 @@ int dev_open(struct net_device *dev)
 		 *	... and announce new interface.
 		 */
 		raw_notifier_call_chain(&netdev_chain, NETDEV_UP, dev);
-
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-		if(((strncmp(dev->name, "eth", 3) == 0) || (strncmp(dev->name, "ra", 2) == 0)) && (ra_sw_nat_hook_rs != NULL)) {
-		    /* reconfigure dstif table in hw_nat module */
-		    ra_sw_nat_hook_rs(0);
-		    ra_sw_nat_hook_rs(1);
-		}
-#endif
 	}
 	return ret;
 }
@@ -975,14 +962,6 @@ int dev_close(struct net_device *dev)
 	 * Tell people we are down
 	 */
 	raw_notifier_call_chain(&netdev_chain, NETDEV_DOWN, dev);
-
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if(((strncmp(dev->name, "eth", 3) == 0) || (strncmp(dev->name, "ra", 2) == 0)) && (ra_sw_nat_hook_rs != NULL)) {
-	    /* reconfigure dstif table in hw_nat module */
-	    ra_sw_nat_hook_rs(0);
-	    ra_sw_nat_hook_rs(1);
-	}
-#endif
 
 	return 0;
 }
@@ -1646,7 +1625,7 @@ DEFINE_PER_CPU(struct netif_rx_stats, netdev_rx_stat) = { 0, };
  *
  */
 
-int FASTPATH netif_rx(struct sk_buff *skb)
+int FASTPATHNET netif_rx(struct sk_buff *skb)
 {
 	struct softnet_data *queue;
 	unsigned long flags;
@@ -1829,12 +1808,12 @@ static int ing_filter(struct sk_buff *skb)
 }
 #endif
 
-int FASTPATH netif_receive_skb(struct sk_buff *skb)
+int FASTPATHNET netif_receive_skb(struct sk_buff *skb)
 {
-	struct packet_type *ptype, *pt_prev;
+	struct packet_type *ptype = NULL, *pt_prev = NULL;
+	struct net_device *null_or_orig = NULL;
 	struct net_device *orig_dev;
 	struct net_device *master;
-	struct net_device *null_or_orig;
 	int ret = NET_RX_DROP;
 	__be16 type;
 
@@ -1848,7 +1827,6 @@ int FASTPATH netif_receive_skb(struct sk_buff *skb)
 	if (!skb->iif)
 		skb->iif = skb->dev->ifindex;
 
-	null_or_orig = NULL;
 	orig_dev = skb->dev;
 	master = ACCESS_ONCE(orig_dev->master);
 	if (master) {
@@ -1866,12 +1844,10 @@ int FASTPATH netif_receive_skb(struct sk_buff *skb)
 	skb_reset_transport_header(skb);
 	skb->mac_len = skb->nh.raw - skb->mac.raw;
 
-	pt_prev = NULL;
-
 	rcu_read_lock();
 
 #ifdef CONFIG_NET_PPPOE_IPV6_PTHROUGH
-	//if packet forwarded return 1
+	/* if packet forwarded return 1 */
 	if (private_pthrough(skb)) {
 	    ret = NET_RX_SUCCESS;
 	    goto out;
@@ -1995,12 +1971,12 @@ static void net_rx_action(struct softirq_action *h)
 	struct softnet_data *queue = &__get_cpu_var(softnet_data);
 	unsigned long time_limit = jiffies + 2;
 	int budget = netdev_budget;
-	void *have __maybe_unused;
 
 	local_irq_disable();
 
 	while (!list_empty(&queue->poll_list)) {
 		struct net_device *dev;
+		void *have;
 
 		/* If softirq window is exhuasted then punt.
 		 * Allow this to run for 2 jiffies since which will allow
@@ -2216,15 +2192,15 @@ static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
 		   stats->rx_dropped + stats->rx_missed_errors,
 		   stats->rx_fifo_errors,
 		   stats->rx_length_errors + stats->rx_over_errors +
-		    stats->rx_crc_errors + stats->rx_frame_errors,
+		   stats->rx_crc_errors + stats->rx_frame_errors,
 		   stats->rx_compressed, stats->multicast,
 		   stats->tx_bytes, stats->tx_packets,
 		   stats->tx_errors, stats->tx_dropped,
 		   stats->tx_fifo_errors, stats->collisions,
 		   stats->tx_carrier_errors +
-		    stats->tx_aborted_errors +
-		    stats->tx_window_errors +
-		    stats->tx_heartbeat_errors,
+		   stats->tx_aborted_errors +
+		   stats->tx_window_errors +
+		   stats->tx_heartbeat_errors,
 		   stats->tx_compressed);
 }
 
@@ -3503,7 +3479,6 @@ void unregister_netdev(struct net_device *dev)
 	unregister_netdevice(dev);
 	rtnl_unlock();
 }
-
 EXPORT_SYMBOL(unregister_netdev);
 
 static int dev_cpu_callback(struct notifier_block *nfb,
