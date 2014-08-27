@@ -1,57 +1,48 @@
-/* ld script to make UltraLinux kernel */
+/* ld script to make SparcLinux kernel */
 
-#include <asm/page.h>
 #include <asm-generic/vmlinux.lds.h>
 
-OUTPUT_FORMAT("elf64-sparc", "elf64-sparc", "elf64-sparc")
-OUTPUT_ARCH(sparc:v9a)
+OUTPUT_FORMAT("elf32-sparc", "elf32-sparc", "elf32-sparc")
+OUTPUT_ARCH(sparc)
 ENTRY(_start)
-
-jiffies = jiffies_64;
+jiffies = jiffies_64 + 4;
 SECTIONS
 {
-  swapper_low_pmd_dir = 0x0000000000402000;
-  . = 0x4000;
-  .text 0x0000000000404000 :
+  . = 0x10000 + SIZEOF_HEADERS;
+  .text 0xf0004000 :
   {
     _text = .;
     TEXT_TEXT
     SCHED_TEXT
     LOCK_TEXT
-    KPROBES_TEXT
     *(.gnu.warning)
   } =0
   _etext = .;
   PROVIDE (etext = .);
-
-  RO_DATA(PAGE_SIZE)
-
+  RODATA
   .data    :
   {
     DATA_DATA
     CONSTRUCTORS
   }
   .data1   : { *(.data1) }
-  . = ALIGN(64);
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-  . = ALIGN(64);
-  .data.read_mostly : { *(.data.read_mostly) }
   _edata  =  .;
   PROVIDE (edata = .);
+  __start___fixup = .;
   .fixup   : { *(.fixup) }
-
-  . = ALIGN(16);
+  __stop___fixup = .;
   __start___ex_table = .;
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
-  . = ALIGN(PAGE_SIZE);
+  . = ALIGN(4096);
   __init_begin = .;
+  _sinittext = .;
   .init.text : { 
-	_sinittext = .;
 	*(.init.text)
-	_einittext = .;
   }
+  _einittext = .;
+  __init_text_end = .;
   .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
@@ -66,36 +57,23 @@ SECTIONS
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
   SECURITY_INIT
-  . = ALIGN(4);
-  __tsb_ldquad_phys_patch = .;
-  .tsb_ldquad_phys_patch : { *(.tsb_ldquad_phys_patch) }
-  __tsb_ldquad_phys_patch_end = .;
-  __tsb_phys_patch = .;
-  .tsb_phys_patch : { *(.tsb_phys_patch) }
-  __tsb_phys_patch_end = .;
-  __cpuid_patch = .;
-  .cpuid_patch : { *(.cpuid_patch) }
-  __cpuid_patch_end = .;
-  __sun4v_1insn_patch = .;
-  .sun4v_1insn_patch : { *(.sun4v_1insn_patch) }
-  __sun4v_1insn_patch_end = .;
-  __sun4v_2insn_patch = .;
-  .sun4v_2insn_patch : { *(.sun4v_2insn_patch) }
-  __sun4v_2insn_patch_end = .;
 
 #ifdef CONFIG_BLK_DEV_INITRD
-  . = ALIGN(PAGE_SIZE);
+  . = ALIGN(4096);
   __initramfs_start = .;
   .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
 #endif
 
-  . = ALIGN(PAGE_SIZE);
+  . = ALIGN(32);
   __per_cpu_start = .;
   .data.percpu  : { *(.data.percpu) }
   __per_cpu_end = .;
-  . = ALIGN(PAGE_SIZE);
+  . = ALIGN(4096);
   __init_end = .;
+  . = ALIGN(32);
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+
   __bss_start = .;
   .sbss      : { *(.sbss) *(.scommon) }
   .bss       :

@@ -24,7 +24,7 @@ HTARGET=mipsel-linux
 #arch options
 CONFOPTS="--host=$HTARGET --target=$HTARGET --build=$HBUILD"
 
-ac_cv_lib_avformat_av_open_input_file=yes
+export ac_cv_lib_avformat_av_open_input_file="yes"
 
 ./configure $CONFOPTS \
 	    --prefix=$APROOTDIR/filesystem \
@@ -32,8 +32,6 @@ ac_cv_lib_avformat_av_open_input_file=yes
 	    --disable-asus \
 	    --enable-tivo \
 	    --with-libiconv-prefix=$FIRMROOT/lib/lib/ \
-	    --with-zlib=$FIRMROOT/lib/lib/ \
-	    --with-zlib-includes=$FIRMROOT/lib/include_shared/ \
 	    --with-log-path=/media/sda1/minidlna \
 	    --with-db-path=/media/sda1/minidlna \
 	    --with-os-name="Linux" \
