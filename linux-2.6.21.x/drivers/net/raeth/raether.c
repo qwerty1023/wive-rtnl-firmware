@@ -538,7 +538,22 @@ static void forward_config(struct net_device *dev)
 #endif
 
 	dev->features |= NETIF_F_IP_CSUM; /* Can checksum TCP/UDP over IPv4 */
-
+#if defined(CONFIG_RALINK_MT7620)
+#if defined (CONFIG_RAETH_TSO)
+	if ((sysRegRead(0xB000000C) & 0xf) >= 0x5) {
+		dev->features |= NETIF_F_SG;
+		dev->features |= NETIF_F_TSO;
+	}
+#endif // CONFIG_RAETH_TSO //
+#if defined (CONFIG_RAETH_TSOV6)
+	if ((sysRegRead(0xB000000C) & 0xf) >= 0x5) {
+		dev->features |= NETIF_F_TSO6;
+#ifdef NETIF_F_IPV6_CSUM
+		dev->features |= NETIF_F_IPV6_CSUM; /* Can checksum TCP/UDP over IPv6 */
+#endif
+	}
+#endif // CONFIG_RAETH_TSOV6 //
+#else
 #if defined (CONFIG_RAETH_TSO)
 	dev->features |= NETIF_F_SG;
 	dev->features |= NETIF_F_TSO;
@@ -546,8 +561,11 @@ static void forward_config(struct net_device *dev)
 
 #if defined (CONFIG_RAETH_TSOV6)
 	dev->features |= NETIF_F_TSO6;
+#ifdef NETIF_F_IPV6_CSUM
 	dev->features |= NETIF_F_IPV6_CSUM; /* Can checksum TCP/UDP over IPv6 */
+#endif
 #endif // CONFIG_RAETH_TSOV6 //
+#endif // CONFIG_MT7620 //
 
 #else // Checksum offload disabled
 
@@ -831,6 +849,9 @@ static int rt2880_eth_send(struct net_device* dev, struct sk_buff *skb, int gmac
 	unsigned long   ctx_idx_start_addr = tx_cpu_owner_idx0;
 #endif
         struct iphdr *iph = NULL;
+#if defined (CONFIG_RAETH_TSOV6)
+	struct ipv6hdr *ip6h = NULL;
+#endif
         struct tcphdr *th = NULL;
 	struct skb_frag_struct *frag;
 	unsigned int nr_frags = skb_shinfo(skb)->nr_frags;
@@ -998,7 +1019,6 @@ static int rt2880_eth_send(struct net_device* dev, struct sk_buff *skb, int gmac
 			}
 		}
 	}
-
 	/* fill in MSS info in tcp checksum field */
 	if( skb_shinfo(skb)->gso_segs > 1) {
 		/* TCP over IPv4 */
@@ -1013,12 +1033,10 @@ static int rt2880_eth_send(struct net_device* dev, struct sk_buff *skb, int gmac
 				th->check = htons(skb_shinfo(skb)->gso_size);
 				dma_cache_sync(NULL, th, sizeof(struct tcphdr), DMA_TO_DEVICE);
 		}
-	    }
-
 #if defined (CONFIG_RAETH_TSOV6)
 		/* TCP over IPv6 */
 		ip6h = (struct ipv6hdr *)skb_network_header(skb);
-		else if ((ip6h->version == 6) && (ip6h->nexthdr == NEXTHDR_TCP)) {
+		if ((ip6h->version == 6) && (ip6h->nexthdr == NEXTHDR_TCP)) {
 			th = (struct tcphdr *)skb_transport_header(skb);
 #ifdef CONFIG_RAETH_RW_PDMAPTR_FROM_VAR
 			ei_local->tx_ring0[ctx_idx_start_addr].txd_info4.TSO = 1;
@@ -1027,10 +1045,9 @@ static int rt2880_eth_send(struct net_device* dev, struct sk_buff *skb, int gmac
 #endif
 				th->check = htons(skb_shinfo(skb)->gso_size);
 				dma_cache_sync(NULL, th, sizeof(struct tcphdr), DMA_TO_DEVICE);
-	    }
+		}
 #endif // CONFIG_RAETH_TSOV6 //
 	}
-
 #ifdef CONFIG_RAETH_RW_PDMAPTR_FROM_VAR
 	ei_local->tx_ring0[ctx_idx_start_addr].txd_info2.DDONE_bit = 0;
 #else
@@ -1192,11 +1209,6 @@ static int FASTPATHNET rt2880_eth_recv(struct net_device* dev)
                         break;
                 }
 #endif
-
-#if defined (CONFIG_RAETH_TSOV6)
-	struct ipv6hdr *ip6h = NULL;
-#endif
-
 #if defined (CONFIG_RAETH_MULTIPLE_RX_RING)
 		if (ei_local->rx_ring1[rx_dma_owner_idx1].rxd_info2.DDONE_bit == 1)  {
 		    rx_ring = ei_local->rx_ring1;
@@ -2716,7 +2728,6 @@ static void FASTPATHNET ei_xmit_housekeeping(unsigned long unused)
 #endif //CONFIG_RAETH_NAPI//
 }
 
-
 #ifdef CONFIG_PSEUDO_SUPPORT
 static int VirtualIF_ioctl(struct net_device * net_dev,
 		    struct ifreq * ifr, int cmd)
@@ -2890,7 +2901,39 @@ static void RAETH_Init_PSEUDO(pEND_DEVICE pAd, struct net_device *net_dev)
 	dev->change_mtu = ei_change_mtu;
 	dev->mtu = DEFAULT_MTU;
 #endif
+#ifdef CONFIG_RAETH_CHECKSUM_OFFLOAD
+	dev->features |= NETIF_F_IP_CSUM; /* Can checksum TCP/UDP over IPv4 */
+#if defined(CONFIG_RALINK_MT7620)
+#if defined (CONFIG_RAETH_TSO)
+	if ((sysRegRead(0xB000000C) & 0xf) >= 0x5) {
+		dev->features |= NETIF_F_SG;
+		dev->features |= NETIF_F_TSO;
+	}
+#endif // CONFIG_RAETH_TSO //
+#if defined (CONFIG_RAETH_TSOV6)
+	if ((sysRegRead(0xB000000C) & 0xf) >= 0x5) {
+		dev->features |= NETIF_F_TSO6;
+#ifdef NETIF_F_IPV6_CSUM
+		dev->features |= NETIF_F_IPV6_CSUM; /* Can checksum TCP/UDP over IPv6 */
+#endif
+	}
+#endif // CONFIG_RAETH_TSOV6 //
+#else
+#if defined (CONFIG_RAETH_TSO)
+	dev->features |= NETIF_F_SG;
+	dev->features |= NETIF_F_TSO;
+#endif // CONFIG_RAETH_TSO //
 
+#if defined (CONFIG_RAETH_TSOV6)
+	dev->features |= NETIF_F_TSO6;
+#ifdef NETIF_F_IPV6_CSUM
+	dev->features |= NETIF_F_IPV6_CSUM; /* Can checksum TCP/UDP over IPv6 */
+#endif
+#endif // CONFIG_RAETH_TSOV6 //
+#endif // CONFIG_MT7620 //
+#else // Checksum offload disabled
+	dev->features &= ~NETIF_F_IP_CSUM; /* disable checksum TCP/UDP over IPv4 */
+#endif // CONFIG_RAETH_CHECKSUM_OFFLOAD //
 #ifdef CONFIG_ETHTOOL
 	dev->ethtool_ops = &ra_virt_ethtool_ops;
     // init mii structure
@@ -2902,7 +2945,6 @@ static void RAETH_Init_PSEUDO(pEND_DEVICE pAd, struct net_device *net_dev)
 	pPseudoAd->mii_info.phy_id = 0x1e;
 	pPseudoAd->mii_info.supports_gmii = mii_check_gmii_support(&pPseudoAd->mii_info);
 #endif
-
 	// Register this device
 	register_netdevice(dev);
     }
