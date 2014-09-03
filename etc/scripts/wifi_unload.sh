@@ -8,8 +8,8 @@
 # include global
 . /etc/scripts/global.sh
 
-stop_serv="minidlna transmission shaper crontab pppoe-relay ddns wscd dhcpd lld2d radvd zebra udpxy upnp \
-	    hotplug igmp_proxy ntp samba dnsserver snmpd xupnp vpnhelper syslog inetd"
+stop_serv="watchdog radvd vpnhelper shaper crontab minidlna transmission pppoe-relay ddns wscd lld2d zebra udpxy upnp \
+	    igmp_proxy ntp dnsserver snmpd xupnp syslog inetd samba hotplug dhcpd"
 
 kill_apps="minidlnad transmission-daemon smbd nmbd pppd xl2tpd udhcpd udhcpc crond lld2d igmpproxy inetd syslogd klogd \
 	    ntpclient ntpd zebra ripd inadyn ftpd scp miniupnpd iwevent telnetd wscd rt2860apd rt61apd dnsmasq cdp-send snmpd xupnpd"
@@ -56,10 +56,8 @@ unload_ra0br0() {
 	    ip link set br0 down > /dev/null 2>&1
 	    brctl delbr br0 > /dev/null 2>&1
 	fi
-
 	# disable WAN and WLAN
 	unload_ra0
-
 	if [ "$1" != "" ]; then
 	    # mirror br0 to eth2x
 	    ip link set "$1" down > /dev/null 2>&1

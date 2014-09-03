@@ -1341,17 +1341,17 @@ static int __ip6_del_rt(struct rt6_info *rt, struct nl_info *info)
 	int err;
 	struct fib6_table *table;
 
-	if (rt == &ip6_null_entry)
-		return -ENOENT;
+	if (rt == &ip6_null_entry) {
+		err = -ENOENT;
+		goto out;
+	}
 
 	table = rt->rt6i_table;
 	write_lock_bh(&table->tb6_lock);
-
 	err = fib6_del(rt, info);
-	dst_release(&rt->u.dst);
-
 	write_unlock_bh(&table->tb6_lock);
-
+out:
+	dst_release(&rt->u.dst);
 	return err;
 }
 
@@ -1963,7 +1963,7 @@ struct rt6_info *addrconf_dst_alloc(struct inet6_dev *idev,
 
 static int fib6_ifdown(struct rt6_info *rt, void *arg)
 {
-	if (((void*)rt->rt6i_dev == arg || arg == NULL) &&
+	if ((rt->rt6i_dev == arg || arg == NULL) &&
 	    rt != &ip6_null_entry)
 		return -1;
 	return 0;
