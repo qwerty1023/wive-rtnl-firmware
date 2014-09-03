@@ -1625,7 +1625,7 @@ DEFINE_PER_CPU(struct netif_rx_stats, netdev_rx_stat) = { 0, };
  *
  */
 
-int FASTPATHNET netif_rx(struct sk_buff *skb)
+int netif_rx(struct sk_buff *skb)
 {
 	struct softnet_data *queue;
 	unsigned long flags;
@@ -1687,8 +1687,6 @@ int netif_rx_ni(struct sk_buff *skb)
 
 	return err;
 }
-
-EXPORT_SYMBOL(netif_rx_ni);
 
 static void net_tx_action(struct softirq_action *h)
 {
@@ -1808,7 +1806,7 @@ static int ing_filter(struct sk_buff *skb)
 }
 #endif
 
-int FASTPATHNET netif_receive_skb(struct sk_buff *skb)
+int netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype = NULL, *pt_prev = NULL;
 	struct net_device *null_or_orig = NULL;
@@ -3696,6 +3694,7 @@ EXPORT_SYMBOL(netdev_set_master);
 EXPORT_SYMBOL(netdev_state_change);
 EXPORT_SYMBOL(netif_receive_skb);
 EXPORT_SYMBOL(netif_rx);
+EXPORT_SYMBOL(netif_rx_ni);
 EXPORT_SYMBOL(register_gifconf);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(register_netdevice_notifier);

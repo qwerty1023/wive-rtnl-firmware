@@ -134,6 +134,7 @@ struct rt6_rtnl_dump_arg
 extern int rt6_dump_route(struct rt6_info *rt, void *p_arg);
 extern void rt6_ifdown(struct net_device *dev);
 extern void rt6_mtu_change(struct net_device *dev, unsigned mtu);
+extern void rt6_clean_tohost(struct in6_addr *gateway);
 
 extern rwlock_t rt6_lock;
 
@@ -167,13 +168,6 @@ static inline int ipv6_unicast_destination(struct sk_buff *skb)
 	struct rt6_info *rt = (struct rt6_info *) skb->dst;
 
 	return rt->rt6i_flags & RTF_LOCAL;
-}
-
-#include <net/ipv6.h>
-static inline int rt6_need_strict(const struct in6_addr *daddr)
-{
-	return ipv6_addr_type(daddr) &
-		(IPV6_ADDR_MULTICAST | IPV6_ADDR_LINKLOCAL | IPV6_ADDR_LOOPBACK);
 }
 #endif
 #endif

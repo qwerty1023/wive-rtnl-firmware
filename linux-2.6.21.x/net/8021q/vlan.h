@@ -1,6 +1,7 @@
 #ifndef __BEN_VLAN_802_1Q_INC__
 #define __BEN_VLAN_802_1Q_INC__
 
+#include <net/arp.h>
 #include <linux/if_vlan.h>
 
 /*  Uncomment this if you want debug traces to be shown. */
@@ -45,11 +46,77 @@ extern unsigned short vlan_name_type;
  *  Must be invoked with rcu_read_lock (ie preempt disabled)
  *  or with RTNL.
  */
-struct net_device *__find_vlan_dev(struct net_device* real_dev,
-				   unsigned short VID); /* vlan.c */
+
+/* Our listing of VLAN group(s) */
+extern struct hlist_head vlan_group_hash[VLAN_GRP_HASH_SIZE];
+#define vlan_grp_hashfn(IDX)    ((((IDX) >> VLAN_GRP_HASH_SHIFT) ^ (IDX)) & VLAN_GRP_HASH_MASK)
+
+/* Must be invoked with RCU read lock (no preempt) */
+static inline struct vlan_group *vlan_find_group(int real_dev_ifindex)
+{
+	struct vlan_group *grp;
+	struct hlist_node *n;
+	int hash = vlan_grp_hashfn(real_dev_ifindex);
+
+	hlist_for_each_entry_rcu(grp, n, &vlan_group_hash[hash], hlist) {
+		if (grp->real_dev_ifindex == real_dev_ifindex)
+			return grp;
+	}
+
+	return NULL;
+}
+
+
+/*  Find the protocol handler.  Assumes VID < VLAN_VID_MASK.
+ *
+ * Must be invoked with RCU read lock (no preempt)
+ */
+static inline struct net_device *find_vlan_dev(struct net_device *real_dev, unsigned short VID)
+{
+	struct vlan_group *grp = vlan_find_group(real_dev->ifindex);
+
+	if (grp)
+		return vlan_group_get_device(grp, VID);
+
+	return NULL;
+}
+
+
+/*
+ *	Rebuild the Ethernet MAC header. This is called after an ARP
+ *	(or in future other address resolution) has completed on this
+ *	sk_buff. We now let ARP fill in the other fields.
+ *
+ *	This routine CANNOT use cached dst->neigh!
+ *	Really, it is used only when dst->neigh is wrong.
+ *
+ * TODO:  This needs a checkup, I'm ignorant here. --BLG
+ */
+static inline int vlan_dev_rebuild_header(struct sk_buff *skb)
+{
+	struct net_device *dev = skb->dev;
+	struct vlan_ethhdr *veth = (struct vlan_ethhdr *)(skb->data);
+
+	switch (veth->h_vlan_encapsulated_proto) {
+#ifdef CONFIG_INET
+	case __constant_htons(ETH_P_IP):
+
+		/* TODO:  Confirm this will work with VLAN headers... */
+		return arp_find(veth->h_dest, skb);
+#endif
+	default:
+		printk(VLAN_DBG
+		       "%s: unable to resolve type %X addresses.\n",
+		       dev->name, ntohs(veth->h_vlan_encapsulated_proto));
+
+		memcpy(veth->h_source, dev->dev_addr, ETH_ALEN);
+		break;
+	};
+
+	return 0;
+}
 
 /* found in vlan_dev.c */
-int vlan_dev_rebuild_header(struct sk_buff *skb);
 int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 		  struct packet_type *ptype, struct net_device *orig_dev);
 int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,

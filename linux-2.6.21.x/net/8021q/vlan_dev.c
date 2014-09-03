@@ -42,46 +42,12 @@
 extern int vlan_double_tag;
 #endif
 
-/*
- *	Rebuild the Ethernet MAC header. This is called after an ARP
- *	(or in future other address resolution) has completed on this
- *	sk_buff. We now let ARP fill in the other fields.
- *
- *	This routine CANNOT use cached dst->neigh!
- *	Really, it is used only when dst->neigh is wrong.
- *
- * TODO:  This needs a checkup, I'm ignorant here. --BLG
- */
-int vlan_dev_rebuild_header(struct sk_buff *skb)
-{
-	struct net_device *dev = skb->dev;
-	struct vlan_ethhdr *veth = (struct vlan_ethhdr *)(skb->data);
-
-	switch (veth->h_vlan_encapsulated_proto) {
-#ifdef CONFIG_INET
-	case __constant_htons(ETH_P_IP):
-
-		/* TODO:  Confirm this will work with VLAN headers... */
-		return arp_find(veth->h_dest, skb);
-#endif
-	default:
-		printk(VLAN_DBG
-		       "%s: unable to resolve type %X addresses.\n",
-		       dev->name, ntohs(veth->h_vlan_encapsulated_proto));
-
-		memcpy(veth->h_source, dev->dev_addr, ETH_ALEN);
-		break;
-	};
-
-	return 0;
-}
-
 static inline struct sk_buff *vlan_check_reorder_header(struct sk_buff *skb)
 {
 	if (VLAN_DEV_INFO(skb->dev)->flags & 1) {
 		if (skb_cow(skb, skb_headroom(skb)) < 0) {
 			kfree_skb(skb);
-			skb = NULL;
+			return NULL;
 		}
 		if (skb) {
 			/* Lifted from Gleb's VLAN code... */
@@ -190,7 +156,7 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	 */
 
 	rcu_read_lock();
-	skb->dev = __find_vlan_dev(dev, vid);
+	skb->dev = find_vlan_dev(dev, vid);
 	if (!skb->dev) {
 		rcu_read_unlock();
 
@@ -238,12 +204,11 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	skb = vlan_check_reorder_header(skb);
 
 	/* Can be null if skb-clone fails when re-ordering */
-	if (skb) {
-		netif_rx(skb);
-	} else {
-		/* TODO:  Add a more specific counter here. */
-		stats->rx_errors++;
-	}
+	if (likely(skb))
+	    netif_rx(skb);
+	else
+	    /* TODO:  Add a more specific counter here. */
+	    stats->rx_errors++;
 	rcu_read_unlock();
 	return 0;
 }

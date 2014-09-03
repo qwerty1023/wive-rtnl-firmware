@@ -152,7 +152,7 @@ struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.forwarding		= 0,
 	.hop_limit		= IPV6_DEFAULT_HOPLIMIT,
 	.mtu6			= IPV6_MIN_MTU,
-	.accept_ra		= 1,
+	.accept_ra		= 0,
 	.accept_redirects	= 1,
 	.autoconf		= 1,
 	.force_mld_version	= 0,
@@ -179,6 +179,9 @@ struct ipv6_devconf ipv6_devconf __read_mostly = {
 #endif
 	.proxy_ndp		= 0,
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
+#ifdef CONFIG_IPV6_OPTIMISTIC_DAD
+	.optimistic_dad		= 1,
+#endif
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -211,6 +214,9 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 #endif
 	.proxy_ndp		= 0,
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
+#ifdef CONFIG_IPV6_OPTIMISTIC_DAD
+	.optimistic_dad		= 1,
+#endif
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -2301,18 +2307,6 @@ static void addrconf_sit_config(struct net_device *dev)
 		sit_route_add(dev);
 }
 #endif
-
-static inline int
-ipv6_inherit_linklocal(struct inet6_dev *idev, struct net_device *link_dev)
-{
-	struct in6_addr lladdr;
-
-	if (!ipv6_get_lladdr(link_dev, &lladdr, IFA_F_TENTATIVE)) {
-		addrconf_add_linklocal(idev, &lladdr);
-		return 0;
-	}
-	return -1;
-}
 
 static int addrconf_notify(struct notifier_block *this, unsigned long event,
 			   void * data)

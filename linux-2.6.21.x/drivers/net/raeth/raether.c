@@ -43,6 +43,10 @@
 #include "ra_qos.h"
 #endif
 
+#ifdef CONFIG_RALINK_RT3052_MP2
+#include "mcast.h"
+#endif
+
 #if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
 #include "../../../net/nat/hw_nat/ra_nat.h"
 #endif
@@ -81,18 +85,6 @@ static void rtl_link_status_changed(void);
 extern int vlan_double_tag;
 #endif
 
-#ifdef CONFIG_RAETH_NAPI
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
-static int raeth_clean(struct napi_struct *napi, int budget);
-#else
-static int raeth_clean(struct net_device *dev, int *budget);
-#endif
-
-static int rt2880_eth_recv(struct net_device* dev, int *work_done, int work_to_do);
-#else
-static int rt2880_eth_recv(struct net_device* dev);
-#endif
-
 #ifndef CONFIG_RA_NAT_NONE
 #ifdef CONFIG_RAETH_MODULE
 extern int (*ra_sw_nat_hook_rx)(struct sk_buff *skb);
@@ -117,11 +109,6 @@ EXPORT_SYMBOL(ra_sw_nat_hook_rs);
 extern int (*ra_classifier_hook_tx)(struct sk_buff *skb, unsigned long cur_cycle);
 extern int (*ra_classifier_hook_rx)(struct sk_buff *skb, unsigned long cur_cycle);
 #endif /* CONFIG_RA_CLASSIFIER */
-
-#if defined (CONFIG_RALINK_RT3052_MP2)
-int32_t mcast_rx(struct sk_buff * skb);
-int32_t mcast_tx(struct sk_buff * skb);
-#endif
 
 #ifdef CONFIG_RAETH_READ_MAC_FROM_MTD
 #ifdef RA_MTD_RW_BY_NUM
@@ -202,7 +189,6 @@ static int ei_open(struct net_device *dev);
 static int ei_close(struct net_device *dev);
 static int ra2882eth_init(void);
 static void ra2882eth_cleanup_module(void);
-static void ei_xmit_housekeeping(unsigned long unused);
 
 #if 0
 void skb_dump(struct sk_buff* sk) {
@@ -1148,9 +1134,9 @@ static int rt_get_skb_header(struct sk_buff *skb, void **iphdr, void **tcph,
 #endif // CONFIG_RAETH_LRO //
 
 #ifdef CONFIG_RAETH_NAPI
-static int FASTPATHNET rt2880_eth_recv(struct net_device* dev, int *work_done, int work_to_do)
+static inline int rt2880_eth_recv(struct net_device* dev, int *work_done, int work_to_do)
 #else
-static int FASTPATHNET rt2880_eth_recv(struct net_device* dev)
+static inline int rt2880_eth_recv(struct net_device* dev)
 #endif
 {
 	struct sk_buff	*skb, *rx_skb;
@@ -1388,28 +1374,25 @@ static int FASTPATHNET rt2880_eth_recv(struct net_device* dev)
 #endif
          {
 #if defined (CONFIG_RALINK_RT3052_MP2)
-	       if(mcast_rx(rx_skb)==0) {
-		   kfree_skb(rx_skb);
-	       }else
+	    if(mcast_rx(rx_skb)==0) {
+		kfree_skb(rx_skb);
+	    } else
 #endif
 #if defined (CONFIG_RAETH_LRO)
-	       if (rx_skb->ip_summed == CHECKSUM_UNNECESSARY) {
-		       lro_receive_skb(&ei_local->lro_mgr, rx_skb, NULL);
-		       //LroStatsUpdate(&ei_local->lro_mgr,0);
-	     }else
+	    if (rx_skb->ip_summed == CHECKSUM_UNNECESSARY) {
+		lro_receive_skb(&ei_local->lro_mgr, rx_skb, NULL);
+		//LroStatsUpdate(&ei_local->lro_mgr,0);
+	    } else
 #endif
 #ifdef CONFIG_RAETH_NAPI
-                netif_receive_skb(rx_skb);
+		netif_receive_skb(rx_skb);
 #else
 #ifdef CONFIG_RAETH_HW_VLAN_RX
-	        if(ei_local->vlgrp && rx_ring[rx_dma_owner_idx].rxd_info2.TAG) {
-			vlan_hwaccel_rx(rx_skb, ei_local->vlgrp, rx_ring[rx_dma_owner_idx].rxd_info3.VID);
-		} else {
-                netif_rx(rx_skb);
-	 }
-#else
-                netif_rx(rx_skb);
+	    if(ei_local->vlgrp && rx_ring[rx_dma_owner_idx].rxd_info2.TAG) {
+		vlan_hwaccel_rx(rx_skb, ei_local->vlgrp, rx_ring[rx_dma_owner_idx].rxd_info3.VID);
+	    } else
 #endif
+                netif_rx(rx_skb);
 #endif
          }
 
@@ -1606,8 +1589,77 @@ static void FASTPATHNET ei_receive(unsigned long unused)  // device structure
 }
 #endif
 
+static inline void ei_xmit_housekeeping(unsigned long unused)
+{
+    struct net_device *dev = dev_raether;
+    END_DEVICE *ei_local = netdev_priv(dev);
+    struct PDMA_txdesc *tx_desc;
+    unsigned long skb_free_idx;
+#ifdef CONFIG_RAETH_QOS
+    unsigned long tx_dtx_idx;
+#endif
+#ifndef CONFIG_RAETH_NAPI
+    unsigned long reg_int_mask=0;
+#endif
+
+#ifdef CONFIG_RAETH_QOS
+    int i;
+    for (i=0;i<NUM_TX_RINGS;i++){
+        skb_free_idx = ei_local->free_idx[i];
+    	if((ei_local->skb_free[i][skb_free_idx])==0){
+		continue;
+	}
+
+	get_tx_desc_and_dtx_idx(ei_local, i, &tx_dtx_idx, &tx_desc);
+
+	while(tx_desc[skb_free_idx].txd_info2.DDONE_bit==1 && (ei_local->skb_free[i][skb_free_idx])!=0 ){
+	    dev_kfree_skb_any((ei_local->skb_free[i][skb_free_idx]));
+	    ei_local->skb_free[i][skb_free_idx]=0;
+	    skb_free_idx = (skb_free_idx +1) % NUM_TX_DESC;
+	}
+	ei_local->free_idx[i] = skb_free_idx;
+    }
+#else
+	sysRegRead(TX_DTX_IDX0);
+	tx_desc = ei_local->tx_ring0;
+	skb_free_idx = ei_local->free_idx;
+	if ((ei_local->skb_free[skb_free_idx]) != 0 && tx_desc[skb_free_idx].txd_info2.DDONE_bit==1) {
+		while(tx_desc[skb_free_idx].txd_info2.DDONE_bit==1 && (ei_local->skb_free[skb_free_idx])!=0 ){
+#if defined (CONFIG_RAETH_TSO)
+	    if(ei_local->skb_free[skb_free_idx]!=(struct  sk_buff *)0xFFFFFFFF)
+		    dev_kfree_skb_any(ei_local->skb_free[skb_free_idx]);
+#else
+	    dev_kfree_skb_any(ei_local->skb_free[skb_free_idx]);
+#endif
+	    ei_local->skb_free[skb_free_idx]=0;
+	    skb_free_idx = (skb_free_idx +1) % NUM_TX_DESC;
+	}
+
+	netif_wake_queue(dev);
+#ifdef CONFIG_PSEUDO_SUPPORT
+		netif_wake_queue(ei_local->PseudoDev);
+#endif
+		tx_ring_full=0;
+		ei_local->free_idx = skb_free_idx;
+	}  /* if skb_free != 0 */
+#endif
+
+#ifndef CONFIG_RAETH_NAPI
+    reg_int_mask=sysRegRead(FE_INT_ENABLE);
+#if defined (DELAY_INT)
+    sysRegWrite(FE_INT_ENABLE, reg_int_mask| TX_DLY_INT);
+#else
+
+    sysRegWrite(FE_INT_ENABLE, reg_int_mask | TX_DONE_INT0 \
+		    			    | TX_DONE_INT1 \
+					    | TX_DONE_INT2 \
+					    | TX_DONE_INT3);
+#endif
+#endif //CONFIG_RAETH_NAPI//
+}
+
 #ifdef CONFIG_RAETH_NAPI
-static int
+static inline int
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
 raeth_clean(struct napi_struct *napi, int budget)
 #else
@@ -2619,7 +2671,6 @@ static int __init rather_probe(struct net_device *dev)
 #else
 	i = ra_mtd_read_nm("Factory", GMAC0_OFFSET, 6, addr.sa_data);
 #endif
-
 	//If reading mtd failed or mac0 is empty, generate a mac address
 	if (i < 0 || (memcmp(addr.sa_data, zero1, 6) == 0) ||
 	    (memcmp(addr.sa_data, zero2, 6) == 0)) {
@@ -2629,6 +2680,8 @@ static int __init rather_probe(struct net_device *dev)
 		addr.sa_data[5] = net_random()&0xFF;
 	}
 
+	ei_set_mac_addr(dev, &addr);
+#endif /* CONFIG_RAETH_READ_MAC_FROM_MTD */
 #ifdef CONFIG_RAETH_LRO
 	ei_local->lro_mgr.dev = dev;
         memset(&ei_local->lro_mgr.stats, 0, sizeof(ei_local->lro_mgr.stats));
@@ -2641,10 +2694,6 @@ static int __init rather_probe(struct net_device *dev)
         ei_local->lro_mgr.lro_arr = ei_local->lro_arr;
         ei_local->lro_mgr.get_skb_header = rt_get_skb_header;
 #endif
-
-	ei_set_mac_addr(dev, &addr);
-#endif /* CONFIG_RAETH_READ_MAC_FROM_MTD */
-
 #ifdef CONFIG_RAETH_NAPI
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,35)
 	netif_napi_add(dev, &ei_local->napi, raeth_clean, DEV_WEIGHT);
@@ -2657,75 +2706,6 @@ static int __init rather_probe(struct net_device *dev)
 	setup_statistics(ei_local);
 
 	return 0;
-}
-
-static void FASTPATHNET ei_xmit_housekeeping(unsigned long unused)
-{
-    struct net_device *dev = dev_raether;
-    END_DEVICE *ei_local = netdev_priv(dev);
-    struct PDMA_txdesc *tx_desc;
-    unsigned long skb_free_idx;
-#ifdef CONFIG_RAETH_QOS
-    unsigned long tx_dtx_idx;
-#endif
-#ifndef CONFIG_RAETH_NAPI
-    unsigned long reg_int_mask=0;
-#endif
-
-#ifdef CONFIG_RAETH_QOS
-    int i;
-    for (i=0;i<NUM_TX_RINGS;i++){
-        skb_free_idx = ei_local->free_idx[i];
-    	if((ei_local->skb_free[i][skb_free_idx])==0){
-		continue;
-	}
-
-	get_tx_desc_and_dtx_idx(ei_local, i, &tx_dtx_idx, &tx_desc);
-
-	while(tx_desc[skb_free_idx].txd_info2.DDONE_bit==1 && (ei_local->skb_free[i][skb_free_idx])!=0 ){
-	    dev_kfree_skb_any((ei_local->skb_free[i][skb_free_idx]));
-	    ei_local->skb_free[i][skb_free_idx]=0;
-	    skb_free_idx = (skb_free_idx +1) % NUM_TX_DESC;
-	}
-	ei_local->free_idx[i] = skb_free_idx;
-    }
-#else
-	sysRegRead(TX_DTX_IDX0);
-	tx_desc = ei_local->tx_ring0;
-	skb_free_idx = ei_local->free_idx;
-	if ((ei_local->skb_free[skb_free_idx]) != 0 && tx_desc[skb_free_idx].txd_info2.DDONE_bit==1) {
-		while(tx_desc[skb_free_idx].txd_info2.DDONE_bit==1 && (ei_local->skb_free[skb_free_idx])!=0 ){
-#if defined (CONFIG_RAETH_TSO)
-	    if(ei_local->skb_free[skb_free_idx]!=(struct  sk_buff *)0xFFFFFFFF)
-		    dev_kfree_skb_any(ei_local->skb_free[skb_free_idx]);
-#else
-	    dev_kfree_skb_any(ei_local->skb_free[skb_free_idx]);
-#endif
-	    ei_local->skb_free[skb_free_idx]=0;
-	    skb_free_idx = (skb_free_idx +1) % NUM_TX_DESC;
-	}
-
-	netif_wake_queue(dev);
-#ifdef CONFIG_PSEUDO_SUPPORT
-		netif_wake_queue(ei_local->PseudoDev);
-#endif
-		tx_ring_full=0;
-		ei_local->free_idx = skb_free_idx;
-	}  /* if skb_free != 0 */
-#endif
-
-#ifndef CONFIG_RAETH_NAPI
-    reg_int_mask=sysRegRead(FE_INT_ENABLE);
-#if defined (DELAY_INT)
-    sysRegWrite(FE_INT_ENABLE, reg_int_mask| TX_DLY_INT);
-#else
-
-    sysRegWrite(FE_INT_ENABLE, reg_int_mask | TX_DONE_INT0 \
-		    			    | TX_DONE_INT1 \
-					    | TX_DONE_INT2 \
-					    | TX_DONE_INT3);
-#endif
-#endif //CONFIG_RAETH_NAPI//
 }
 
 #ifdef CONFIG_PSEUDO_SUPPORT

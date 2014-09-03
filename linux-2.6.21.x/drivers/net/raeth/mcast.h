@@ -11,7 +11,6 @@
 #include <linux/if_vlan.h>
 #include <linux/if_ether.h>
 
-
 #define MAX_MCAST_ENTRY	    16
 #define AGEING_TIME	    5  //Unit: Sec
 #define MAC_ARG(x) ((u8*)(x))[0],((u8*)(x))[1],((u8*)(x))[2], \
@@ -110,7 +109,6 @@ static int inline mcast_entry_ins(uint16_t vlan_id, uint8_t *src_mac, uint8_t *d
 
 }
 
-
 /*
  * Return:
  *	    0: entry found
@@ -130,29 +128,27 @@ static int inline mcast_entry_del(uint16_t vlan_id, uint8_t *src_mac, uint8_t *d
 	}
 	up(&mtbl_lock);
 	return 0;
-    }else { 
+    }else {
 	/* this multicast packet was not sent by meself, just ignore it */
 	up(&mtbl_lock);
 	return 1;
     }
 }
 
-/* 
+/*
  * Return
  *	    0: drop packet
  *	    1: continue
  */
-int32_t mcast_rx(struct sk_buff * skb)
+static inline int32_t mcast_rx(struct sk_buff * skb)
 {
     struct vlan_ethhdr *eth = (struct vlan_ethhdr *)(skb->data-ETH_HLEN);
 
-    /* if we do not send multicast packet before, 
+    /* if we do not send multicast packet before,
      * we don't need to check re-inject multicast packet.
      */
-    if (atomic_read(&mcast_entry_num)==0) {
+    if (atomic_read(&mcast_entry_num)==0)
 	return 1;
-    }
-
 
     if(is_multicast_pkt(eth->h_dest)) {
 	MCAST_PRINT("%s: %0X:%0X:%0X:%0X:%0X:%0X\n", __FUNCTION__, \
@@ -168,11 +164,9 @@ int32_t mcast_rx(struct sk_buff * skb)
     return 1;
 }
 
-
-int32_t mcast_tx(struct sk_buff *skb)
+static inline void mcast_tx(struct sk_buff *skb)
 {
     struct vlan_ethhdr *eth = (struct vlan_ethhdr *)(skb->data);
-
 
     if(is_multicast_pkt(eth->h_dest)) {
 	MCAST_PRINT("%s: %0X:%0X:%0X:%0X:%0X:%0X\n", __FUNCTION__,\
@@ -184,6 +178,4 @@ int32_t mcast_tx(struct sk_buff *skb)
 	    mcast_entry_ins(0, eth->h_source, eth->h_dest);
 	}
     }
-
-    return 1;
 }

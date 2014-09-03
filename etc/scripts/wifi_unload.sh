@@ -12,8 +12,7 @@ stop_serv="minidlna transmission shaper crontab pppoe-relay ddns wscd dhcpd lld2
 	    hotplug igmp_proxy ntp samba dnsserver snmpd xupnp vpnhelper syslog inetd"
 
 kill_apps="minidlnad transmission-daemon smbd nmbd pppd xl2tpd udhcpd udhcpc crond lld2d igmpproxy inetd syslogd klogd \
-	    ntpclient ntpd zebra ripd inadyn ftpd scp miniupnpd \
-	    iwevent telnetd wscd rt2860apd rt61apd dnsmasq cdp-send snmpd xupnpd"
+	    ntpclient ntpd zebra ripd inadyn ftpd scp miniupnpd iwevent telnetd wscd rt2860apd rt61apd dnsmasq cdp-send snmpd xupnpd"
 
 rmmod_mod="hw_nat ppp_mppe pppol2tp pptp pppoe pppox ppp_generic imq ipt_account ipt_TTL ipt_IMQ ipt_tos \
 	    ipt_REDIRECT ipt_ttl ipt_TOS xt_string xt_webstr xt_connmark xt_CONNMARK xt_conntrack \
@@ -25,8 +24,12 @@ rmmod_mod="hw_nat ppp_mppe pppol2tp pptp pppoe pppox ppp_generic imq ipt_account
 
 # disable forward
 sysctl -wq net.ipv4.ip_forward=0
-echo 0 > /proc/sys/net/ipv4/conf/all/mc_forwarding
-echo 0 > /proc/sys/net/ipv4/conf/default/mc_forwarding
+sysctl -wq net.ipv4.conf.all.forwarding=0
+sysctl -wq net.ipv4.conf.all.mc_forwarding=0
+sysctl -wq net.ipv4.conf.default.forwarding=0
+sysctl -wq net.ipv4.conf.default.mc_forwarding=0
+sysctl -wq net.ipv6.conf.all.forwarding=0
+sysctl -wq net.ipv6.conf.default.forwarding=0
 
 # clear conntrack and routes tables/caches
 flush_net_caches
@@ -117,7 +120,7 @@ free_mem_cahce() {
     # small workaround for defrag ane clean mem
     sysctl -wq vm.min_free_kbytes=8192
     sync
-    sysctl -wq vm.min_free_kbytes=4096
+    sysctl -wq vm.min_free_kbytes=2048
 }
 
 # unload all applications

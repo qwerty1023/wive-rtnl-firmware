@@ -401,22 +401,40 @@ startv6() {
 
     $LOG "Add netfiler rules for ipv6"
     # default rules
-    ip6tables -I INPUT -i lo -j ACCEPT
+    ip6tables -A INPUT -i lo -j ACCEPT
     ip6tables -A INPUT $STATE_EST -j ACCEPT
 
     # wan accept and mss fix rules
     ip6tables -A FORWARD -t mangle -p tcp ! -o $lan_if --tcp-flags SYN,RST SYN -j TCPMSS --clamp-mss-to-pmtu
-    ip6tables -A FORWARD $STATE_EST -j ACCEPT
 
-    # temp rules need enchange in future
+    # temp rules need enchange in future (need add service limit for ipv6 local services)
     ip6tables -A INPUT -i $lan_if -j ACCEPT
     ip6tables -A FORWARD -i $lan_if -j ACCEPT
+
+    if [ "$WANPingFilter" = "0" ] && [ "$ROUTE_MODE" = "on" ]; then
+	$LOG "Filter all ipv6 icmp echo requests for router and clients."
+        ip6tables -A INPUT -p ipv6-icmp --icmpv6-type echo-request -j DROP
+        ip6tables -A FORWARD -p ipv6-icmp --icmpv6-type echo-request -j DROP
+    else
+	$LOG "Allow ratelimited icmp echo requests to router and clients."
+	ip6tables -A INPUT -p ipv6-icmp --icmpv6-type echo-request -m limit --limit 10/s -j ACCEPT
+	ip6tables -A INPUT -p ipv6-icmp --icmpv6-type echo-request -j DROP
+	ip6tables -A FORWARD -p ipv6-icmp --icmpv6-type echo-request -m limit --limit 10/s -j ACCEPT
+	ip6tables -A FORWARD -p ipv6-icmp --icmpv6-type echo-request -j DROP
+    fi
+
+    # allow all others icmp messages (mtu probing and others) to router and clients
+    ip6tables -A INPUT -p ipv6-icmp ! --icmpv6-type echo-request -j ACCEPT
+    ip6tables -A FORWARD -p ipv6-icmp ! --icmpv6-type echo-request -j ACCEPT
 
     # allow mupnp to open connection from earth to local
     #if [ "$upnpEnabled" = "1" ]; then
 	#ip6tables -t filter -N MINIUPNPD
 	#ip6tables -t filter -A FORWARD -i $tunif ! -o $tunif -j MINIUPNPD
     #fi
+#########################################ACCEPT_ESTABLISHED################################
+    ip6tables -A FORWARD $STATE_EST -j ACCEPT
+############################################ENDRULES#######################################
     $LOG "Configure netfilter for ipv6 OK!"
 }
 

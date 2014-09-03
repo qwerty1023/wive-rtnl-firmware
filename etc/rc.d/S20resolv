@@ -31,7 +31,11 @@ if [ ! -f /var/run/goahead.pid ] || [ "$wan_static_dns" = "on" ]; then
 	echo "nameserver 8.8.8.8" >> $fname
 	echo "nameserver 8.8.4.4" >> $fname
     fi
-
+    if [ "$radvdEnabled" = "1" ]; then
+	$LOG "Add google ipv6 servers (need replace to user manual servers from webui in future)"
+	echo "nameserver 2001:4860:4860::8888" >> $fname
+	echo "nameserver 2001:4860:4860::8844" >> $fname
+    fi
     # read for all write by root
     chmod 644 "$fname" > /dev/null 2>&1
 fi
