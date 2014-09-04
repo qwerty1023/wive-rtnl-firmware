@@ -8,7 +8,7 @@
 # include global
 . /etc/scripts/global.sh
 
-stop_serv="watchdog radvd vpnhelper shaper crontab minidlna transmission pppoe-relay ddns wscd lld2d zebra udpxy upnp \
+stop_serv="watchdog radvd shaper crontab minidlna transmission vpnhelper pppoe-relay ddns wscd lld2d zebra udpxy upnp \
 	    igmp_proxy ntp dnsserver snmpd xupnp syslog inetd samba hotplug dhcpd"
 
 kill_apps="minidlnad transmission-daemon smbd nmbd pppd xl2tpd udhcpd udhcpc crond lld2d igmpproxy inetd syslogd klogd \

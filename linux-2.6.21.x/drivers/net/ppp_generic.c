@@ -56,6 +56,10 @@
 extern int ppp_cpu_load;
 static unsigned long cpload[3];
 static unsigned long curload;
+#ifdef CONFIG_RALINK_WATCHDOG
+extern void RaWdgReload(void);
+extern int WdgLoadValue;
+#endif
 #endif
 
 #ifdef CONFIG_RALINK_GPIO_LED_VPN
@@ -1227,6 +1231,11 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 
 			/* drop if load high in current interval */
 			if (curload > ppp_cpu_load) {
+#ifdef CONFIG_RALINK_WATCHDOG
+			/* Refresh Ralink hardware watchdog timer, prevent reboot at high cpu load */
+    			if(WdgLoadValue)
+			    RaWdgReload();
+#endif
 					goto drop2;      /* drop packet ... */
 			}
 	    }
