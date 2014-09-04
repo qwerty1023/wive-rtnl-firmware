@@ -8,7 +8,7 @@
 LOG="logger -t services"
 MODE="$1"
 
-$LOG "Restart needed services and scripts. Mode $MODE"
+$LOG "Restart needed services and scripts. Mode: $MODE"
 
 ##########################################################
 # MODES:						 #
@@ -41,6 +41,9 @@ $LOG "Restart needed services and scripts. Mode $MODE"
     if [ -e /etc/init.d/parprouted ]; then
 	service parprouted restart
     fi
+    if [ -e /etc/init.d/transmission ]; then
+	service transmission restart
+    fi
 
 ##########################################################
 # Need restart this:					 #
@@ -57,9 +60,6 @@ if [ "$MODE" = "dhcp" ] || [ "$MODE" = "misc" ] || [ "$MODE" = "all" ]; then
     fi
     if [ -e /etc/init.d/udpxy ]; then
 	service udpxy restart
-    fi
-    if [ -e /etc/init.d/transmission ]; then
-	service transmission restart
     fi
 fi
 

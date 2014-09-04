@@ -159,11 +159,11 @@ getWanIfName() {
 
 getTunIfName() {
     if [ "$ipv6_mode" = "6RD" ]; then
-	tunif="6rd"
+	tun_if="6rd"
     elif [ "$ipv6_mode" = "6TO4" ]; then
-	tunif="sit0"
+	tun_if="sit0"
     elif [ "$ipv6_mode" = "NATIVE" ]; then
-	tunif="$real_wan_if"
+	tun_if="$real_wan_if"
     fi
 }
 
@@ -230,10 +230,7 @@ flush_arp_cache() {
 }
 
 delif_from_br() {
-    ip addr flush dev $1 > /dev/null 2>&1
-    if [ -d /proc/sys/net/ipv6 ]; then
-        ip -6 addr flush dev $1 > /dev/null 2>&1
-    fi
+    ip -4 addr flush dev $1 > /dev/null 2>&1
     ip link set $1 down > /dev/null 2>&1
     brctl delif br0 $1 > /dev/null 2>&1
 }
