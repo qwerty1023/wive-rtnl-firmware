@@ -27,7 +27,7 @@ start() {
 	fi
 	gen_config
 	ip -4 route replace $upmpm_net dev $lan_if
-        miniupnpd -f /etc/miniupnpd.conf -i "$real_wan_if" -o "$real_wan_ipaddr" -a "$lan_if" &
+        miniupnpd -f /etc/miniupnpd.conf -i "$real_wan_if" -o "$real_wan_ipaddr" -a "$lan_if" -z "$HostName" &
     fi
 }
 
@@ -35,8 +35,13 @@ gen_config() {
 ####################generate config###########################
 printf "
 minissdpdsocket=/var/run/minissdpd.sock
+friendly_name=Wive-RTNL
+manufacturer_name=Wive-RTNL
+manufacturer_url=http://wive-ng.sf.net
+model_name=Wive-RTNL
+model_description=Wive-RTNL
+model_url=http://wive.ng.sf.net
 lease_file=/var/upnp_leases
-port=8666
 enable_natpmp=yes
 enable_upnp=yes
 secure_mode=no
@@ -46,6 +51,7 @@ system_uptime=yes
 notify_interval=60
 clean_ruleset_threshold=5
 clean_ruleset_interval=1500
+http_port=8666
 allow 1024-65535 $lan_ipaddr/$lan_netmask 1024-65535
 deny 0-65535 0.0.0.0/0 0-65535
 model_number=1
@@ -56,7 +62,7 @@ cat /etc/miniupnpd.conf.uuid >> /etc/miniupnpd.conf
 }
 
 get_param() {
-    eval `nvram_buf_get 2860 lan_ipaddr lan_netmask upnpEnabled`
+    eval `nvram_buf_get 2860 lan_ipaddr lan_netmask upnpEnabled HostName`
 }
 
 stop() {

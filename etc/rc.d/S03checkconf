@@ -5,7 +5,7 @@ if [ -f /tmp/nvram_checked ] || [ -f /var/run/goahead.pid ]; then
     exit 0
 fi
 
-LOG="logger -t CHECKCONF"
+LOG="logger -t checkconf"
 
 start() {
     # get variables
@@ -34,7 +34,7 @@ start() {
 
 ######################################## MINIMAL CONFIG FOR NORMAL START #########################################
     #
-    # chech mac correct set if check mac in nvram set to not NO and web not start
+    # check mac correct set if check mac in nvram set to not NO and web not start
     #
     if [ "$CHECKMAC" != "NO" ] && [ ! -f /var/run/goahead.pid ]; then
 	if [ $MAC_TEST = "0" ] || [ $WMAC_TEST = "0" ] || [ $WMAC2_TEST = "0" ] || [ $LANMAC_TEST = "0" ]; then

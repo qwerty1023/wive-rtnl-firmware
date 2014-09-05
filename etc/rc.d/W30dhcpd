@@ -76,6 +76,7 @@ start() {
 	set_dns
 	# wins servers for clients
 	if [ "$SmbEnabled" = "1" ]; then
+		# use local samba server as wins server
 		config-udhcpd.sh -w "$lan_ipaddr"
 	fi
 	# lease time

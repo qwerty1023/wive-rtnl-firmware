@@ -136,6 +136,7 @@ static int mton(uint32_t mask)
 	return i;
 }
 
+#if ENABLE_FEATURE_UDHCPC_SANITIZEOPT
 /* Check if a given label represents a valid DNS label
  * Return pointer to the first character after the label upon success,
  * NULL otherwise.
@@ -192,6 +193,9 @@ static int good_hostname(const char *name)
 		name++;
 	}
 }
+#else
+# define good_hostname(name) 1
+#endif
 
 /* Create "opt_name=opt_value" string */
 static NOINLINE char *xmalloc_optname_optval(uint8_t *option, const struct dhcp_optflag *optflag, const char *opt_name)
@@ -662,10 +666,10 @@ static void add_client_options(struct dhcp_packet *packet)
  * client reverts to using the IP broadcast address.
  */
 
-static int raw_bcast_from_client_config_ifindex(struct dhcp_packet *packet)
+static int raw_bcast_from_client_config_ifindex(struct dhcp_packet *packet, uint32_t src_nip)
 {
 	return udhcp_send_raw_packet(packet,
-		/*src*/ INADDR_ANY, CLIENT_PORT,
+		/*src*/ src_nip, CLIENT_PORT,
 		/*dst*/ INADDR_BROADCAST, SERVER_PORT, MAC_BCAST_ADDR,
 		client_config.ifindex);
 }
@@ -676,7 +680,7 @@ static int bcast_or_ucast(struct dhcp_packet *packet, uint32_t ciaddr, uint32_t 
 		return udhcp_send_kernel_packet(packet,
 			ciaddr, CLIENT_PORT,
 			server, SERVER_PORT);
-	return raw_bcast_from_client_config_ifindex(packet);
+	return raw_bcast_from_client_config_ifindex(packet, ciaddr);
 }
 
 /* Broadcast a DHCP discover packet to the network, with an optionally requested IP */
@@ -702,7 +706,7 @@ static NOINLINE int send_discover(uint32_t xid, uint32_t requested)
 	add_client_options(&packet);
 
 	bb_info_msg("Sending discover...");
-	return raw_bcast_from_client_config_ifindex(&packet);
+	return raw_bcast_from_client_config_ifindex(&packet, INADDR_ANY);
 }
 
 /* Broadcast a DHCP request message */
@@ -746,7 +750,7 @@ static NOINLINE int send_select(uint32_t xid, uint32_t server, uint32_t requeste
 
 	addr.s_addr = requested;
 	bb_info_msg("Sending select for %s...", inet_ntoa(addr));
-	return raw_bcast_from_client_config_ifindex(&packet);
+	return raw_bcast_from_client_config_ifindex(&packet, INADDR_ANY);
 }
 
 /* Unicast or broadcast a DHCP renew message */
@@ -814,7 +818,7 @@ static NOINLINE int send_decline(/*uint32_t xid,*/ uint32_t server, uint32_t req
 	udhcp_add_simple_option(&packet, DHCP_SERVER_ID, server);
 
 	bb_info_msg("Sending decline...");
-	return raw_bcast_from_client_config_ifindex(&packet);
+	return raw_bcast_from_client_config_ifindex(&packet, INADDR_ANY);
 }
 #endif
 
