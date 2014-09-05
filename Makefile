@@ -1,4 +1,4 @@
-############################################################################
+###########################################################################
 #
 # Makefile -- Top level uClinux makefile.
 #
@@ -11,14 +11,14 @@
 # Lets work out what the user wants, and if they have configured us yet
 #
 
-ifeq ($(ROOTDIR),)
-ROOTDIR=.
-endif
+.EXPORT_ALL_VARIABLES:
+
+ROOTDIR	:= $(shell pwd)
 
 ifeq (.config,$(wildcard .config))
 -include version
 -include .config
-all: tools linux lib_only user_only romfs image
+all: linux tools lib_only user_only romfs image
 else
 all: config_error
 endif
@@ -45,51 +45,52 @@ CXXFLAGS	:=
 # Get the core stuff worked out
 #
 
-ROOTDIR		:= $(shell pwd)
-HOSTCC		:= gcc
+MAKE		?= make
+HOSTCC		?= gcc
+
 ROMFSINST	:= romfs-inst.sh
 TFTPDIR		:= /tftpboot
-PATH		:= $(PATH):$(ROOTDIR)/tools:$(ROOTDIR)/toolchain/bin:$(ROOTDIR)/lib/lib:$(ROOTDIR)/lib/include
 
-LINUXDIR	= $(CONFIG_LINUXDIR)
-LIBCDIR		= $(CONFIG_LIBCDIR)
-IMAGEDIR	= $(ROOTDIR)/images
-ROMFSDIR	= $(ROOTDIR)/romfs
-SCRIPTSDIR	= $(ROOTDIR)/config/scripts
-LINUX_CONFIG	= $(ROOTDIR)/$(LINUXDIR)/.config
-CONFIG_CONFIG	= $(ROOTDIR)/config/.config
-STRIPOPT	= -R .comment -R .note -g --strip-unneeded
+LINUXDIR	:= $(CONFIG_LINUXDIR)
+LIBCDIR		:= $(CONFIG_LIBCDIR)
+IMAGEDIR	:= $(ROOTDIR)/images
+ROMFSDIR	:= $(ROOTDIR)/romfs
+SCRIPTSDIR	:= $(ROOTDIR)/config/scripts
+LINUX_CONFIG	:= $(ROOTDIR)/$(LINUXDIR)/.config
+CONFIG_CONFIG	:= $(ROOTDIR)/config/.config
+PATH		:= $(PATH):$(ROOTDIR):$(ROOTDIR)/tools:$(ROOTDIR)/toolchain/bin:$(ROOTDIR)/lib/lib:$(ROOTDIR)/lib/include:$(LINUXDIR):$(LIBCDIR)
+
+# May use a different compiler
+CROSS_COMPILE		?= $(ROOTDIR)/toolchain/bin/mipsel-linux-uclibc-
+KERNEL_CROSS_COMPILE	:= $(CROSS_COMPILE)
+CROSS_COMPILER_PREFIX	:= $(CROSS_COMPILE)
 
 #NUM MAKE PROCESS = CPU NUMBER IN THE SYSTEM * CPU_OVERLOAD
-CPU_OVERLOAD	= 4
-HOST_NCPU	= $(shell if [ -f /proc/cpuinfo ]; then n=`grep -c processor /proc/cpuinfo`; if [ $$n -gt 1 ];then expr $$n \* ${CPU_OVERLOAD}; else echo $$n; fi; else echo 1; fi)
+CPU_OVERLOAD	:= 4
 
-BUILD_START_STRING ?= $(shell date "+%a, %d %b %Y %T %z")
+HOST_NCPU	:= $(shell if [ -f /proc/cpuinfo ]; then n=`grep -c processor /proc/cpuinfo`; if [ $$n -gt 1 ];then expr $$n \* ${CPU_OVERLOAD}; else echo $$n; fi; else echo 1; fi)
+BUILD_START_STRING := $(shell date "+%a, %d %b %Y %T %z")
 
-CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
-	  else if [ -x /bin/bash ]; then echo /bin/bash; \
-	  else echo sh; fi ; fi)
+CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; else if [ -x /bin/bash ]; then echo /bin/bash; else echo sh; fi ; fi)
 
 ifeq (config.arch,$(wildcard config.arch))
 ifeq ($(filter %_default, $(MAKECMDGOALS)),)
-include config.arch
-ARCH_CONFIG = $(ROOTDIR)/config.arch
+ARCH_CONFIG := $(ROOTDIR)/config.arch
+include $(ARCH_CONFIG)
 export ARCH_CONFIG
 endif
 endif
 
-# May use a different compiler for the kernel
-KERNEL_CROSS_COMPILE ?= $(CROSS_COMPILE)
 ifneq ($(SUBARCH),)
 # Using UML, so make the kernel and non-kernel with different ARCHs
-MAKEARCH = $(MAKE) ARCH=$(SUBARCH) CROSS_COMPILE=$(CROSS_COMPILE)
-MAKEARCH_KERNEL = $(MAKE) ARCH=$(ARCH) SUBARCH=$(SUBARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
+MAKEARCH := $(MAKE) ARCH=$(SUBARCH) CROSS_COMPILE=$(CROSS_COMPILE)
+MAKEARCH_KERNEL := $(MAKE) ARCH=$(ARCH) SUBARCH=$(SUBARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
 else
-MAKEARCH = $(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE)
-MAKEARCH_KERNEL = $(MAKEARCH)  ARCH=$(ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
+MAKEARCH := $(MAKE) ARCH=$(ARCH) CROSS_COMPILE=$(CROSS_COMPILE)
+MAKEARCH_KERNEL := $(MAKEARCH)  ARCH=$(ARCH) CROSS_COMPILE=$(KERNEL_CROSS_COMPILE)
 endif
 
-DIRS    =  $(ROOTDIR)/vendors $(ROOTDIR)/user $(ROOTDIR)/lib
+DIRS    :=  $(ROOTDIR)/vendors $(ROOTDIR)/user $(ROOTDIR)/lib
 
 export LANG LC_COLLATE LC_MESSAGES LC_ALL
 export VENDOR PRODUCT ROOTDIR LINUXDIR HOSTCC CONFIG_SHELL
@@ -97,18 +98,6 @@ export CONFIG_CONFIG LINUX_CONFIG ROMFSDIR SCRIPTSDIR
 export RT288X_SDK_VERSION VERSIONPKG VERSIONSTR ROMFSINST PATH IMAGEDIR RELFILES TFTPDIR
 export BUILD_START_STRING
 export HOST_NCPU DIRS
-
-.PHONY: ucfront
-ucfront: tools/ucfront/*.c
-	$(MAKE) -C tools/ucfront
-	ln -sf $(ROOTDIR)/tools/ucfront/ucfront tools/ucfront-gcc
-	ln -sf $(ROOTDIR)/tools/ucfront/ucfront tools/ucfront-g++
-	ln -sf $(ROOTDIR)/tools/ucfront/ucfront-ld tools/ucfront-ld
-
-.PHONY: cksum
-cksum: tools/sg-cksum/*.c
-	$(MAKE) -C tools/sg-cksum
-	ln -sf $(ROOTDIR)/tools/sg-cksum/cksum tools/cksum
 
 ############################################################################
 
@@ -138,31 +127,6 @@ config.tk: config.in
 	echo "set help_file \"config/Configure.help\"" >> config.tk
 	cat $(SCRIPTSDIR)/tail.tk >> config.tk
 	chmod 755 config.tk
-
-.PHONY: xconfig
-xconfig: config.tk
-	@wish -f config.tk
-	@if [ ! -f .config ]; then \
-		echo; \
-		echo "You have not saved your config, please re-run make config"; \
-		echo; \
-		exit 1; \
-	 fi
-	@chmod u+x config/setconfig
-	@config/setconfig defaults
-	@if egrep "^CONFIG_DEFAULTS_KERNEL=y" .config > /dev/null; then \
-		$(MAKE) linux_xconfig; \
-	 fi
-	@if egrep "^CONFIG_DEFAULTS_VENDOR=y" .config > /dev/null; then \
-		$(MAKE) config_xconfig; \
-	 fi
-	@if egrep "^CONFIG_DEFAULTS_BUSYBOX=y" .config > /dev/null; then \
-		$(MAKE) -C user/busybox menuconfig; \
-	 fi
-	@if egrep "^CONFIG_DEFAULTS_UCLIBC=y" .config > /dev/null; then \
-		$(MAKE) -C lib menuconfig; \
-	 fi
-	@config/setconfig final
 
 .PHONY: config
 config: config.in
@@ -213,15 +177,12 @@ menuconfig: config.in
 
 .PHONY: oldconfig
 oldconfig: config.in
-	@HELP_FILE=config/Configure.help \
-		$(CONFIG_SHELL) $(SCRIPTSDIR)/Configure -d config.in
+	@HELP_FILE=config/Configure.help $(CONFIG_SHELL) $(SCRIPTSDIR)/Configure -d config.in
 	@$(MAKE) oldconfig_linux
 	@$(MAKE) oldconfig_config
 	@chmod u+x config/setconfig
 	@config/setconfig final
 
-linux_xconfig:
-	KCONFIG_NOTIMESTAMP=1 $(MAKEARCH_KERNEL) -C $(LINUXDIR) xconfig
 linux_menuconfig:
 	KCONFIG_NOTIMESTAMP=1 $(MAKEARCH_KERNEL) -C $(LINUXDIR) menuconfig
 linux_config:
@@ -293,46 +254,31 @@ image:
 
 .PHONY: release
 release:
-	make -C release release
+	$(MAKE) -C release release
 
-%_fullrelease:
-	@echo "This target no longer works"
-	@echo "Do a make -C release $@"
-	exit 1
 #
 # fancy target that allows a vendor to have other top level
 # make targets,  for example "make vendor_flash" will run the
 # vendor_flash target in the vendors directory
 #
-
 vendor_%:
 	$(MAKEARCH) -C vendors $@
 
+# for select build mode (one/multi thread)
+-include $(LINUX_CONFIG)
+ifeq ($(CONFIG_RT2860V2_STA),m)
+# Added by Steven@Ralink FIXME!!!
+# In linux-2.6, it do not support VPATH in Makefile.
+# But we need to use drivers/net/wireless/rt2860v2 to build ap and sta driver.
+# Workaround: Don't build ap and sta driver at the same time.
+THREADS="-j1"
+else
+THREADS="-j$(HOST_NCPU)"
+endif
+
 .PHONY: linux
 linux:
-	# Added by Steven@Ralink FIXME!!!
-	# In linux-2.6, it do not support VPATH in Makefile.
-	# But we need to use drivers/net/wireless/rt2860v2 to build ap and sta driver.
-	# Workaround: Don't build ap and sta driver at the same time.
-ifeq ($(CONFIG_VENDOR),Ralink)
-	$(MAKEARCH_KERNEL) -j1 -C $(LINUXDIR) $(LINUXTARGET) || exit 1
-else
-	$(MAKEARCH_KERNEL) -j$(HOST_NCPU) -C $(LINUXDIR) $(LINUXTARGET) || exit 1
-endif
-	if [ -f $(LINUXDIR)/vmlinux ]; then \
-		ln -f $(LINUXDIR)/vmlinux $(LINUXDIR)/linux ; \
-	fi
-
-linux%_only:
-	# Added by Steven@Ralink FIXME!!!
-	# In linux-2.6, it do not support VPATH in Makefile.
-	# But we need to use drivers/net/wireless/rt2860v2 to build ap and sta driver.
-	# Workaround: Don't build ap and sta driver at the same time.
-ifeq ($(CONFIG_VENDOR),Ralink)
-	$(MAKEARCH_KERNEL) -j1 -C $(LINUXDIR) $(LINUXTARGET) || exit 1
-else
-	$(MAKEARCH_KERNEL) -j$(HOST_NCPU) -C $(LINUXDIR) $(LINUXTARGET) || exit 1
-endif
+	$(MAKEARCH_KERNEL) $(THREADS) -C $(LINUXDIR) $(LINUXTARGET) || exit 1
 	if [ -f $(LINUXDIR)/vmlinux ]; then \
 		ln -f $(LINUXDIR)/vmlinux $(LINUXDIR)/linux ; \
 	fi
@@ -357,12 +303,11 @@ dep:
 	@if [ $(LINUXDIR) = linux ] ; then \
 	$(MAKEARCH_KERNEL) -C $(LINUXDIR) prepare ; \
 	fi
-
 	$(MAKEARCH_KERNEL) -C $(LINUXDIR) dep
 
 .PHONY: tools
 tools:
-	make -C tools
+	$(MAKE) -C tools
 
 # This one removes all executables from the tree and forces their relinking
 .PHONY: relink
@@ -377,9 +322,9 @@ clean:
 	touch $(ROOTDIR)/.config
 	#################CLEAN ALL SUBDIRS#############################
 	for dir in $(LINUXDIR) $(DIRS); do [ ! -d $$dir ] || $(MAKEARCH) -C $$dir clean ; done
-	make clean -C Uboot
-	make clean -C fulldump
-	make clean -C tools
+	$(MAKE) clean -C Uboot
+	$(MAKE) clean -C fulldump
+	$(MAKE) clean -C tools
 	##############REMOVE UNUSED FILES 1###########################
 	rm -rf $(ROOTDIR)/dev
 	rm -rf $(IMAGEDIR)
@@ -416,22 +361,22 @@ clean:
 	find $(ROOTDIR) -type d -name '.deps' | xargs rm -rf
 
 mrproper: clean
-	make mrproper -C Uboot
-	make mrproper -C linux
-	make clean -C config
+	$(MAKE) mrproper -C Uboot
+	$(MAKE) mrproper -C linux
+	$(MAKE) clean -C config
 	rm -rf romfs config.in config.arch config.tk images
 	rm -f modules/config.tk
 	rm -rf .config .config.old .oldconfig autoconf.h
 
 distclean: mrproper
-	make -C linux distclean
+	$(MAKE) -C linux distclean
 
 %_only:
 	@case "$(@)" in \
 	*/*) d=`expr $(@) : '\([^/]*\)/.*'`; \
 	     t=`expr $(@) : '[^/]*/\(.*\)'`; \
-	     $(MAKEARCH) -C $$d $$t;; \
-	*)   $(MAKEARCH) -C $(@:_only=);; \
+	     $(MAKEARCH) -j$(HOST_NCPU) -C $$d $$t;; \
+	*)   $(MAKEARCH) -j$(HOST_NCPU) -C $(@:_only=);; \
 	esac
 
 %_clean:
@@ -447,13 +392,13 @@ distclean: mrproper
 		echo "vendors/$(@:_default=)/config.device must exist first"; \
 		exit 1; \
 	 fi
-	-make clean > /dev/null 2>&1
+	-$(MAKE) clean > /dev/null 2>&1
 	cp vendors/$(@:_default=)/config.device .config
 	chmod u+x config/setconfig
 	yes "" | config/setconfig defaults
 	config/setconfig final
-	make dep
-	make
+	$(MAKE) dep
+	$(MAKE)
 
 config_error:
 	@echo "*************************************************"
@@ -464,14 +409,6 @@ config_error:
 	@echo "3. 'make'"
 	@echo "*************************************************"
 	@exit 1
-
-prune: ucfront
-	@for i in `ls -d linux-* | grep -v $(LINUXDIR)`; do \
-		rm -fr $$i; \
-	done
-	$(MAKE) -C uClib prune
-	$(MAKE) -C user prune
-	$(MAKE) -C vendors prune
 
 dist-prep:
 	-find $(ROOTDIR) -name 'Makefile*.bin' | while read t; do \
