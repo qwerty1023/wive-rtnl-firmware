@@ -982,6 +982,7 @@ static inline int ip6_ufo_append_data(struct sock *sk,
 
 {
 	struct sk_buff *skb;
+	struct frag_hdr fhdr;
 	int err;
 
 	/* There is support for UDP large send offload by network
@@ -1008,31 +1009,24 @@ static inline int ip6_ufo_append_data(struct sock *sk,
 		skb->h.raw = skb->nh.raw + fragheaderlen;
 
 		skb->protocol = htons(ETH_P_IPV6);
-		skb->ip_summed = CHECKSUM_PARTIAL;
 		skb->csum = 0;
-	}
 
-	err = skb_append_datato_frags(sk,skb, getfrag, from,
-				      (length - transhdrlen));
-	if (!err) {
-		struct frag_hdr fhdr;
-
-		/* specify the length of each IP datagram fragment*/
-		skb_shinfo(skb)->gso_size = mtu - fragheaderlen -
-					    sizeof(struct frag_hdr);
-		skb_shinfo(skb)->gso_type = SKB_GSO_UDP;
-		ipv6_select_ident(skb, &fhdr);
-		skb_shinfo(skb)->ip6_frag_id = fhdr.identification;
 		__skb_queue_tail(&sk->sk_write_queue, skb);
-
-		return 0;
+	} else if (skb_is_gso(skb)) {
+		goto append;
 	}
-	/* There is not enough support do UPD LSO,
-	 * so follow normal path
-	 */
-	kfree_skb(skb);
 
-	return err;
+	skb->ip_summed = CHECKSUM_PARTIAL;
+	/* specify the length of each IP datagram fragment*/
+	skb_shinfo(skb)->gso_size = mtu - fragheaderlen -
+				    sizeof(struct frag_hdr);
+	skb_shinfo(skb)->gso_type = SKB_GSO_UDP;
+	ipv6_select_ident(skb, &fhdr);
+	skb_shinfo(skb)->ip6_frag_id = fhdr.identification;
+
+append:
+	return skb_append_datato_frags(sk, skb, getfrag, from,
+				       (length - transhdrlen));
 }
 
 int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
@@ -1060,7 +1054,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 		 */
 		if (opt) {
 			if (np->cork.opt == NULL) {
-				np->cork.opt = kmalloc(opt->tot_len,
+				np->cork.opt = kzalloc(opt->tot_len,
 						       sk->sk_allocation);
 				if (unlikely(np->cork.opt == NULL))
 					return -ENOBUFS;
@@ -1129,20 +1123,21 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 	 *        are too large.
 	 * --yoshfuji
 	 */
-
+	skb = skb_peek_tail(&sk->sk_write_queue);
 	inet->cork.length += length;
-	if (((length > mtu) && (sk->sk_protocol == IPPROTO_UDP)) &&
+	if (((length > mtu) ||
+	     (skb && skb_has_frags(skb))) &&
+	    (sk->sk_protocol == IPPROTO_UDP) &&
 	    (rt->u.dst.dev->features & NETIF_F_UFO)) {
-
-		err = ip6_ufo_append_data(sk, getfrag, from, length, hh_len,
-					  fragheaderlen, transhdrlen, mtu,
-					  flags);
+		err = ip6_ufo_append_data(sk, getfrag, from, length,
+					  hh_len, fragheaderlen,
+					  transhdrlen, mtu, flags);
 		if (err)
 			goto error;
 		return 0;
 	}
 
-	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
+	if (!skb)
 		goto alloc_new_skb;
 
 	while (length > 0) {
