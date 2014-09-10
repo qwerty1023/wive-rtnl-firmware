@@ -83,7 +83,7 @@ const char *get_system_type(void)
 	return "RT3352 Ralink SoC";
     } else if(strcmp(Id,"RT6855  ")==0) {
 	return "RT6855 Ralink SoC";
-    } else if(strcmp(Id,"MT7620  ")==0) {
+    } else if((strcmp(Id,"RT6352  ")==0) || (strcmp(Id,"MT7620  ")==0)) {
 	return "MT7620 Ralink SoC";
     }
 
@@ -116,7 +116,11 @@ void __init rt2880_setup(void)
 		char *s =(char *) prom_getenv("modetty0");
 		while(s[i] >= '0' && s[i] <= '9')
 			i++;
+#ifdef CONFIG_RALINK_MT7620
+		strcpy(serial_console, "ttyS0,");
+#else
 		strcpy(serial_console, "ttyS1,");
+#endif
 		strncpy(serial_console + 6, s, i);
 		printk("Config serial console: %s\n", serial_console);
 		console_setup(serial_console, NULL);

@@ -352,9 +352,6 @@ static void prom_init_sysclk(void)
 ** To get the correct baud_base value, prom_init_sysclk() must be called before
 ** this function is called.
 */
-#ifdef CONFIG_SERIAL_CORE
-extern int early_serial_setup(struct uart_port *port);
-#endif
 static struct uart_port serial_req[2];
 static int prom_init_serial_port(void)
 {
@@ -406,59 +403,24 @@ static int prom_init_serial_port(void)
 
 static void serial_setbrg(unsigned long wBaud)
 {
-#ifdef CONFIG_SERIAL_CONSOLE
-/////////////////////CLASSIC INIT////////////////////////////////////////////////////////////////////////////////////////////
-#include "serial_rt2880.h"
-	//fix at SURFBOARD_DEFAULT_BAUD 8 n 1 n
+	//fix at 57600 8 n 1 n
  	*(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC08)= 0;
         *(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC10)= 0;
         *(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC14)= 0x3;
 #if defined (CONFIG_RALINK_RT3883) || defined (CONFIG_RALINK_RT3352) ||  defined (CONFIG_RALINK_RT5350) || defined (CONFIG_RALINK_RT6855) || defined (CONFIG_RALINK_MT7620)
-        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC28)= (40000000 / SURFBOARD_BAUD_DIV / SURFBOARD_DEFAULT_BAUD);
+        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC28)= (40000000 / SURFBOARD_BAUD_DIV / 57600);
 #else
-        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC28)= (surfboard_sysclk / SURFBOARD_BAUD_DIV / SURFBOARD_DEFAULT_BAUD);
+        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0xC28)= (surfboard_sysclk / SURFBOARD_BAUD_DIV / 57600);
 #endif
-	//fix at SURFBOARD_DEFAULT_BAUD 8 n 1 n
+	//fix at 57600 8 n 1 n
  	*(volatile u32 *)(RALINK_SYSCTL_BASE + 0x508)= 0;
         *(volatile u32 *)(RALINK_SYSCTL_BASE + 0x510)= 0;
         *(volatile u32 *)(RALINK_SYSCTL_BASE + 0x514)= 0x3;
-#if defined (CONFIG_RALINK_RT3883) || defined (CONFIG_RALINK_RT3352) ||  defined (CONFIG_RALINK_RT5350) || defined (CONFIG_RALINK_RT6855) || defined (CONFIG_RALINK_MT7620)
-        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0x528)= (40000000 / SURFBOARD_BAUD_DIV / SURFBOARD_DEFAULT_BAUD);
+#if defined (CONFIG_RALINK_RT3883) || defined (CONFIG_RALINK_RT3352) || defined (CONFIG_RALINK_RT5350) || defined (CONFIG_RALINK_RT6855) || defined (CONFIG_RALINK_MT7620)
+        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0x528)= (40000000 / SURFBOARD_BAUD_DIV / 57600);
 #else
-        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0x528)= (surfboard_sysclk / SURFBOARD_BAUD_DIV / SURFBOARD_DEFAULT_BAUD);
+        *(volatile u32 *)(RALINK_SYSCTL_BASE + 0x528)= (surfboard_sysclk / SURFBOARD_BAUD_DIV / 57600);
 #endif
-#else
-/////////////////////UBOOT INIT////////////////////////////////////////////////////////////////////////////////////////////
-#include "serial_uboot.h"
-        unsigned int clock_divisor = (surfboard_sysclk / SURFBOARD_BAUD_DIV);
-	//reset uart lite and uart full
-#if defined(CONFIG_RT2880_ASIC) || defined(CONFIG_RT2880_FPGA)
-	*(unsigned long *)(RALINK_SYSCTL_BASE + 0x0034) = cpu_to_le32(1<<12);
-#elif defined(CONFIG_RT3052_ASIC) || defined(CONFIG_RT3052_FPGA) || \
-      defined(CONFIG_RT3352_ASIC) || defined(CONFIG_RT3352_FPGA) || \
-      defined(CONFIG_RT3883_ASIC) || defined(CONFIG_RT3883_FPGA)
-	*(unsigned long *)(RALINK_SYSCTL_BASE + 0x0034) = cpu_to_le32(1<<19|1<<12);
-#else
-#error "undefined Platform"
-#endif
-	/* RST Control change from W1C to W1W0 to reset, update 20080812 */
-	*(unsigned long *)(RALINK_SYSCTL_BASE + 0x0034) = 0;
-#if defined(CONFIG_RT3883_ASIC) || defined(CONFIG_RT3883_FPGA) || \
-    defined(CONFIG_RT3352_ASIC) || defined(CONFIG_RT3352_FPGA)
-	clock_divisor = (40*1000*1000/ SURFBOARD_BAUD_DIV / SURFBOARD_DEFAULT_BAUD);
-#else
-	clock_divisor = (surfboard_sysclk/ SURFBOARD_BAUD_DIV / SURFBOARD_DEFAULT_BAUD);
-#endif
-
-	IER(CFG_RT2880_CONSOLE) = 0;					/* Disable for now */
-	FCR(CFG_RT2880_CONSOLE) = 0;					/* No fifos enabled */
-
-	/* set baud rate */
-	LCR(CFG_RT2880_CONSOLE) = LCR_WLS0 | LCR_WLS1 | LCR_DLAB;
-	DLL(CFG_RT2880_CONSOLE) = clock_divisor & 0xffff;
-	LCR(CFG_RT2880_CONSOLE) = LCR_WLS0 | LCR_WLS1;
-#endif
-
 }
 
 int serial_init(unsigned long wBaud)
@@ -484,7 +446,7 @@ __init void prom_init(void)
 	set_io_port_base(KSEG1);
 	write_c0_wired(0);
 
-	serial_init(SURFBOARD_DEFAULT_BAUD);	/* Kernel driver serial init */
+	serial_init(57600);			/* Kernel driver serial init */
 	prom_init_serial_port();		/* Set rate. Needed for Serial Console */
 	prom_meminit();				/* Autodetect RAM size and set need variables */
 	prom_usbinit();				/* USB power saving*/
