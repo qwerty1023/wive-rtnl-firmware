@@ -1,4 +1,4 @@
-SRC_NAME=e2fsprogs-1.42.8
+SRC_NAME=e2fsprogs-1.42.12
 
 all:	config_test
 	$(MAKE) -C $(SRC_NAME)
