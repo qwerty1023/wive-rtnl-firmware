@@ -40,6 +40,7 @@ romfs:
 	$(ROMFSINST) -S $(SRC_NAME)/e2fsck/e2fsck /bin/e2fsck
 	$(ROMFSINST) -S $(SRC_NAME)/misc/mke2fs /bin/mke2fs
 	$(ROMFSINST) -S $(SRC_NAME)/misc/tune2fs /bin/tune2fs
+	$(ROMFSINST) -S $(SRC_NAME)/misc/badblocks /bin/badblocks
 	$(ROMFSINST) -S $(SRC_NAME)/lib/e2p/libe2p.so.2.3 /lib/libe2p.so.2.3
 	$(ROMFSINST) -S $(SRC_NAME)/lib/et/libcom_err.so.2.1 /lib/libcom_err.so.2.1
 	$(ROMFSINST) -S $(SRC_NAME)/lib/ext2fs/libext2fs.so.2.4 /lib/libext2fs.so.2.4
