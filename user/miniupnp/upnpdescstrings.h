@@ -13,8 +13,8 @@
 #define ROOTDEV_FRIENDLYNAME		OS_NAME " router"
 #define ROOTDEV_MANUFACTURER		OS_NAME
 #define ROOTDEV_MANUFACTURERURL		OS_URL
-#define ROOTDEV_MODELNAME			OS_NAME " router"
-#define ROOTDEV_MODELDESCRIPTION	OS_NAME " router"
+#define ROOTDEV_MODELNAME			OS_VERSION
+#define ROOTDEV_MODELDESCRIPTION	OS_VERSION
 #define ROOTDEV_MODELURL			OS_URL
 
 #define WANDEV_FRIENDLYNAME			"WANDevice"
@@ -24,7 +24,7 @@
 #define WANDEV_MODELDESCRIPTION		"WAN Device"
 #define WANDEV_MODELNUMBER			UPNP_VERSION
 #define WANDEV_MODELURL				"http://miniupnp.free.fr/"
-#define WANDEV_UPC					"000000000000"
+#define WANDEV_UPC					"MINIUPNPD"
 /* UPC is 12 digit (barcode) */
 
 #define WANCDEV_FRIENDLYNAME		"WANConnectionDevice"
@@ -34,7 +34,7 @@
 #define WANCDEV_MODELDESCRIPTION	"MiniUPnP daemon"
 #define WANCDEV_MODELNUMBER			UPNP_VERSION
 #define WANCDEV_MODELURL			"http://miniupnp.free.fr/"
-#define WANCDEV_UPC					"000000000000"
+#define WANCDEV_UPC					"MINIUPNPD"
 /* UPC is 12 digit (barcode) */
 
 #endif
