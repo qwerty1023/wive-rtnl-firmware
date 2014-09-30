@@ -201,18 +201,18 @@ static void printersrv(webs_t wp, char_t *path, char_t *query)
 	nvram_set(RT2860_NVRAM, "PrinterSrvEnabled", enable);
 	nvram_set(RT2860_NVRAM, "PrinterSrvBidir", bidirect);
 
-submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
 	if (! submitUrl[0])
 	{
-
-	// debug print
-	websHeader(wp);
-	websWrite(wp, T("<h2>Printer Server Settings</h2><br>\n"));
-	websWrite(wp, T("enabled: %s<br>\n"), enable);
-	websFooter(wp);
-	websDone(wp, 200);
-	}
-	else
+#ifdef PRINT_DEBUG
+	    // debug print
+	    websHeader(wp);
+	    websWrite(wp, T("<h2>Printer Server Settings</h2><br>\n"));
+	    websWrite(wp, T("enabled: %s<br>\n"), enable);
+	    websFooter(wp);
+#endif
+	    websDone(wp, 200);
+	} else
 		websRedirect(wp, submitUrl);
 }
 #endif
@@ -243,13 +243,13 @@ static void usbmodem(webs_t wp, char_t *path, char_t *query)
 	char_t *submit;
 
 	submit = websGetVar(wp, T("hiddenButton"), T(""));
-
+	
 	if (0 == strcmp(submit, "apply"))
 		{
 			char_t *modem_enabled = websGetVar(wp, T("modem_enabled"), T("0"));
 			if (modem_enabled == NULL)
 				modem_enabled = "0";
-
+		
 			nvram_init(RT2860_NVRAM);
 			nvram_bufset(RT2860_NVRAM, "MODEMENABLED", modem_enabled);
 
@@ -298,7 +298,7 @@ static int modemShowStatus(int eid, webs_t wp, int argc, char_t **argv)
 
 	// Get value
 	char *modem_enabled = nvram_get(RT2860_NVRAM, "MODEMENABLED");
-
+	
 	// Do not perform other checks if modem is turned off
 	if (strcmp(modem_enabled, "1")==0)
 	{
@@ -308,7 +308,7 @@ static int modemShowStatus(int eid, webs_t wp, int argc, char_t **argv)
 
 			// Try to find pppd
 			int found = procps_count("pppd");
-
+			
 			if (found>0)
 			{
 				// Now status is at least 'connecting'
