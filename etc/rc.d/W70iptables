@@ -21,6 +21,7 @@ start() {
   $LOG "Starting IPTABLES"
     get_param
     stop
+	$LOG "Add netfiler rules for ipv4"
 #########################################DEFAULTRULES###################################
 	# default filters
 	$LOG "Set default filters"
@@ -398,7 +399,7 @@ start() {
 #########################################ACCEPT_ESTABLISHED################################
     iptables -A FORWARD $STATE_EST -j ACCEPT
 ############################################ENDRULES#######################################
-    $LOG "Configure netfilter OK!"
+    $LOG "Configure netfilter for ipv4 OK!"
 }
 
 startv6() {
@@ -434,6 +435,12 @@ startv6() {
 	ip6tables -A FORWARD -p ipv6-icmp ! --icmpv6-type echo-request -j ACCEPT
 #########################################ACCEPT_ESTABLISHED################################
 	ip6tables -A FORWARD $STATE_EST -j ACCEPT
+#########################################TRANSMISSION_PORT#################################
+	if [ "$TransmissionEnabled" = "1" ]; then
+	    $LOG "transmission"
+	    # Incoming peers
+	    ip6tables -A INPUT -p tcp --dport $TransInPort -j ACCEPT
+	fi
 ############################################ENDRULES#######################################
 	$LOG "Configure netfilter for ipv6 OK!"
     fi

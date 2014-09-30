@@ -366,7 +366,7 @@ static void makePortForwardRule(char *buf, int len, char *wan_name, char *ip_add
 				len -= rc;
 			}
 		}
-		rc = snprintf(pos, len, "-j MASQUERADE > /dev/null 2>&1\n");
+		rc = snprintf(pos, len, "-j MASQUERADE\n");
 		pos += rc;
 		len -= rc;
 	}
@@ -501,7 +501,7 @@ static void makePortForwardRuleVPN(char *buf, int len, char *wan_name, char *ip_
 				len -= rc;
 			}
 		}
-		rc = snprintf(pos, len, "-j MASQUERADE > /dev/null 2>&1\n");
+		rc = snprintf(pos, len, "-j MASQUERADE\n");
 		pos += rc;
 		len -= rc;
 	}
@@ -1324,9 +1324,11 @@ static void portForward(webs_t wp, char_t *path, char_t *query)
 	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
 	if (! submitUrl[0])
 	{
+#ifdef PRINT_DEBUG
 		websHeader(wp);
 		websWrite(wp, T("portForwardEnabled: %s<br>\n"), pfe);
 		websFooter(wp);
+#endif
 		websDone(wp, 200);
 	}
 	else
@@ -1362,10 +1364,12 @@ static void portFiltering(webs_t wp, char_t *path, char_t *query)
 	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
 	if (! submitUrl[0])
 	{
+#ifdef PRINT_DEBUG
 		websHeader(wp);
 		websWrite(wp, T("portFilteringEnabled: %s<br>\n"), firewall_enable);
 		websWrite(wp, T("default_policy: %s<br>\n"), default_policy);
 		websFooter(wp);
+#endif
 		websDone(wp, 200);
 	}
 	else
@@ -1391,7 +1395,7 @@ static void DMZ(webs_t wp, char_t *path, char_t *query)
 	{
 		if (!isIpValid(ip_address))
 			return;
-		
+
 		nvram_init(RT2860_NVRAM);
 		nvram_bufset(RT2860_NVRAM, "DMZEnable", "1");
 		nvram_bufset(RT2860_NVRAM, "DMZIPAddress", ip_address);
@@ -1405,10 +1409,12 @@ static void DMZ(webs_t wp, char_t *path, char_t *query)
 	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
 	if (! submitUrl[0])
 	{
+#ifdef PRINT_DEBUG
 		websHeader(wp);
 		websWrite(wp, T("DMZEnabled: %s<br>\n"), dmzE);
 		websWrite(wp, T("ip_address: %s<br>\n"), ip_address);
 		websFooter(wp);
+#endif
 		websDone(wp, 200);
 	}
 	else

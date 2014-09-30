@@ -2117,6 +2117,7 @@ static void setLan(webs_t wp, char_t *path, char_t *query)
 	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
 	if (! submitUrl[0])
 	{
+#ifdef PRINT_DEBUG
 		//debug print
 		websHeader(wp);
 		websWrite(wp, T("<h3>LAN Interface Setup</h3><br>\n"));
@@ -2135,6 +2136,7 @@ static void setLan(webs_t wp, char_t *path, char_t *query)
 			websWrite(wp, T("SecDns: %s<br>\n"), sd);
 		}
 		websFooter(wp);
+#endif
 		websDone(wp, 200);
 	}
 	else
@@ -2307,7 +2309,7 @@ static void setWan(webs_t wp, char_t *path, char_t *query)
 		websRedirect(wp, submitUrl);
 
 	/* Prevent deadloop at WAN apply change if VPN started */
-	doSystem("(ip route flush cache && service vpnhelper stop) /dev/null 2>&1");
+	doSystem("ip route flush cache && service vpnhelper stop && service wan stop");
 	initInternet();
 }
 
