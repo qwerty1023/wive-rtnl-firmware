@@ -210,7 +210,7 @@ int check(char *imagefile, int offset, int len, char *err_msg)
 	{
 		munmap(ptr, len);
 		close(ifd);
-		sprintf (err_msg, "*** Warning: \"%s\" has bad header checksum!\n", imagefile);
+		sprintf (err_msg, "*** ERROR: \"%s\" has bad header checksum!\n", imagefile);
 		return 0;
 	}
 
@@ -224,7 +224,7 @@ int check(char *imagefile, int offset, int len, char *err_msg)
 	{
 		munmap(ptr, len);
 		close(ifd);
-		sprintf (err_msg, "*** Warning: \"%s\" has corrupted data!\n", imagefile);
+		sprintf (err_msg, "*** ERROR: \"%s\" has corrupted data!\n", imagefile);
 		return 0;
 	}
 
@@ -235,7 +235,7 @@ int check(char *imagefile, int offset, int len, char *err_msg)
 	if(len > MAX_IMG_SIZE || len > getMTDPartSize("\"Kernel\"")){
 		munmap(ptr, len);
 		close(ifd);
-		sprintf(err_msg, "*** Error: the image file(0x%x) is bigger than Kernel MTD partition.\n", len);
+		sprintf(err_msg, "*** ERROR: the image file(0x%x) is bigger than Kernel MTD partition.\n", len);
 		return 0;
 	}
 #elif defined(CONFIG_RT2880_ROOTFS_IN_FLASH)
@@ -243,21 +243,21 @@ int check(char *imagefile, int offset, int len, char *err_msg)
 	if(len > MAX_IMG_SIZE || len > getMTDPartSize("\"Kernel_RootFS\"")){
 		munmap(ptr, len);
 		close(ifd);
-		sprintf(err_msg, "*** Error: the image file(0x%x) is bigger than Kernel_RootFS MTD partition.\n", len);
+		sprintf(err_msg, "*** ERROR: the image file(0x%x) is bigger than Kernel_RootFS MTD partition.\n", len);
 		return 0;
 	}
   #else
 	if(len > MAX_IMG_SIZE || len < CONFIG_MTD_KERNEL_PART_SIZ){
 		munmap(ptr, len);
 		close(ifd);
-		sprintf(err_msg, "*** Error: the image file(0x%x) size doesn't make sense.\n", len);
+		sprintf(err_msg, "*** ERROR: the image file(0x%x) size doesn't make sense.\n", len);
 		return 0;
 	}
 
 	if((len - CONFIG_MTD_KERNEL_PART_SIZ) > getMTDPartSize("\"RootFS\"")){
 		munmap(ptr, len);
 		close(ifd);
-		sprintf(err_msg, "*** Error: the image file(0x%x) is bigger than RootFS MTD partition.\n", len - CONFIG_MTD_KERNEL_PART_SIZ);
+		sprintf(err_msg, "*** ERROR: the image file(0x%x) is bigger than RootFS MTD partition.\n", len - CONFIG_MTD_KERNEL_PART_SIZ);
 		return 0;
 	}
   #endif
@@ -369,7 +369,7 @@ int main (int argc, char *argv[])
 	// check image size
 	if (!check(filename, (int)file_begin, (int)(file_end - file_begin), err_msg))
 	{
-		html_error("Not a valid firmware.");
+		html_error(err_msg);
 		return -1;
 	}
 
