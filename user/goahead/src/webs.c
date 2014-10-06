@@ -69,7 +69,7 @@ static int 		websLogFd;						/* Log file handle */
 #endif
 
 static int		websListenSock;					/* Listen socket */
-static char_t	websRealm[64] = T("Wive-RTNL GoAhead");	/* Realm name */
+static char_t	websRealm[64] = T("Wive-RTNL");	/* Realm name */
 
 static int		websOpenCount = 0;		/* count of apps using this module */
 
