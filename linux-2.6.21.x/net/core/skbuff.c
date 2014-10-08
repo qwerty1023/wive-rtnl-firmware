@@ -194,7 +194,9 @@ struct sk_buff FASTPATHNET *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	}
 
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#if defined(HNAT_USE_HEADROOM)
 	DO_FAST_CLEAR_FOE(skb); // fast clear FoE info header
+#endif
 #endif
 	return skb;
 }
@@ -343,8 +345,8 @@ static void skb_release_all(struct sk_buff *skb)
 void FASTPATHNET __kfree_skb(struct sk_buff *skb)
 {
 #if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if(IS_MAGIC_TAG_VALID(skb) || (FOE_MAGIC_TAG(skb) == FOE_MAGIC_PPE))
-		memset(FOE_INFO_START_ADDR(skb), 0, FOE_INFO_LEN);
+	if(IS_MAGIC_TAG_VALID(skb) || FOE_MAGIC_TAG(skb) == FOE_MAGIC_PPE)
+	    memset(FOE_INFO_START_ADDR(skb), 0, FOE_INFO_LEN);
 #endif
 	skb_release_all(skb);
 	kfree_skbmem(skb);
