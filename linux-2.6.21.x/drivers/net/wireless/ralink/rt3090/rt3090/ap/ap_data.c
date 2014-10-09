@@ -32,9 +32,18 @@
 */
 #include "rt_config.h"
 
-#define IS_MULTICAST_MAC_ADDR(Addr)			((((Addr[0]) & 0x01) == 0x01) && ((Addr[0]) != 0xff))
-#define IS_BROADCAST_MAC_ADDR(Addr)			((((Addr[0]) & 0xff) == 0xff))
+#ifdef LINUX
+/* use native linux mcast/bcast adress checks. */
+#include <linux/etherdevice.h>
 
+#define IS_MULTICAST_MAC_ADDR(Addr)			(is_multicast_ether_addr(Addr) && ((Addr[0]) != 0xff))
+#define IS_IPV6_MULTICAST_MAC_ADDR(Addr)		(is_multicast_ether_addr(Addr) && ((Addr[0]) == 0x33))
+#define IS_BROADCAST_MAC_ADDR(Addr)			(is_broadcast_ether_addr(Addr))
+#else
+#define IS_MULTICAST_MAC_ADDR(Addr)			((((Addr[0]) & 0x01) == 0x01) && ((Addr[0]) != 0xff))
+#define IS_IPV6_MULTICAST_MAC_ADDR(Addr)		((((Addr[0]) & 0x01) == 0x01) && ((Addr[0]) == 0x33))
+#define IS_BROADCAST_MAC_ADDR(Addr)			((((Addr[0]) & 0xff) == 0xff))
+#endif
 
 static VOID APFindCipherAlgorithm(
 	IN	PRTMP_ADAPTER	pAd,
@@ -561,8 +570,7 @@ NDIS_STATUS APSendPacket(
 		{
 			NDIS_STATUS PktCloneResult = IgmpPktClone(pAd, pSrcBufVA, pPacket, InIgmpGroup, pGroupEntry, QueIdx, UserPriority);
 			RELEASE_NDIS_PACKET(pAd, pPacket, NDIS_STATUS_SUCCESS);
-			if (PktCloneResult != NDIS_STATUS_SUCCESS)
-				return NDIS_STATUS_FAILURE;
+			return PktCloneResult; /* need to alway return to prevent skb double free. */
 		}
 		else
 #endif /* IGMP_SNOOP_SUPPORT */

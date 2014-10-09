@@ -43,9 +43,18 @@
 
 #define MULTICAST_ADDR_HASH_INDEX(Addr)      (MAC_ADDR_HASH(Addr) & (MAX_LEN_OF_MULTICAST_FILTER_HASH_TABLE - 1))
 
+#ifdef LINUX
+/* use native linux mcast/bcast adress checks. */
+#include <linux/etherdevice.h>
+
+#define IS_MULTICAST_MAC_ADDR(Addr)			(is_multicast_ether_addr(Addr) && ((Addr[0]) != 0xff))
+#define IS_IPV6_MULTICAST_MAC_ADDR(Addr)		(is_multicast_ether_addr(Addr) && ((Addr[0]) == 0x33))
+#define IS_BROADCAST_MAC_ADDR(Addr)			(is_broadcast_ether_addr(Addr))
+#else
 #define IS_MULTICAST_MAC_ADDR(Addr)			((((Addr[0]) & 0x01) == 0x01) && ((Addr[0]) != 0xff))
-#define IS_IPV6_MULTICAST_MAC_ADDR(Addr)	((((Addr[0]) & 0x01) == 0x01) && ((Addr[0]) == 0x33))
+#define IS_IPV6_MULTICAST_MAC_ADDR(Addr)		((((Addr[0]) & 0x01) == 0x01) && ((Addr[0]) == 0x33))
 #define IS_BROADCAST_MAC_ADDR(Addr)			((((Addr[0]) & 0xff) == 0xff))
+#endif
 
 #define IGMP_NONE		0
 #define IGMP_PKT		1
@@ -93,9 +102,6 @@ BOOLEAN isMldPkt(
 	IN PUCHAR pIpHeader,
 	OUT UINT8 *pProtoType,
 	OUT PUCHAR *pMldHeader);
-
-BOOLEAN IPv6MulticastFilterExcluded(
-	IN PUCHAR pDstMacAddr);
 
 VOID MLDSnooping(
 	IN PRTMP_ADAPTER pAd,
@@ -149,6 +155,12 @@ NDIS_STATUS IgmpPktClone(
 	IN PMULTICAST_FILTER_TABLE_ENTRY pGroupEntry,
 	IN UCHAR QueIdx,
 	IN UINT8 UserPriority);
+
+
+typedef struct rsv_table {
+	UINT32 addr;
+	UINT32 mask;
+} rsv_table_t;
 
 #endif /* __RTMP_IGMP_SNOOP_H__ */
 
