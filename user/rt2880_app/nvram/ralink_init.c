@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <net/if.h>
 #include <sys/ioctl.h>
-#include <linux/config.h>
+#include <linux/autoconf.h>
 
 #include "nvram.h"
 
@@ -169,10 +169,8 @@ static int nvram_load_default(void)
 
 	printf("Clear nvram...\n");
 	nvram_clear(RT2860_NVRAM);
-	sync();
 	printf("Load defaults nvram...\n");
 	renew_nvram(RT2860_NVRAM, "/etc/default/nvram_default");
-	sync();
 
 	/* reinit nvram before commit */
 	if ( nvram_init(RT2860_NVRAM) == -1 )
