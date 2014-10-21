@@ -16,7 +16,7 @@
 <script type="text/javascript" src="/js/controls.js"></script>
 
 <script language="JavaScript" type="text/javascript">
-var http_request = false;
+
 Butterlate.setTextDomain("internet");
 
 function connectionTypeSwitch(form)

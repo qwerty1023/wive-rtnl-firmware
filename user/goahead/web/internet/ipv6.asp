@@ -1,7 +1,7 @@
-<!DOCTYPE html>
 <html>
 <head>
 <title>IPv6 Settings</title>
+
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, post-check=0, pre-check=0">
 <meta http-equiv="Pragma" content="no-cache">
@@ -12,6 +12,7 @@
 
 <script type="text/javascript" src="/lang/b28n.js"></script>
 <script type="text/javascript" src="/js/validation.js"></script>
+<script type="text/javascript" src="/js/share.js"></script>
 <script type="text/javascript" src="/js/controls.js"></script>
 
 <script language="JavaScript" type="text/javascript">
@@ -32,83 +33,59 @@ function display_on()
 
 function initTranslation()
 {
+	_TRV("lApply", "inet apply");
+	_TRV("lCancel", "inet cancel");
 }
 
-function SwitchOpMode()
+function SwitchOpMode(form)
 {
-	document.getElementById("v6StaticTable").style.visibility = "hidden";
-	document.getElementById("v6StaticTable").style.display = "none";
-	document.ipv6_cfg.ipv6_lan_ipaddr.disabled = true;
-	document.ipv6_cfg.ipv6_lan_prefix_len.disabled = true;
-	document.ipv6_cfg.ipv6_wan_ipaddr.disabled = true;
-	document.ipv6_cfg.ipv6_wan_prefix_len.disabled = true;
-	document.ipv6_cfg.ipv6_static_gw.disabled = true;
-	document.getElementById("v66rdTable").style.visibility = "hidden";
-	document.getElementById("v66rdTable").style.display = "none";
-	document.ipv6_cfg.ipv6_6rd_prefix.disabled = true;
-	document.ipv6_cfg.ipv6_6rd_prefix_len.disabled = true;
-	document.ipv6_cfg.ipv6_6rd_border_ipaddr.disabled = true;
-	document.getElementById("6to4Table").style.visibility = "hidden";
-	document.getElementById("6to4Table").style.display = "none";
-	document.ipv6_cfg.ipv6_6to4_srv_ipaddr.disabled = true;
-
-	if (document.ipv6_cfg.ipv6_opmode.options.selectedIndex == 1) {
-		document.getElementById("v6StaticTable").style.visibility = "visible";
-		document.getElementById("v6StaticTable").style.display = display_on();
-		document.ipv6_cfg.ipv6_lan_ipaddr.disabled = false;
-		document.ipv6_cfg.ipv6_lan_prefix_len.disabled = false;
-		document.ipv6_cfg.ipv6_wan_ipaddr.disabled = false;
-		document.ipv6_cfg.ipv6_wan_prefix_len.disabled = false;
-		document.ipv6_cfg.ipv6_static_gw.disabled = false;
-	} else if (ipv66rdb == "1" && document.ipv6_cfg.ipv6_opmode.options.selectedIndex == 2) {
-		document.getElementById("v66rdTable").style.visibility = "visible";
-		document.getElementById("v66rdTable").style.display = display_on();
-		document.ipv6_cfg.ipv6_6rd_prefix.disabled = false;
-		document.ipv6_cfg.ipv6_6rd_prefix_len.disabled = false;
-		document.ipv6_cfg.ipv6_6rd_border_ipaddr.disabled = false;
-	} else if (document.ipv6_cfg.ipv6_opmode.options.selectedIndex == document.ipv6_cfg.ipv6_opmode.options.length-1) {
-		document.getElementById("6to4Table").style.visibility = "visible";
-		document.getElementById("6to4Table").style.display = display_on();
-		document.ipv6_cfg.ipv6_6to4_srv_ipaddr.disabled = false;
-	}
+	var conn_type = form.ipv6_opmode.value;
+	displayElement('v6StaticTable', conn_type == '1');
+	displayElement('v66rdTable', conn_type == '2');
+	displayElement('6to4Table', conn_type == '3');
 }
 
 function initValue()
 {
 	var opmode = "<% getCfgZero(1, "IPv6OpMode"); %>";
 	var opmode_len = document.ipv6_cfg.ipv6_opmode.options.length;
+	var form = document.ipv6_cfg;
+
+	initTranslation();
 
 	if (ipv66rdb == "1") {
-		document.ipv6_cfg.ipv6_opmode.options[2] = new Option("Tunneling Connection (6RD)", "2");
+		form.ipv6_opmode.options[2] = new Option("Tunneling Connection (6RD)", "2");
 		opmode_len++;
 	}
 	if (ip6to4b == "1") {
-		document.ipv6_cfg.ipv6_opmode.options[opmode_len] = new Option("Tunneling Connection (6TO4)", "3");
+		form.ipv6_opmode.options[opmode_len] = new Option("Tunneling Connection (6TO4)", "3");
 		opmode_len++;
 	}
 
 	if (opmode == "1")
-		document.ipv6_cfg.ipv6_opmode.options.selectedIndex = 1;
-	else if (opmode == "2")
-		document.ipv6_cfg.ipv6_opmode.options.selectedIndex = 2;
-	else if (opmode == "3")
-		document.ipv6_cfg.ipv6_opmode.options.selectedIndex = opmode_len-1;
+		form.ipv6_opmode.value = 1;
+	else if (ipv66rdb == "1" && opmode == "2")
+		form.ipv6_opmode.value = 2;
+	else if (ip6to4b == "1" && opmode == "3")
+		form.ipv6_opmode.value = 3;
+	else form.ipv6_opmode.value = 0;
 
-	SwitchOpMode();
 
-	if (opmode == "1") {
-		document.ipv6_cfg.ipv6_lan_ipaddr.value = "<% getCfgGeneral(1, "IPv6IPAddr"); %>";
-		document.ipv6_cfg.ipv6_lan_prefix_len.value = "<% getCfgGeneral(1, "IPv6PrefixLen"); %>";
-		document.ipv6_cfg.ipv6_wan_ipaddr.value = "<% getCfgGeneral(1, "IPv6WANIPAddr"); %>";
-		document.ipv6_cfg.ipv6_wan_prefix_len.value = "<% getCfgGeneral(1, "IPv6WANPrefixLen"); %>";
-		document.ipv6_cfg.ipv6_static_gw.value = "<% getCfgGeneral(1, "IPv6GWAddr"); %>";
-	} else if (opmode == "2") {
-		document.ipv6_cfg.ipv6_6rd_prefix.value = "<% getCfgGeneral(1, "IPv6IPAddr"); %>";
-		document.ipv6_cfg.ipv6_6rd_prefix_len.value = "<% getCfgGeneral(1, "IPv6PrefixLen"); %>";
-		document.ipv6_cfg.ipv6_6rd_border_ipaddr.value = "<% getCfgGeneral(1, "IPv6SrvAddr"); %>";
-	} else if (opmode == "3") {
-		document.ipv6_cfg.ipv6_6to4_srv_ipaddr.value = "<% getCfgGeneral(1, "ipv6_6to4_srv_ipaddr"); %>";
-	}
+	form.ipv6_lan_ipaddr.value = "<% getCfgGeneral(1, "IPv6IPAddr"); %>";
+	form.ipv6_lan_prefix_len.value = "<% getCfgGeneral(1, "IPv6PrefixLen"); %>";
+
+	form.ipv6_wan_ipaddr.value = "<% getCfgGeneral(1, "IPv6WANIPAddr"); %>";
+	form.ipv6_wan_prefix_len.value = "<% getCfgGeneral(1, "IPv6WANPrefixLen"); %>";
+	form.ipv6_static_gw.value = "<% getCfgGeneral(1, "IPv6GWAddr"); %>";
+
+	form.ipv6_6rd_prefix.value = "<% getCfgGeneral(1, "IPv6IPAddr"); %>";
+	form.ipv6_6rd_prefix_len.value = "<% getCfgGeneral(1, "IPv6PrefixLen"); %>";
+	form.ipv6_6rd_border_ipaddr.value = "<% getCfgGeneral(1, "IPv6SrvAddr"); %>";
+
+	form.ipv6_6to4_srv_ipaddr.value = "<% getCfgGeneral(1, "ipv6_6to4_srv_ipaddr"); %>";
+
+	SwitchOpMode(form);
+
 }
 
 function atoi(str, num)
@@ -284,51 +261,56 @@ function CheckValue()
 	}
 	return true;
 }
+
 </script>
 </head>
 
 <body onLoad="initValue()">
+
 <table class="body"><tr><td>
 
-<h1 id="lTitle"></h1>
-<p id="lIntroduction">IPv6 Setup</p>
+<h1 id="IPv6 Network Settings">IPv6 Network Settings</h1>
+<p id="Setup your IPv6 network">Setup your IPv6 network</p>
 <hr>
 
-<form method=post name="ipv6_cfg" action="/goform/setIPv6" onSubmit="return CheckValue()">
-<table width="95%" border="1" cellpadding="2" cellspacing="1">
+<form method="POST" name="ipv6_cfg" action="/goform/setIPv6" onSubmit="return CheckValue(this)">
+
+<table class="form">
 <tr>
-  <td class="title" colspan="2" id="v6ConnType">IPv6 Connection Type</td>
+	<td class="title" colspan="2">IPv6 connection type</td>
 </tr>
 <tr>
-  <td class="head" id="v6OpMode">IPv6 Operation Mode</td>
-  <td>
-    <select name="ipv6_opmode" size="1" onChange="SwitchOpMode()">
-      <option value="0" id="v6Disable">Disable</option>
-      <option value="1" id="v6Static">Native dynamic/static IP Connection</option>
-    </select>
-  </td>
-</tr>
-</table>
-<!-- STATIC IP --!>
-<table width="95%" id="v6StaticTable" border="1" bordercolor="#9babbd" cellpadding="3" cellspacing="1" hspace="2" vspace="2" width="540" style="visibility: hidden;">
-<tr>
-  <td class="title" colspan="2" id="v6StaticIPSetup">IPv6 Static IP Setup</td>
-</tr>
-<tr>
-  <td class="head" id="v6StaticIPAddr">LAN IPv6 Address / Subnet Prefix Length</td>
-  <td><input name="ipv6_lan_ipaddr" maxlength=39 size=27> / <input name="ipv6_lan_prefix_len" maxlength=3 size=2></td>
-</tr>
-<tr>
-  <td class="head" id="v6StaticIPAddr">WAN IPv6 Address / Subnet Prefix Length</td>
-  <td><input name="ipv6_wan_ipaddr" maxlength=39 size=27> / <input name="ipv6_wan_prefix_len" maxlength=3 size=2></td>
-</tr>
-<tr>
-  <td class="head" id="v6StaticGW">Default Gateway</td>
-  <td><input name="ipv6_static_gw" maxlength=39 size=27></td>
+	<td class="head" id="v6OpMode">IPv6 Operation Mode</td>
+	<td>
+		<select name="ipv6_opmode" class="mid" onChange="SwitchOpMode(this.form)">
+			<option value="0" id="v6Disable">Disable</option>
+			<option value="1" id="v6Static">Native dynamic/static IP Connection</option>
+		</select>
+	</td>
 </tr>
 </table>
-<!-- 6RD --!>
-<table width="95%" id="v66rdTable" border="1" bordercolor="#9babbd" cellpadding="3" cellspacing="1" hspace="2" vspace="2" width="540" style="visibility: hidden;">
+
+<!-- === STATIC IP === -->
+<table id="v6StaticTable" class="form">
+<tr>
+	<td class="title" colspan="2" id="v6StaticIPSetup">IPv6 Static IP Setup</td>
+</tr>
+<tr>
+	<td class="head" id="v6StaticIPAddr">LAN IPv6 Address / Subnet Prefix Length</td>
+	<td><input name="ipv6_lan_ipaddr" class="mid" maxlength=39 size=27> / <input name="ipv6_lan_prefix_len" maxlength=3 size=2></td>
+</tr>
+<tr>
+	<td class="head" id="v6StaticIPAddr">WAN IPv6 Address / Subnet Prefix Length</td>
+	<td><input name="ipv6_wan_ipaddr" class="mid" maxlength=39 size=27> / <input name="ipv6_wan_prefix_len" maxlength=3 size=2></td>
+</tr>
+<tr>
+	<td class="head" id="v6StaticGW">Default Gateway</td>
+	<td><input name="ipv6_static_gw" class="mid" maxlength=39 size=27></td>
+</tr>
+</table>
+
+<!-- 6RD -->
+<table id="v66rdTable" class="form">
 <tr>
   <td class="title" colspan="2" id="v66rdSetup">Tunneling Connection (6RD) Setup</td>
 </tr>
@@ -341,8 +323,8 @@ function CheckValue()
   <td><input name="ipv6_6rd_border_ipaddr" maxlength=15 size=13></td>
 </tr>
 </table>
-<!-- 6to4 --!>
-<table width="95%" id="6to4Table" border="1" bordercolor="#9babbd" cellpadding="3" cellspacing="1" hspace="2" vspace="2" width="540" style="visibility: hidden;">
+<!-- 6to4 -->
+<table id="6to4Table" class="form">
 <tr>
   <td class="title" colspan="2" id="6to4Setup">Tunneling Connection (6to4) Setup</td>
 </tr>
@@ -351,12 +333,13 @@ function CheckValue()
   <td><input name="ipv6_6to4_srv_ipaddr" maxlength=39 size=27></td>
 </tr>
 </table>
-<table width="95%" cellpadding="2" cellspacing="1">
-<tr align="center">
-  <td>
-    <input type=submit style="{width:120px;}" value="Apply" id="v6Apply">&nbsp;&nbsp;
-    <input type=reset  style="{width:120px;}" value="Cancel" id="v6Cancel">
-  </td>
+
+<table class="buttons">
+<tr>
+	<td>
+		<input type="submit" class="normal" value="Apply" id="lApply">&nbsp;&nbsp;
+		<input type="reset" class="normal" value="Cancel" id="lCancel" onClick="window.location.reload();">
+	</td>
 </tr>
 </table>
 </form>
