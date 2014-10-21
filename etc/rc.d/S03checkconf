@@ -64,6 +64,12 @@ start() {
     fi
 
     #
+    #	set default ipv6 mode to disabled if not set
+    #
+    if [ "$IPv6OpMode" = "" ]; then
+	nvram_set IPv6OpMode 0
+    fi
+    #
     #	set default offload mode to complex if not set
     #
     if [ "$offloadMode" = "" ]; then

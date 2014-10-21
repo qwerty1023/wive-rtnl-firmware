@@ -81,13 +81,19 @@ static int vpnIfaceList(int eid, webs_t wp, int argc, char_t **argv);
 static void formVPNSetup(webs_t wp, char_t *path, char_t *query);
 static void setLan(webs_t wp, char_t *path, char_t *query);
 static void setWan(webs_t wp, char_t *path, char_t *query);
+#if defined (CONFIG_IPV6)
+static int getIPv6Built(int eid, webs_t wp, int argc, char_t **argv);
+static int getIPv66rdBuilt(int eid, webs_t wp, int argc, char_t **argv);
+static int getIP6to4Built(int eid, webs_t wp, int argc, char_t **argv);
+static void setIPv6(webs_t wp, char_t *path, char_t *query);
+#endif
 static void getMyMAC(webs_t wp, char_t *path, char_t *query);
 static void editRouting(webs_t wp, char_t *path, char_t *query);
 
 #ifdef CONFIG_USER_ZEBRA
 static void dynamicRouting(webs_t wp, char_t *path, char_t *query);
-void zebraRestart(void);
-void ripdRestart(void);
+static void zebraRestart(void);
+static void ripdRestart(void);
 #endif
 
 #ifdef CONFIG_USER_CHILLISPOT
@@ -132,6 +138,12 @@ void formDefineInternet(void) {
 	websAspDefine(T("getUSBModemBuilt"), getUSBModemBuilt);
 	websFormDefine(T("setLan"), setLan);
 	websFormDefine(T("setWan"), setWan);
+#if defined (CONFIG_IPV6)
+	websAspDefine(T("getIPv6Built"), getIPv6Built);
+	websAspDefine(T("getIPv66rdBuilt"), getIPv66rdBuilt);
+	websAspDefine(T("getIP6to4Built"), getIP6to4Built);
+	websFormDefine(T("setIPv6"), setIPv6);
+#endif
 	websFormDefine(T("getMyMAC"), getMyMAC);
 	websFormDefine(T("editRouting"), editRouting);
 	websAspDefine(T("getTransmissionBuilt"), getTransmissionBuilt);
@@ -274,7 +286,7 @@ int getIfIp(char *ifname, char *if_addr)
  * description: return 1 if interface is up
  *              return 0 if interface is down
  */
-int getIfIsUp(char *ifname)
+static int getIfIsUp(char *ifname)
 {
 	struct ifreq ifr;
 	int skfd;
@@ -302,7 +314,7 @@ int getIfIsUp(char *ifname)
  *            if_net - a 16-byte buffer to store subnet mask
  * description: fetch subnet mask associated to given interface name
  */
-int getIfNetmask(char *ifname, char *if_net)
+static int getIfNetmask(char *ifname, char *if_net)
 {
 	struct ifreq ifr;
 	int skfd = 0;
@@ -354,7 +366,7 @@ char* getWanIfName(void)
 /*
  * description: return vpn interface name or VPN_DEF as default
  */
-char* getPPPIfName(void)
+static char* getPPPIfName(void)
 {
     FILE *fp;
     char ppp_if[16]; /* max 16 char in vpn if name */
@@ -903,6 +915,31 @@ static int getUSBBuilt(int eid, webs_t wp, int argc, char_t **argv)
 	return websWrite(wp, T("0"));
 #endif
 }
+
+#if defined (CONFIG_IPV6)
+static int getIPv6Built(int eid, webs_t wp, int argc, char_t **argv)
+{
+	return websWrite(wp, T("1"));
+}
+
+static int getIPv66rdBuilt(int eid, webs_t wp, int argc, char_t **argv)
+{
+#if defined (CONFIG_IPV6_SIT_6RD)
+	return websWrite(wp, T("1"));
+#else
+	return websWrite(wp, T("0"));
+#endif
+}
+
+static int getIP6to4Built(int eid, webs_t wp, int argc, char_t **argv)
+{
+#if defined (CONFIG_IPV6_SIT) ||  defined (CONFIG_IPV6_SIT_MODULE)
+	return websWrite(wp, T("1"));
+#else
+	return websWrite(wp, T("0"));
+#endif
+}
+#endif
 
 static int getStorageBuilt(int eid, webs_t wp, int argc, char_t **argv)
 {
@@ -1873,7 +1910,7 @@ static void editRouting(webs_t wp, char_t *path, char_t *query)
 }
 
 #ifdef CONFIG_USER_ZEBRA
-void ripdRestart(void)
+static void ripdRestart(void)
 {
 	char lan_ip[16], wan_ip[16], lan_mask[16], wan_mask[16];
 
@@ -1920,7 +1957,7 @@ out:
 	doSystem("service ripd restart");
 }
 
-void zebraRestart(void)
+static void zebraRestart(void)
 {
 	char *opmode = nvram_get(RT2860_NVRAM, "OperationMode");
 	char *password = nvram_get(RT2860_NVRAM, "Password");
@@ -2312,6 +2349,82 @@ static void setWan(webs_t wp, char_t *path, char_t *query)
 	doSystem("ip route flush cache && service vpnhelper stop && service wan stop");
 	initInternet();
 }
+
+#if defined (CONFIG_IPV6)
+/* goform/setIPv6 */
+static void setIPv6(webs_t wp, char_t *path, char_t *query)
+{
+	char_t	*opmode, *submitUrl;
+	char_t  *ipaddr, *prefix_len, *wan_ipaddr, *wan_prefix_len, *srv_ipaddr;
+	ipaddr = prefix_len = wan_ipaddr = wan_prefix_len = srv_ipaddr = NULL;
+
+	opmode = websGetVar(wp, T("ipv6_opmode"), T("0"));
+	nvram_init(RT2860_NVRAM);
+	if (!strcmp(opmode, "1")) {
+		ipaddr = websGetVar(wp, T("ipv6_lan_ipaddr"), T(""));
+		prefix_len = websGetVar(wp, T("ipv6_lan_prefix_len"), T(""));
+		wan_ipaddr = websGetVar(wp, T("ipv6_wan_ipaddr"), T(""));
+		wan_prefix_len = websGetVar(wp, T("ipv6_wan_prefix_len"), T(""));
+		srv_ipaddr = websGetVar(wp, T("ipv6_static_gw"), T(""));
+		nvram_bufset(RT2860_NVRAM, "IPv6IPAddr", ipaddr);
+		nvram_bufset(RT2860_NVRAM, "IPv6PrefixLen", prefix_len);
+		nvram_bufset(RT2860_NVRAM, "IPv6WANIPAddr", wan_ipaddr);
+		nvram_bufset(RT2860_NVRAM, "IPv6WANPrefixLen", wan_prefix_len);
+		nvram_bufset(RT2860_NVRAM, "IPv6GWAddr", srv_ipaddr);
+#if defined (CONFIG_IPV6_SIT) ||  defined (CONFIG_IPV6_SIT_MODULE)
+#if defined (CONFIG_IPV6_SIT_6RD)
+	} else if (!strcmp(opmode, "2")) {
+		ipaddr = websGetVar(wp, T("ipv6_6rd_prefix"), T(""));
+		prefix_len = websGetVar(wp, T("ipv6_6rd_prefix_len"), T(""));
+		srv_ipaddr = websGetVar(wp, T("ipv6_6rd_border_ipaddr"), T(""));
+		nvram_bufset(RT2860_NVRAM, "IPv6IPAddr", ipaddr);
+		nvram_bufset(RT2860_NVRAM, "IPv6PrefixLen", prefix_len);
+		nvram_bufset(RT2860_NVRAM, "IPv6SrvAddr", srv_ipaddr);
+#endif
+	} else if (!strcmp(opmode, "3")) {
+		ipaddr = websGetVar(wp, T("ipv6_6to4_srv_ipaddr"), T(""));
+		nvram_bufset(RT2860_NVRAM, "ipv6_6to4_srv_ipaddr", ipaddr);
+#endif
+	}
+	nvram_bufset(RT2860_NVRAM, "IPv6OpMode", opmode);
+	nvram_commit(RT2860_NVRAM);
+	nvram_close(RT2860_NVRAM);
+
+	//debug print
+	websHeader(wp);
+	websWrite(wp, T("<h3>IPv6 Setup</h3><br>\n"));
+	websWrite(wp, T("ipv6_opmode: %s<br>\n"), opmode);
+	if (!strcmp(opmode, "1")) {
+		websWrite(wp, T("ipv6_lan_ipaddr: %s<br>\n"), ipaddr);
+		websWrite(wp, T("ipv6_lan_prefix_len: %s<br>\n"), prefix_len);
+		websWrite(wp, T("ipv6_wan_ipaddr: %s<br>\n"), wan_ipaddr);
+		websWrite(wp, T("ipv6_wan_prefix_len: %s<br>\n"), wan_prefix_len);
+		websWrite(wp, T("ipv6_static_gw: %s<br>\n"), srv_ipaddr);
+#if defined (CONFIG_IPV6_SIT_6RD)
+	} else if (!strcmp(opmode, "2")) {
+		websWrite(wp, T("ipv6_6rd_prefix: %s<br>\n"), ipaddr);
+		websWrite(wp, T("ipv6_6rd_prefix_len: %s<br>\n"), prefix_len);
+		websWrite(wp, T("ipv6_6rd_border_ipaddr: %s<br>\n"), srv_ipaddr);
+#endif
+#if defined (CONFIG_IPV6_SIT) ||  defined (CONFIG_IPV6_SIT_MODULE)
+	} else if (!strcmp(opmode, "3")) {
+		websWrite(wp, T("ipv6_6to4_srv_ipaddr: %s<br>\n"), ipaddr);
+#endif
+	}
+
+	doSystem("internet.sh");
+
+	// Write OK
+	websWrite(wp, T("<script language=\"JavaScript\" type=\"text/javascript\">ajaxReloadDelayedPage(10000, '/internet/ipv6.asp', true);</script>\n"));
+	websFooter(wp);
+
+	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+	if (submitUrl[0])
+		websRedirect(wp, submitUrl);
+	else
+		websDone(wp, 200);
+}
+#endif
 
 #ifdef CONFIG_USER_CHILLISPOT
 // ChilliSpot variables

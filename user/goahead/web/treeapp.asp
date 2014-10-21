@@ -53,6 +53,9 @@ function initValue()
 	if (e!=null)
 		e.innerHTML = _("treeapp closeall");
 }
+if (ipv6b == "1") {
+	a.add(307, 300, _("treeapp ipv6"), 		    "javascript:go('internet/ipv6.asp');");
+}
 
 function go(zz) {
 	top.view.location=zz;
@@ -69,6 +72,7 @@ function refresh(){
 <script type="text/javascript">
 var opmode = '<% getCfgZero(1, "OperationMode"); %>';
 var vpnen = '<% getVPNBuilt(); %>';
+var ipv6b = '<% getIPv6Built(); %>';
 var meshb = '<% getMeshBuilt(); %>';
 var wdsb = '<% getWDSBuilt(); %>';
 var wscb = '<% getWSCBuilt(); %>';
@@ -98,6 +102,8 @@ a.add(300,   0, _("treeapp network settings"),		"javascript:a.oo(300);");
 a.add(301, 300, _("treeapp lan"),					"javascript:go('internet/lan.asp');");
 if (opmode != '0')
 	a.add(302, 300, _("treeapp wan"),				"javascript:go('internet/wan.asp');");
+if (ipv6b == "1")
+	a.add(307, 300, _("treeapp ipv6"), 		    "javascript:go('internet/ipv6.asp');");
 a.add(303, 300, _("treeapp vpn"),					"javascript:go('internet/vpn.asp');");
 if (opmode != '0')
 	a.add(304, 300, _("treeapp routing"),			"javascript:go('internet/routing.asp');");
