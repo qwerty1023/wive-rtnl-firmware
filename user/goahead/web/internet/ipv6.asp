@@ -339,6 +339,7 @@ function CheckValue()
 	<td>
 		<input type="submit" class="normal" value="Apply" id="lApply">&nbsp;&nbsp;
 		<input type="reset" class="normal" value="Cancel" id="lCancel" onClick="window.location.reload();">
+		<input type="hidden" value="/internet/ipv6.asp" name="submit-url">
 	</td>
 </tr>
 </table>
