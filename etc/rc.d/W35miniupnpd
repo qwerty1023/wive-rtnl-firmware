@@ -36,6 +36,8 @@ gen_config() {
 printf "
 minissdpdsocket=/var/run/minissdpd.sock
 lease_file=/var/upnp_leases
+ext_ifname=$real_wan_if
+listening_ip=$lan_if
 enable_natpmp=yes
 enable_upnp=yes
 secure_mode=no
