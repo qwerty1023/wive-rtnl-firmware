@@ -110,9 +110,13 @@ start() {
     elif [ "$wanConnectionMode" = "DHCP" ] && [ "$vpnPurePPPOE" != "1" ]; then
 	# get udhcp param
 	udhcpc_opts
-
 	$LOG "Start DHCP client."
 	(sleep 2 && udhcpc $UDHCPCOPTS > /dev/null 2>&1) &
+	if [ -f /bin/dhcp6c ] && [ "$IPv6Dhcpc" = "1" ]; then
+	    $LOG "Start DHCPv6 client."
+	    dhcp6c $real_wan_if
+	    (sleep 2 && dhcp6c $real_wan_if > /dev/null 2>&1) &
+	fi
     elif [ "$wanConnectionMode" = "ZERO" ] || [ "$vpnPurePPPOE" = "1" ]; then
 	$LOG "Call zeroconf for get wan ip address."
 	zero_conf
@@ -146,7 +150,7 @@ wan_if_preconf() {
 
 get_param() {
     # get parametrs
-    eval `nvram_buf_get 2860 wan_ipaddr wan_netmask wan_gateway wan_manual_mtu lan_ipaddr lan_netmask HostName xupnpd`
+    eval `nvram_buf_get 2860 wan_ipaddr wan_netmask wan_gateway wan_manual_mtu lan_ipaddr lan_netmask HostName xupnpd IPv6Dhcpc`
 }
 
 stop() {
@@ -154,9 +158,12 @@ stop() {
     service vpnhelper stop
     # stop dhcp and zeroconf client
     killall -q udhcpc
+    killall -q dhcp6c
     killall -q zcip
     killall -q -SIGKILL udhcpc
+    killall -q -SIGKILL dhcp6c
     killall -q -SIGKILL zcip
+
     # this prevent flood/loop with ic+ aplink/downlink switches
     flush_arp_cache
     # in gw/hotspot modes down wlan if not bridge and not ethconvert
