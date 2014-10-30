@@ -448,7 +448,7 @@ startv6() {
 	ip6tables -A FORWARD $STATE_EST -j ACCEPT
 #########################################TRANSMISSION_PORT#################################
 	if [ "$TransmissionEnabled" = "1" ]; then
-	    $LOG "transmission"
+	    $LOG "transmission in port"
 	    # Incoming peers
 	    ip6tables -A INPUT -p tcp --dport $TransInPort -j ACCEPT
 	fi
