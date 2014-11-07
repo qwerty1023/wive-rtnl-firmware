@@ -73,7 +73,6 @@ function refresh(){
 var opmode = '<% getCfgZero(1, "OperationMode"); %>';
 var vpnen = '<% getVPNBuilt(); %>';
 var ipv6b = '<% getIPv6Built(); %>';
-var meshb = '<% getMeshBuilt(); %>';
 var wdsb = '<% getWDSBuilt(); %>';
 var wscb = '<% getWSCBuilt(); %>';
 var stab = '<% getSTABuilt(); %>';
@@ -137,10 +136,6 @@ else
 	a.add(407, 400, _("treeapp station list"),		"javascript:go('wireless/stainfo.asp');");
 	if (ad == '1')
 		a.add(408, 400, "Antenna Diversity",		"javascript:go('wireless/ant_diversity.asp');");
-	if (meshb == "1")
-	{
-		a.add(409, 400, _("treeapp mesh settings"),	"javascript:go('wireless/mesh.asp');");
-	}
 }
 
 // Firewall

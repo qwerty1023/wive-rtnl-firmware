@@ -5,10 +5,6 @@ if [ ! -f /bin/igmpproxy ]; then
     exit 0
 fi
 
-# wait to start web and run from goahead code
-. /etc/scripts/web_wait.sh
-web_wait
-
 # get params
 . /etc/scripts/global.sh
 
@@ -20,8 +16,8 @@ start() {
   # if igmpproxy enable and mode not full bridge
     if [ "$igmpEnabled" = "1" ] && [ "$OperationMode" != "0" ] && [ "$ApCliBridgeOnly" != "1" ]; then
       ( # send to background
+
 	# check ip adress set at wan
-	wan_is_not_null=`ip -4 addr show $wan_if | grep inet -c`
 	if [ "$wan_is_not_null" = "0" ]; then
     	    $LOG "Wait 15 sec before start..."
 	    sleep 15

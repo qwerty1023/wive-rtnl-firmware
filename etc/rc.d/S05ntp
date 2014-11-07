@@ -5,9 +5,6 @@ LOG="logger -t ntp"
 start() {
     # generate new timezone file
     TZ_generate
-    # wait to start web and run from goahead code
-    . /etc/scripts/web_wait.sh
-    web_wait
     # start time sync daemon
     ntp_start
 }

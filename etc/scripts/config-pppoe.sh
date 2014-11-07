@@ -138,6 +138,12 @@ if [ "$vpnLCPFailure" = "" ] || [ "$vpnLCPInterval" = "" ]; then
     vpnLCPInterval=30
 fi
 
+if [ "$IPv6OpMode" = "1" ]; then
+    SIXEN="+ipv6"
+else
+    SIXEN=""
+fi
+
 printf "
 lcp-echo-failure  $vpnLCPFailure
 lcp-echo-interval $vpnLCPInterval
@@ -147,6 +153,7 @@ $CHAP
 $EAP
 $MSCHAP
 $MSCHAP2
+$SIXEN
 " > $OPTFILE
 
 # Standard PPP options we always use

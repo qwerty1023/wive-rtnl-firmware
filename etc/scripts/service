@@ -17,7 +17,6 @@ fi
 
 if [ "$1" = "list" ]; then
   ls $INITDIR/
-  ls $RC_DIR/
   exit 1;
 fi
 
@@ -28,7 +27,7 @@ if [ -x "$INITDIR/$1" ]; then
     # include profile variables
     . /etc/profile
 
-    ($RC_DIR/*"$1" "$2" 2>&1)
+    ($RC_DIR/???"$1" "$2" 2>&1)
 else
     echo "No such Service: $1 in $INITDIR";
     exit 1
