@@ -125,6 +125,12 @@ apcli_config() {
 	if [ "$second_wlan_mbss" != "" ]; then
 	    addMBSSID $second_wlan_mbss
 	fi
+	# delete ra0 from bridge and down if only apcli-bridge
+	eval `nvram_buf_get 2860 ApCliClientOnly`
+	if  [ "$ApCliClientOnly" = "1" ] && [ "$OperationMode" = "0" -o "$OperationMode" = "3" ]; then
+    	    echo "APCLI Only client mode enable, shutdown $first_wlan_root_if interface."
+    	    delif_from_br $first_wlan_root_if
+	fi
 }
 
 spot_config() {
@@ -215,12 +221,6 @@ if [ "$OperationMode" = "0" -o "$OperationMode" = "3" ] && [ "$MODE" != "connect
 	$LOG "Reconfigure switch..."
 	/etc/scripts/config-switch.sh
     fi
-    # disable AP interface if client only configured
-    eval `nvram_buf_get 2860 ApCliClientOnly`
-    if [ "$ApCliClientOnly" = "1" ]; then
-	echo "APCLI Only client mode enable shutdown $first_wlan_root_if..."
-	delif_from_br $first_wlan_root_if
-    fi
 fi
 
 ##########################################################
@@ -236,7 +236,7 @@ services_restart.sh all
 # in dhcp client mode restart from dhcp script
 # in static/zeroconf or pure pppoe mode need restart anyway
 if [ "$vpnEnabled" = "on" -a "$vpnType" = "0" -a "$vpnPurePPPOE" = "1" ] || [ "$wanConnectionMode" != "DHCP" ]; then
-    (service vpnhelper stop && sleep 2 && service vpnhelper start) &
+    service vpnhelper restart
 fi
 
 # this is hook for exec user script after physycal connection configured

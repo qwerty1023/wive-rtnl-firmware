@@ -129,7 +129,7 @@ CATALOGS = @CATALOGS@
 CATOBJEXT = @CATOBJEXT@
 CC = @CC@
 CCDEPMODE = @CCDEPMODE@
-CFLAGS = @CFLAGS@
+CFLAGS = @CFLAGS@ -ffunction-sections -fdata-sections
 CPP = @CPP@
 CPPFLAGS = @CPPFLAGS@
 CURL_MINIMUM = @CURL_MINIMUM@
@@ -170,7 +170,7 @@ INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 INSTOBJEXT = @INSTOBJEXT@
 INTLLIBS = @INTLLIBS@
 LD = @LD@
-LDFLAGS = @LDFLAGS@
+LDFLAGS = @LDFLAGS@ -Wl,--gc-sections
 LIBAPPINDICATOR_CFLAGS = @LIBAPPINDICATOR_CFLAGS@
 LIBAPPINDICATOR_LIBS = @LIBAPPINDICATOR_LIBS@
 LIBAPPINDICATOR_MINIMUM = @LIBAPPINDICATOR_MINIMUM@
@@ -834,8 +834,8 @@ dist-hook:
 	rm -rf `find $(distdir)/qt -name .svn`
 
 romfs: install
-	$(ROMFSINST) -S init.d/W75transmission /etc/rc.d/W75transmission
-	$(ROMFSINST) -s /etc/rc.d/W75transmission /etc/init.d/transmission
+	$(ROMFSINST) -S init.d/W95transmission /etc/rc.d/W95transmission
+	$(ROMFSINST) -s /etc/rc.d/W95transmission /etc/init.d/transmission
 	$(ROMFSINST) -S filesystem/bin/transmission-daemon /bin/transmission-daemon
 	cp -rfva filesystem/share/transmission* $(ROMFSDIR)/share/transmission/
 

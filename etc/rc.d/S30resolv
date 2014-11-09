@@ -4,7 +4,7 @@ LOG="logger -t resolv"
 
 start() {
 get_param
-if [ ! -f /var/run/goahead.pid ] || [ "$wan_static_dns" = "on" ]; then
+if [ ! -f /tmp/bootgood ] || [ "$wan_static_dns" = "on" ]; then
     # drop current
     rm -f $fname
     touch $fname
@@ -47,7 +47,7 @@ fi
 }
 
 get_param() {
-    eval `nvram_buf_get 2860 wan_static_dns wan_primary_dns wan_secondary_dns dnsPEnabled dhcpDomain HostName IPv6OpMode`
+    eval `nvram_buf_get 2860 wan_static_dns wan_primary_dns wan_secondary_dns dnsPEnabled dhcpDomain IPv6OpMode`
     fname="/etc/resolv.conf"
 
     #if no file create

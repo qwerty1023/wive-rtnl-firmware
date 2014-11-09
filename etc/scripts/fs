@@ -73,6 +73,8 @@ restore() {
 
 nvramreset() {
     echo "Load user defaults..."
+    # remove backuped config
+    rm -f /etc/backup/nvram_backup.dat
     nvram_default 2860
 }
 
@@ -88,7 +90,7 @@ fullreset() {
     killall -q -SIGKILL goahead
     wifi_unload.sh
     rm -f /tmp/nvram_checked
-    rm -f /var/run/goahead.pid
+    rm -f /tmp/bootgood
     burnrf
     nvramreset
     echo "Erase RW-FS partitions"

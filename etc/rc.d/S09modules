@@ -10,8 +10,14 @@ LOG="logger -t modules"
 
 start() {
     get_param
+    # generate modules dep if need
+    if [ ! -f /etc/modules.dep ]; then
+        $LOG "Start modules.dep generate."
+        depmod -a -n > /etc/modules.dep
+    fi
+
     # if goahead started
-    if [  -f /var/run/goahead.pid ]; then
+    if [  -f /tmp/bootgood ]; then
 	# clear conntrack and routes tables/caches
 	flush_net_caches
 
@@ -62,27 +68,35 @@ start() {
 		ip link set $second_wlan_apcli up
 	    fi
 	fi
-    else
-	# if goahead not started
-	# generate modules dep
-	if [ ! -f /etc/modules.dep ]; then
-	    $LOG "Start modules.dep generate."
-	    depmod -a -n > /etc/modules.dep
-	fi
+	$LOG "Tune wifi modules after load..."
+	retune_wifi
+
 	# not load this modules after goahead start
 	# load conntrack helpers modules
 	load_nat_helpers
     fi
 }
 
-get_param() {
-    eval `nvram_buf_get 2860 macCloneEnabled macCloneMac`
-}
-
 gen_wifi_config() {
     rm -f /etc/Wireless/RT2860/RT2860.dat
     rm -f /etc/Wireless/iNIC/RT2860AP.dat
     ralink_init make_wireless_config rt2860
+}
+
+retune_wifi() {
+    get_param
+    # preconfigure wifi
+    /etc/scripts/wifi.sh $first_wlan_root_if &
+    if [ "$CONFIG_RT2860V2_AP_APCLI" != "" ] && [ "$ApCliEnable" = "1" ]; then
+	/etc/scripts/wifi.sh $first_wlan_apcli &
+    fi
+    if [ "$second_wlan_root_if" != "" ]; then
+	# preconfigure second wlan root interface to
+	/etc/scripts/wifi.sh $second_wlan_root_if &
+	if [ "$CONFIG_RT2860V2_AP_APCLI" != "" ]; then
+	    /etc/scripts/wifi.sh $second_wlan_apcli &
+	fi
+    fi
 }
 
 load_nat_helpers() {
@@ -121,6 +135,7 @@ load_nat_helpers() {
 }
 
 wlan_down_all() {
+    get_param
     $LOG "Shutdown all wireless interfaces."
     # always clear conntrack and routes tables/caches
     flush_net_caches
@@ -158,34 +173,26 @@ wlan_down_all() {
     fi
 }
 
-retune_wifi() {
-    # preconfigure wifi
-    (sleep 2 && /etc/scripts/wifi.sh $first_wlan_root_if) &
-    if [ "$second_wlan_root_if" != "" ]; then
-	# preconfigure second wlan root interface to
-	(sleep 2 && /etc/scripts/wifi.sh $second_wlan_root_if) &
-    fi
+get_param() {
+    eval `nvram_buf_get 2860 macCloneEnabled macCloneMac ApCliEnable`
 }
 
 stop() {
-    get_param
-    if [ -f /var/run/goahead.pid ]; then
-	$LOG "link wifi down first"
-	wlan_down_all
-	if [ -d /sys/module/hw_nat ]; then
-	    $LOG "Unload hw_nat and wireless modules."
-	    mod="hw_nat rt2860v2_ap rt2860v2_sta rt3090_ap"
-	else
-	    $LOG "Unload wireless modules."
-	    mod="rt2860v2_ap rt2860v2_sta rt3090_ap"
-	fi
-	for module in $mod
-	do
-	    if [ -d /sys/module/$module ]; then
-		rmmod $module > /dev/null 2>&1
-	    fi
-	done
+    $LOG "link wifi down first"
+    wlan_down_all
+    if [ -d /sys/module/hw_nat ]; then
+        $LOG "Unload hw_nat and wireless modules."
+        mod="hw_nat rt2860v2_ap rt2860v2_sta rt3090_ap"
+    else
+        $LOG "Unload wireless modules."
+        mod="rt2860v2_ap rt2860v2_sta rt3090_ap"
     fi
+    for module in $mod
+    do
+	if [ -d /sys/module/$module ]; then
+	    rmmod $module > /dev/null 2>&1
+	fi
+    done
 }
 
 case "$1" in
