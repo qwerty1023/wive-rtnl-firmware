@@ -977,8 +977,10 @@ static rsv_table_t ip_addr_rsvd[] =
 	{ 0xe0000006, 0xffffffff }, /* OSPF2 routers */
 	{ 0xe0000009, 0xffffffff }, /* RIP v2 routers */
 	{ 0xe000000d, 0xffffffff }, /* PIMd routers */
-	{ 0xe0000010, 0xffffffff }, /* IGMP v3 routers */
-	{ 0xe00000fb, 0xffffffff }, /* Reserved */
+	{ 0xe0000012, 0xffffffff }, /* VRRP routers */
+	{ 0xe0000016, 0xffffffff }, /* IGMP v3 routers */
+	{ 0xe00000fb, 0xffffffff }, /* mDNS */
+	{ 0xe00000fc, 0xffffffff }, /* LLMNR */
 	{ 0xe000ff87, 0xffffffff }, /* Reserved */
 	{ 0xeffffffa, 0xffffffff }, /* UPnP */
 };
@@ -1183,13 +1185,13 @@ NDIS_STATUS IgmpPktClone(
 			else
 			{
 				/* insert the pkt to TxSwQueue. */
-				if (pAd->TxSwQueue[QueIdx].Number >= pAd->TxSwQMaxLen)
+				if (pAd->TxSwQueue[QueIdx].Number >= MAX_PACKETS_IN_MCAST_NORMAL_QUEUE)
 				{
 #ifdef BLOCK_NET_IF
 					StopNetIfQueue(pAd, QueIdx, pSkbClone);
 #endif /* BLOCK_NET_IF */
 					RELEASE_NDIS_PACKET(pAd, pSkbClone, NDIS_STATUS_FAILURE);
-					return NDIS_STATUS_RESOURCES;
+					return NDIS_STATUS_FAILURE;
 				}
 				else
 				{

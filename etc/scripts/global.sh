@@ -95,6 +95,8 @@ getLanIfName() {
 	lan_if="br0"
 	lan2_if="br0:9"
     fi
+    # export for goahead
+    echo -n "$lan_if" > /tmp/lan_if_name
 }
 
 # VPN interface name -> $vpn_if
@@ -124,23 +126,27 @@ getWanIfName() {
 	phys_wan_if="eth2.2"
     fi
     # real wan name
-    if [ "$OperationMode" = "0" ] || [ "$ApCliBridgeOnly" = "1" ]; then
+    if [ "$OperationMode" = "0" ]; then
+	# bridge
 	wan_if="br0"
     elif [ "$OperationMode" = "1" ] || [ "$OperationMode" = "4" ]; then
+	# gateway/chillispot
 	wan_if="$phys_wan_if"
     elif [ "$OperationMode" = "2" ]; then
+	# ethernet converter
 	wan_if="$first_wlan_root_if"
     elif [ "$OperationMode" = "3" ]; then
-	if [ "$first_wlan_apcli" != "" ]; then
-	    wan_if="$first_wlan_apcli"
-	elif [ "$second_wlan_apcli" != "" ]; then
-	    wan_if="$second_wlan_apcli"
+        if [ "$ApCliBridgeOnly" = "1" ]; then
+    	    # apclient bridge
+	    wan_if="br0"
 	else
-	    echo "Driver not support APCLI mode."
-	    wan_if="$phys_wan_if"
+    	    # apclient gw
+	    if [ "$first_wlan_apcli" != "" ]; then
+		wan_if="$first_wlan_apcli"
+	    elif [ "$second_wlan_apcli" != "" ]; then
+		wan_if="$second_wlan_apcli"
+	    fi
 	fi
-    elif [ "$OperationMode" = "4" ]; then
-	    wan_if="$phys_wan_if"
     fi
     # services wan name
     if [ "$vpnEnabled" = "on" -a  "$vpnDGW" = "1" ] || [ "$MODEMENABLED" = "1" ]; then
@@ -162,6 +168,8 @@ getWanIfName() {
     if [ "$vpn_if" = "" ]; then
 	vpn_if="$vpn_def_if"
     fi
+    # export for goahead
+    echo -n "$wan_if" > /tmp/wan_if_name
 }
 
 getTunIfName() {

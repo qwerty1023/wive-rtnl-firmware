@@ -1343,6 +1343,7 @@ VOID RTMPDeQueuePacket(
 						pEntry = RemoveHeadQueue(pQueue);
 						RTMPFreeNdisPacket(pAd, pPacket);
 						DEQUEUE_UNLOCK(&pAd->irq_lock, bIntContext, IrqFlags);
+						Count++;
 						continue;
 					}
 					else
@@ -1364,7 +1365,7 @@ VOID RTMPDeQueuePacket(
 						So we will not send any packet even the link quality
 						is recovered.
 					*/
-#define ENTRY_RETRY_INTERVAL	(100 * OS_HZ / 1000)
+#define ENTRY_RETRY_INTERVAL	(50 * OS_HZ / 1000)
 					ULONG Now32;
 				    NdisGetSystemUpTime(&Now32);
 					if(RTMP_TIME_BEFORE(Now32, pMacEntry->TimeStamp_toTxRing + ENTRY_RETRY_INTERVAL))
@@ -1372,6 +1373,7 @@ VOID RTMPDeQueuePacket(
 						pEntry = RemoveHeadQueue(pQueue);
 						RTMPFreeNdisPacket(pAd, pPacket);
 						DEQUEUE_UNLOCK(&pAd->irq_lock, bIntContext, IrqFlags);
+						Count++;
 						continue;
 					}
 					else
@@ -1834,10 +1836,22 @@ VOID RTMPWriteTxWI_Data(
 
 	if((pTxBlk->TxFrameType == TX_AMPDU_FRAME) && (pMacEntry))
 	{
-		UCHAR		RABAOriIdx = 0;	//The RA's BA Originator table index.
-					
-		RABAOriIdx = pTxBlk->pMacEntry->BAOriWcidArray[pTxBlk->UserPriority];
-		BASize = pAd->BATable.BAOriEntry[RABAOriIdx].BAWinSize;
+		/*
+ 		 * Under HT20, 2x2 chipset, OPEN, and with some atero chipsets
+ 		 * reduce BASize to 7 to add one bulk A-MPDU during one TXOP
+ 		 * to improve throughput
+ 		 */
+		if ((pAd->CommonCfg.BBPCurrentBW == BW_20) && (pAd->Antenna.field.TxPath == 2)
+			&& (pMacEntry->bIAmBadAtheros) && (pMacEntry->WepStatus == Ndis802_11EncryptionDisabled))
+		{
+			BASize = 7;
+		}
+		else 
+		{
+			UCHAR RABAOriIdx = 0; /*The RA's BA Originator table index.*/
+			RABAOriIdx = pTxBlk->pMacEntry->BAOriWcidArray[pTxBlk->UserPriority];
+			BASize = pAd->BATable.BAOriEntry[RABAOriIdx].BAWinSize;
+		}
 	}
 
 #ifdef RTMP_RBUS_SUPPORT
@@ -1914,6 +1928,9 @@ VOID RTMPWriteTxWI_Data(
 			}
 		}
 		{
+		if ((pAd->CommonCfg.BBPCurrentBW == BW_20) && (pMacEntry->bIAmBadAtheros))
+			pTxWI->MpduDensity = 7;
+		else
 			pTxWI->MpduDensity = pMacEntry->MpduDensity;
 		}
 	}
@@ -2591,8 +2608,8 @@ MAC_TABLE_ENTRY *MacTableInsertEntry(
 			pEntry->ContinueTxFailCnt = 0;
 #ifdef WDS_SUPPORT
 			pEntry->LockEntryTx = FALSE;
-			pEntry->TimeStamp_toTxRing = 0;
 #endif // WDS_SUPPORT //
+			pEntry->TimeStamp_toTxRing = 0;
 			InitializeQueueHeader(&pEntry->PsQueue);
 
 
