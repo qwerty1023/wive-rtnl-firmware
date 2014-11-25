@@ -110,8 +110,18 @@ function onImportSettings(form)
 			ajaxShowProgress);
 }
 
-</script>
+function onUploadRWFSSubmit(form)
+{
+	if (checkFilePresent(form.filename))
+		ajaxPostForm(
+			'Proceed uploading RWFS?',
+			form,
+			'RWFSReloader',
+			'/messages/wait_rwfs.asp',
+			ajaxShowProgress);
+}
 
+</script>
 </head>
 <body onload="initValue();">
 <table class="body" style="width:600px;"><tr><td>
@@ -119,7 +129,7 @@ function onImportSettings(form)
 <div id="staticText">
 <p>You can select language and set administrator login and password here.</p>
 <p>You can also upgrade the Wive-RTNL firmware to obtain new functionality.
-It takes about 1 minute to upload firmware &amp; upgrade flash. Please be patient.</p>
+It takes about 2 minute to upload firmware &amp; upgrade flash. Please be patient.</p>
 <p style="color: #ff0000;">Caution! A corrupted image will hang up the system.</p>
 </div>
 <hr>
@@ -156,11 +166,11 @@ It takes about 1 minute to upload firmware &amp; upgrade flash. Please be patien
 </tr>
 <tr>
 	<td class="head">Login</td>
-	<td><input type="text" name="admuser" size="16" maxlength="16" value="<% getCfgGeneral(1, "Login"); %>"></td>
+	<td><input type="text" name="admuser" size="16" maxlength="16" value='<% getCfgGeneral(1, "Login"); %>'></td>
 </tr>
 <tr>
 	<td class="head" id="manAdmPasswd">Password</td>
-	<td><input type="password" name="admpass" size="16" maxlength="32" value="<% getCfgGeneral(1, "Password"); %>"></td>
+	<td><input type="password" name="admpass" size="16" maxlength="32" value='<% getCfgGeneral(1, "Password"); %>'></td>
 </tr>
 <tr>
 	<td class="head">Apply new login/password</td>
@@ -191,8 +201,21 @@ It takes about 1 minute to upload firmware &amp; upgrade flash. Please be patien
 	</td>
 </tr>
 </table>
-
-<!-- ----------------- Settings management ----------------- -->
+        <!-- ================= RwFs ================= -->
+        <table class="form">
+          <tr>
+            <td colspan="2" class="title">RW-FS Upload</td>
+          </tr>
+          <tr>
+            <td class="head" id="uploadRWFSLocation">Filename:</td>
+            <td class="value"><form method="POST" name="UploadRWFS" action="/cgi-bin/upload_rwfs.cgi" enctype="multipart/form-data">
+                <input type="file" name="filename" maxlength="256">
+                <input type="button" value="Load" id="uploadRWFSApply" class="half" onclick="onUploadRWFSSubmit(this.form);">
+                <iframe id="RWFSReloader" name="RWFSReloader" src="" style="width:0;height:0;border:0px solid #fff;"></iframe>
+              </form></td>
+          </tr>
+        </table>
+        <!-- ================= Settings management ================= -->
 <table class="form">
 <tr>
 	<td class="title" colspan="2">Router Settings Management</td>
@@ -227,7 +250,7 @@ It takes about 1 minute to upload firmware &amp; upgrade flash. Please be patien
 	</td>
 </tr>
 </table>
-<div>
+</div>
 
 <div class="whitespace">&nbsp;</div>
 

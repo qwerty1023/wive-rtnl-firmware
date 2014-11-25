@@ -87,12 +87,11 @@ function initTranslation()
 	_TR("lUpnpE", "inet enable");
 
 	_TR("lRadvd", "lan radvd");
+	_TR("lDhcpv6", "lan dhcpv6");
 	_TR("lRadvdD", "inet disable");
+	_TR("lDhcpv6D", "inet disable");
 	_TR("lRadvdE", "inet enable");
-
-	_TR("lPppoer", "lan pppoer");
-	_TR("lPppoerD", "inet disable");
-	_TR("lPppoerE", "inet enable");
+	_TR("lDhcpv6E", "inet enable");
 
 	_TR("lDnsp", "lan dnsp");
 	_TR("lDnspD", "inet disable");
@@ -111,7 +110,7 @@ function initValue()
 	var upnp = <% getCfgZero(1, "upnpEnabled"); %>;
 	var xupnpd = <% getCfgZero(1, "xupnpd"); %>;
 	var radvd = <% getCfgZero(1, "radvdEnabled"); %>;
-	var pppoe = <% getCfgZero(1, "pppoeREnabled"); %>;
+	var dhcpv6 = <% getCfgZero(1, "dhcpv6Enabled"); %>;
 	var dns = <% getCfgZero(1, "dnsPEnabled"); %>;
 	var wan = "<% getCfgZero(1, "wanConnectionMode"); %>";
 	var cdp = "<% getCfgZero(1, "cdpEnabled"); %>";
@@ -125,7 +124,7 @@ function initValue()
 	var upnpb = "<% getUpnpBuilt(); %>";
 	var xupnpdb = "<% getXupnpdBuilt(); %>";
 	var radvdb = "<% getRadvdBuilt(); %>";
-	var pppoeb = "<% getPppoeRelayBuilt(); %>";
+	var dhcpv6b = "<% getDhcpv6Built(); %>";
 	var dnsp = "<% getDnsmasqBuilt(); %>";
 	var snmpdb = "<% getSNMPDBuilt(); %>";
 	var krnl_pppoe = "<% getCfgZero(1, "pppoe_pass"); %>";
@@ -148,7 +147,7 @@ function initValue()
 	form.upnpEnbl.options.selectedIndex = 1*upnp;
 	form.xupnpdEnbl.options.selectedIndex = 1*xupnpd;
 	form.radvdEnbl.options.selectedIndex = 1*radvd;
-	form.pppoeREnbl.options.selectedIndex = 1*pppoe;
+	form.dhcpv6Enbl.options.selectedIndex = 1*dhcpv6;
 	form.dnspEnbl.options.selectedIndex = 1*dns;
 	form.cdpEnbl.options.selectedIndex = 1*cdp;
 	form.lltdEnbl.options.selectedIndex = 1*lltd;
@@ -192,7 +191,7 @@ function initValue()
 	displayElement('upnp', upnpb == '1');
 	displayElement('xupnpd', xupnpdb == '1');
 	displayElement('radvd', radvdb == '1');
-	displayElement('pppoerelay', pppoeb == '1');
+	displayElement('dhcpv6', dhcpv6b == '1');
 	displayElement('dnsproxy', dnsp == '1');
 
 	// Set-up NAT fastpath
@@ -217,14 +216,14 @@ function initValue()
 	sshRmtSelect(form);
 	pingerSelect(form);
 	udpxySelect(form);
-	
+
 	displayServiceStatus();
 }
 
 function CheckValue(form)
 {
 	var thresh = form.offloadMode.value;
-	
+
 	if ((thresh == '2') || (thresh == '3'))
 	{
 		// Check threshold
@@ -242,7 +241,7 @@ function CheckValue(form)
 			return false;
 		}
 	}
-	
+
 	var udpxy_port = form.udpxyPort.value * 1;
 	if (!((udpxy_port == 81) || ((udpxy_port >= 1024) && (udpxy_port <= 65535))))
 	{
@@ -250,20 +249,20 @@ function CheckValue(form)
 		form.udpxyPort.focus();
 		return false;
 	}
-	
+
 	if (form.RemoteManagementPort.value != rmtManagementPort)
 	{
 		if (!confirm("You have changed remote management port number. This change needs to reboot your router. Do you want to proceed?"))
 			return false;
-		
+
 		form.rmt_http_port_changed.value = '1';
 		ajaxPostForm(null, form, 'setMiscReloader', '/messages/rebooting.asp', ajaxShowProgress);
 		return false;
 	}
-	
+
 	// Timeout reload
 	TimeoutReload(20);
-	
+
 	return true;
 }
 
@@ -307,28 +306,29 @@ function udpxySelect(form)
 function displayServiceHandler(response)
 {
 	var form = document.miscServiceCfg;
-	
+
 	var services = [
 		// turned_on, row_id, daemon_id, url-finish, about
-		[ '<% getCfgGeneral(1, "UDPXYMode"); %>', 'udpxy', 'udpxy', '<% getCfgGeneral(1, "UDPXYPort"); %>/status/', 'udpxy.sourceforge.net/' ],
+		[ '<% getCfgGeneral(1, "UDPXYMode"); %>', 'udpxy', 'udpxy', '<% getCfgGeneral(1, "UDPXYPort"); %>/status/', 'udpxy.sourceforge.net' ],
 		[ '<% getCfgGeneral(1, "xupnpd"); %>', 'xupnpd', 'xupnpd', '4044/', 'xupnpd.org/' ],
 		[ '<% getCfgGeneral(1, "CrondEnable"); %>', 'crond', 'crond', null, 'crontab.org/' ],
 		[ '<% getCfgGeneral(1, "snmpd"); %>', 'snmpd', 'snmpd', null, 'www.net-snmp.org/docs/man/snmpd.html' ],
-		[ '<% getCfgGeneral(1, "igmpEnabled"); %>', 'igmpProxy', 'igmpproxy', null, 'sourceforge.net/projects/igmpproxy/' ],
+		[ '<% getCfgGeneral(1, "igmpEnabled"); %>', 'igmpProxy', 'igmpproxy', null, 'sourceforge.net/projects/igmpproxy' ],
 		[ '<% getCfgGeneral(1, "lltdEnabled"); %>', 'lltd', 'lld2d', null, 'msdn.microsoft.com/en-us/windows/hardware/gg463061.aspx' ],
 		[ '<% getCfgGeneral(1, "upnpEnabled"); %>', 'upnp', 'miniupnpd', null, 'miniupnp.free.fr/' ],
 		[ '<% getCfgGeneral(1, "cdpEnabled"); %>', 'cdp', 'cdp-send', null, 'freecode.com/projects/cdp-tools' ],
 		[ '<% getCfgGeneral(1, "dnsPEnabled"); %>', 'dnsproxy', 'dnsmasq', null, 'thekelleys.org.uk/dnsmasq/doc.html' ],
 		[ '<% getCfgGeneral(1, "parproutedEnabled"); %>', 'parprouted', 'parprouted', null, 'freecode.com/projects/parprouted' ],
-		[ '<% getCfgGeneral(1, "radvdEnabled"); %>', 'radvd', 'radvd', null, 'www.litech.org/radvd/' ]
+		[ '<% getCfgGeneral(1, "radvdEnabled"); %>', 'radvd', 'radvd', null, 'www.litech.org/radvd' ],
+		[ '<% getCfgGeneral(1, "dhcpv6Enabled"); %>', 'dhcpv6', 'dhcp6s', null, 'wide-dhcpv6.sourceforge.net' ]
 	];
-	
+
 	// Create associative array
 	var tmp = response.split(',');
 	var daemons = [];
 	for (var i=0; i<tmp.length; i++)
 		daemons[tmp[i]] = 1;
-	
+
 	// Now display all services
 	for (var i=0; i<services.length; i++)
 	{
@@ -338,7 +338,7 @@ function displayServiceHandler(response)
 		for (var j=0; j<row.childNodes.length; j++)
 			if (row.childNodes[j].nodeName == 'TD')
 				tds.push(row.childNodes[j]);
-		
+
 		if (row != null)
 		{
 			// Fill-up about
@@ -427,7 +427,6 @@ function displayServiceStatus()
 	</select>
 </td>
 </tr>
-<tr>
 <!-- Software fastpaths -->
 <tr id="fastpath_row">
 	<td class="title" colspan="5">Software fastpaths</td>
@@ -453,7 +452,6 @@ function displayServiceStatus()
 		<option value="1">Enable</option>
 	</select></td>
 </tr>
-
 <!-- Remote management -->
 <tr>
 	<td class="title" colspan="5">Remote management</td>
@@ -495,30 +493,6 @@ function displayServiceStatus()
 	</select>
 </td>
 </tr>
-
-<!-- Pass Through -->
-<tr>
-	<td class="title" colspan="5">Pass Through</td>
-</tr>
-<tr>
-<td class="head">PPPOE pass through</td>
-<td colspan="4">
-	<select name="krnlPppoePass" class="half">
-		<option value="0">Disable</option>
-		<option value="1">Enable</option>
-	</select>
-</td>
-</tr>
-<tr>
-<td class="head">IPv6 pass through</td>
-<td colspan="4">
-	<select name="krnlIpv6Pass" class="half">
-		<option value="0">Disable</option>
-		<option value="1">Enable</option>
-	</select>
-</td>
-</tr>
-
 <!-- Services -->
 <tr>
 	<td class="title">Services</td>
@@ -527,24 +501,22 @@ function displayServiceStatus()
 	<td class="title" style="width: 56px;">Status</td>
 	<td class="title" style="width: 80px;">Configure</td>
 </tr>
-
-<tr id="parprouted">
-<td class="head" id="lArppt">ARP Proxy</td>
+<tr id="dnsproxy">
+<td class="head" id="lDnsp">DNS cached proxy</td>
 <td>
-	<select name="arpPT" class="half">
-		<option value="0" id="lArpptD">Disable</option>
-		<option value="1" id="lArpptE">Enable</option>
+	<select name="dnspEnbl" class="half">
+		<option value="0">Disable</option>
+		<option value="1">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
-
-<tr id="cdp">
-<td class="head" id="lCdp">CDP daemon</td>
+<tr id="upnp">
+<td class="head" id="lUpnp">UPNP support</td>
 <td>
-	<select name="cdpEnbl" class="half">
-		<option value="0" id="lCdpD">Disable</option>
-		<option value="1" id="lCdpE">Enable</option>
+	<select name="upnpEnbl" class="half">
+		<option value="0" id="lUpnpD">Disable</option>
+		<option value="1" id="lUpnpE">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
@@ -569,44 +541,43 @@ function displayServiceStatus()
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
-<tr id="igmpProxy">
-<td class="head" id="lIgmpp">IGMP proxy</td>
+<tr id="parprouted">
+<td class="head" id="lArppt">ARP Proxy</td>
 <td>
-	<select name="igmpEnbl" class="half" onchange="igmpSelect(this.form);">
-		<option value="0" id="lIgmppD">Disable</option>
-		<option value="1" id="lIgmppE">Enable</option>
+	<select name="arpPT" class="half">
+		<option value="0" id="lArpptD">Disable</option>
+		<option value="1" id="lArpptE">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
-<tr id="igmpSnoop">
-<td class="head" id="lIgmpp">LAN IGMP snooping</td>
-<td colspan="4">
-	<select name="igmpSnoop" class="half">
-		<option value="">Auto</option>
-		<option value="n">Disable</option>
-	</select>
-</td>
-</tr>
-<tr id="upnp">
-<td class="head" id="lUpnp">UPNP support</td>
+<tr id="cdp">
+<td class="head" id="lCdp">CDP daemon</td>
 <td>
-	<select name="upnpEnbl" class="half">
-		<option value="0" id="lUpnpD">Disable</option>
-		<option value="1" id="lUpnpE">Enable</option>
+	<select name="cdpEnbl" class="half">
+		<option value="0" id="lCdpD">Disable</option>
+		<option value="1" id="lCdpE">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
-<tr id="xupnpd">
-<td class="head">UPNP media server (XUPNPD)</td>
+<tr id="crond">
+<td class="head">Cron daemon</td>
 <td>
-	<select name="xupnpdEnbl" class="half">
+	<select name="CrondEnable" class="half">
 		<option value="0">Disable</option>
 		<option value="1">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+</tr>
+<!-- IPv6 -->
+<tr>
+	<td class="title">Services IPv6</td>
+	<td class="title">Value</td>
+	<td class="title" style="width: 88px;">Details</td>
+	<td class="title" style="width: 56px;">Status</td>
+	<td class="title" style="width: 80px;">Configure</td>
 </tr>
 <tr id="radvd">
 <td class="head" id="lRadvd">Router Advertisement</td>
@@ -618,27 +589,44 @@ function displayServiceStatus()
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
-<tr id="pppoerelay">
-<td class="head" id="lPppoer">PPPOE relay</td>
-<td colspan="4">
-	<select name="pppoeREnbl" class="half">
-		<option value="0" id="lPppoerD">Disable</option>
-		<option value="1" id="lPppoerE">Enable</option>
-	</select>
-</td>
-</tr>
-<tr id="dnsproxy">
-<td class="head" id="lDnsp">DNS cached proxy</td>
+<tr id="dhcpv6">
+<td class="head" id="lDhcpv6">Dynamic IPv6 configuration</td>
 <td>
-	<select name="dnspEnbl" class="half">
-		<option value="0">Disable</option>
-		<option value="1">Enable</option>
+	<select name="dhcpv6Enbl" class="half">
+		<option value="0" id="lDhcpv6D">Disable</option>
+		<option value="1" id="lDhcpv6E">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
+<!-- IPTV -->
+<tr>
+	<td class="title">Services IPTV</td>
+	<td class="title">Value</td>
+	<td class="title" style="width: 88px;">Details</td>
+	<td class="title" style="width: 56px;">Status</td>
+	<td class="title" style="width: 80px;">Configure</td>
+</tr>
+<tr id="igmpProxy">
+<td class="head" id="lIgmpp">IGMP proxy</td>
+<td>
+	<select name="igmpEnbl" class="half" onchange="igmpSelect(this.form);">
+		<option value="0" id="lIgmppD">Disable</option>
+		<option value="1" id="lIgmppE">Enable</option>
+	</select>
+</td>
+<td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+</tr>
+<tr id="igmpSnoop">
+	<td class="head" id="lIgmpp">LAN IGMP snooping</td>
+	<td colspan="4"><select name="igmpSnoop" class="half">
+		<option value="">Auto</option>
+		<option value="n">Disable</option>
+	</select>
+</td>
+</tr>
 <tr id="udpxy">
-<td class="head">Multicast to http proxy (UDPXY)</td>
+<td class="head">Multicast to http proxy (udpxy)</td>
 <td>
 	<select name="udpxyMode" class="half" onchange="udpxySelect(this.form);">
 		<option value="0">Disable</option>
@@ -654,18 +642,38 @@ function displayServiceStatus()
 	<input name="udpxyPort" class="half">
 </td>
 </tr>
-
-<tr id="crond">
-<td class="head">Cron daemon</td>
+<tr id="xupnpd">
+<td class="head">UPNP media server (xupnpd)</td>
 <td>
-	<select name="CrondEnable" class="half">
+	<select name="xupnpdEnbl" class="half">
 		<option value="0">Disable</option>
 		<option value="1">Enable</option>
 	</select>
 </td>
 <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
 </tr>
-
+<!-- Pass Through -->
+<tr>
+	<td class="title" colspan="5">Pass Through</td>
+</tr>
+<tr>
+<td class="head">PPPOE pass through</td>
+<td colspan="4">
+	<select name="krnlPppoePass" class="half">
+		<option value="0">Disable</option>
+		<option value="1">Enable</option>
+	</select>
+</td>
+</tr>
+<tr>
+<td class="head">IPv6 pass through</td>
+<td colspan="4">
+	<select name="krnlIpv6Pass" class="half">
+		<option value="0">Disable</option>
+		<option value="1">Enable</option>
+	</select>
+</td>
+</tr>
 <!-- Watchers -->
 <tr>
 	<td class="title" colspan="5">Watchers</td>
@@ -706,7 +714,7 @@ function displayServiceStatus()
 	<td class="title" colspan="5">Others</td>
 </tr>
 <tr>
-<td class="head">Switch reinit on DHCP lease fail</td>
+<td class="head">Reinit WAN if DHCP lease fail</td>
 <td colspan="4">
 	<select name="dhcpSwReset" class="half">
 		<option value="0">Disable</option>
@@ -715,7 +723,7 @@ function displayServiceStatus()
 </td>
 </tr>
 <tr>
-<td class="head">Force DHCP renew lease at WAN port status change</td>
+<td class="head">DHCP renew lease at WAN UP</td>
 <td colspan="4">
 	<select name="ForceRenewDHCP" class="half">
 		<option value="0">Disable</option>

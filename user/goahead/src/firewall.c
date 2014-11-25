@@ -21,10 +21,10 @@
 #include "internet.h"
 #include "helpers.h"
 
+static void firewall_rebuild(void);
 static void websSysFirewall(webs_t wp, char_t *path, char_t *query);
-char l7name[8192]; // export it for internet.c qos (The actual string is about 7200 bytes.)
 
-int isMacValid(char *str)
+static int isMacValid(char *str)
 {
 	int i, len = strlen(str);
 	if(len != 17)
@@ -80,7 +80,7 @@ static int isOnlyOneSlash(char *str)
 	return count <= 1 ? 1 : 0;
 }
 
-int isIpNetmaskValid(char *s)
+static int isIpNetmaskValid(char *s)
 {
 	char str[32];
 	char *slash;
@@ -187,7 +187,7 @@ static void makeIPPortFilterRule(char *buf, int len, char *iface, char *mac_addr
 	}
 	pos += rc;
 	len -= rc;
-	
+
 	if (iface != NULL)
 	{
 		rc = snprintf(pos, len, "-i %s ", iface);
@@ -602,7 +602,7 @@ static void iptablesIPPortFilterBuildScript(void)
 		default_policy = "0";
 
 	// get wan name
-	strncpy(wan_name, getWanIfNamePPP(), sizeof(wan_name)-1);
+	strncpy(wan_name, getWanIfName(), sizeof(wan_name)-1);
 
 	//Generate portforward script file
 	FILE *fd = fopen(_PATH_MACIP_FILE, "w");
@@ -789,7 +789,7 @@ static void iptablesPortForwardBuildScript(void)
 	int nat_loopback_on = checkNatLoopback(rule);
 
 	// get wan name
-	strncpy(wan_name, getWanIfNamePPP(), sizeof(wan_name)-1);
+	strncpy(wan_name, getWanIfName(), sizeof(wan_name)-1);
 
 	// Generate portforward script file
 	FILE *fd = fopen(_PATH_PFW_FILE, "w");
@@ -805,7 +805,7 @@ static void iptablesPortForwardBuildScript(void)
 
 	// Additional rules if port forwarding enabled
 	if (nat_loopback_on)
-		fprintf(fd, 
+		fprintf(fd,
 			"iptables -t nat -N %s\n"
 			"iptables -t nat -A POSTROUTING -j %s\n\n",
 			PORT_FORWARD_POST_CHAIN, PORT_FORWARD_POST_CHAIN);
@@ -822,14 +822,14 @@ static void iptablesPortForwardBuildScript(void)
 
 	// Print header for VPN
 	fputs("#!/bin/sh\n\n", fd_vpn);
-	fprintf(fd_vpn, 
+	fprintf(fd_vpn,
 		"iptables -t nat -N %s\n"
 		"iptables -t nat -A PREROUTING -j %s\n\n",
 		PORT_FORWARD_PRE_CHAIN_VPN, PORT_FORWARD_PRE_CHAIN_VPN);
 
 	// Additional rules if port forwarding enabled
 	if (nat_loopback_on)
-		fprintf(fd_vpn, 
+		fprintf(fd_vpn,
 			"iptables -t nat -N %s\n"
 			"iptables -t nat -A POSTROUTING -j %s\n\n",
 			PORT_FORWARD_POST_CHAIN_VPN, PORT_FORWARD_POST_CHAIN_VPN);
@@ -974,7 +974,8 @@ static void iptablesPortForwardBuildScript(void)
 	fclose(fd_vpn);
 	fclose(fd);
 }
-int getRuleNums(char *rules)
+
+static int getRuleNums(char *rules)
 {
 	return getNums(rules, ';');
 }
@@ -1322,16 +1323,15 @@ static void portForward(webs_t wp, char_t *path, char_t *query)
 	nvram_close(RT2860_NVRAM);
 
 	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
 	if (! submitUrl[0])
 	{
-#ifdef PRINT_DEBUG
 		websHeader(wp);
 		websWrite(wp, T("portForwardEnabled: %s<br>\n"), pfe);
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
-	}
-	else
+	} else
+#endif
 		websRedirect(wp, submitUrl);
 
 	// call iptables
@@ -1362,17 +1362,16 @@ static void portFiltering(webs_t wp, char_t *path, char_t *query)
 	nvram_close(RT2860_NVRAM);
 
 	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
 	if (! submitUrl[0])
 	{
-#ifdef PRINT_DEBUG
 		websHeader(wp);
 		websWrite(wp, T("portFilteringEnabled: %s<br>\n"), firewall_enable);
 		websWrite(wp, T("default_policy: %s<br>\n"), default_policy);
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
-	}
-	else
+	} else
+#endif
 		websRedirect(wp, submitUrl);
 
 	// Call iptables
@@ -1407,17 +1406,16 @@ static void DMZ(webs_t wp, char_t *path, char_t *query)
 		return;
 
 	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
 	if (! submitUrl[0])
 	{
-#ifdef PRINT_DEBUG
 		websHeader(wp);
 		websWrite(wp, T("DMZEnabled: %s<br>\n"), dmzE);
 		websWrite(wp, T("ip_address: %s<br>\n"), ip_address);
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
-	}
-	else
+	} else
+#endif
 		websRedirect(wp, submitUrl);
 
 	// Call iptables
@@ -1448,7 +1446,7 @@ static void websSysFirewall(webs_t wp, char_t *path, char_t *query)
 #define BLK_ACTIVE              0x02
 #define BLK_COOKIE              0x04
 #define BLK_PROXY               0x08
-void iptablesWebsFilterRun(void)
+static void iptablesWebsFilterRun(void)
 {
 	int i, content_filter = 0;
 	char entry[256]; //need long buffer for utf domain name encoding support 
@@ -1601,97 +1599,6 @@ static void setFirewallAlg(webs_t wp, char_t *path, char_t *query)
 
 }
 
-char *getNameIntroFromPat(char *filename)
-{
-	static char result[512];
-	char buf[512], *begin, *end, *desh;
-	char path_filename[512];
-	char *rc;
-	FILE *fp;
-
-	sprintf(path_filename, "%s/%s", "/etc/l7-protocols", filename);
-	if(! (fp = fopen(path_filename, "r")))
-		return NULL;
-	result[0] = '\0';
-	rc = fgets(buf, sizeof(buf), fp);
-	if (rc)
-	{
-		// find name
-		begin = buf + 2;
-		if(! ( desh = strchr(buf, '-'))){
-			printf("warning: can't find %s name.\n", filename);
-			fclose(fp);
-			return "N/A#N/A";
-		}
-		end = desh;
-		if(*(end-1) == ' ')
-			end--;
-		*end = '\0';
-		strncat(result, begin, sizeof(result));
-		strncat(result, "#", sizeof(result));
-
-		// find intro
-		if(!(end = strchr(desh+1, '\n'))){
-			printf("warning: can't find %s intro.\n", filename);
-			fclose(fp);
-			return "N/A#N/A";
-		}
-		*end = '\0';
-		strncat(result, desh + 2 , sizeof(result));
-	}
-	else
-	{
-		printf("warning: can't read %s intro.\n", filename);
-		fclose(fp);
-		return "N/A#N/A";
-	}
-
-	fclose(fp);
-	return result;
-}
-
-
-void LoadLayer7FilterName(void)
-{
-	char *delim;
-	struct dirent *dir;
-	DIR *d;
-	char *intro;
-
-	l7name[0] = '\0';
-	if(!(d = opendir("/etc/l7-protocols")))
-		return;
-
-	while ((dir = readdir(d)))
-	{
-		if(dir->d_name[0] == '.')
-			continue;
-		if(!(delim = strstr(dir->d_name, ".pat")) )
-			continue;
-
-		intro = getNameIntroFromPat(dir->d_name);
-
-		*delim = '\0';
-		if(l7name[0] == '\0'){
-			strncat(l7name, dir->d_name, sizeof(l7name));
-			strncat(l7name, "#", sizeof(l7name));
-			strncat(l7name, intro, sizeof(l7name));
-		}else{
-			strncat(l7name, ";", sizeof(l7name));
-			strncat(l7name, dir->d_name, sizeof(l7name));
-			strncat(l7name, "#", sizeof(l7name));
-			strncat(l7name, intro, sizeof(l7name));
-		}
-	}
-	closedir(d);
-}
-
-static int getLayer7FiltersASP(int eid, webs_t wp, int argc, char_t **argv)
-{
-	websLongWrite(wp, l7name);
-	return 0;
-}
-
 void formDefineFirewall(void)
 {
 	websFormDefine(T("portFiltering"), portFiltering);
@@ -1710,8 +1617,6 @@ void formDefineFirewall(void)
 
 	websFormDefine(T("websSysFirewall"), websSysFirewall);
 	websFormDefine(T("webContentFilterSetup"), webContentFilterSetup);
-
-	websAspDefine(T("getLayer7FiltersASP"), getLayer7FiltersASP);
 
 	websAspDefine(T("checkIfUnderBridgeModeASP"), checkIfUnderBridgeModeASP);
 }
@@ -1741,17 +1646,12 @@ void firewall_rebuild_etc(void)
 	// Web filtering
 	doSystem("rm -f " _PATH_WEBS_FILE);
 	iptablesWebsFilterRun();
-
-	// Sync unwritten buffers to disk
-	sync();
 }
 
-void firewall_rebuild(void)
+static void firewall_rebuild(void)
 {
 	//rebuild firewall scripts in etc
 	firewall_rebuild_etc();
 	//no backgroudn it!!!!
 	doSystem("service iptables restart");
-	///-----Load L7 filters rules----////
-	LoadLayer7FilterName();
 }

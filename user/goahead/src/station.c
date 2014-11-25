@@ -17,6 +17,7 @@
 #include	"oid.h"
 #include	"internet.h"
 #include	"helpers.h"
+#include	"station.h"
 
 static int	getCACLCertList(int eid, webs_t wp, int argc, char_t **argv);
 static int	getKeyCertList(int eid, webs_t wp, int argc, char_t **argv);
@@ -1867,10 +1868,9 @@ void initStaConnection(void)
 		}
 		Sleep(1);
 	}
-
 	close(s);
-	sync();
-	//Configure wan and get param from dhcp and restart all service. Not use wifi only mode
+
+	// Configure wan and get param from dhcp and restart all service. Not use wifi only mode
 	doSystem("internet.sh connect_sta");
 }
 

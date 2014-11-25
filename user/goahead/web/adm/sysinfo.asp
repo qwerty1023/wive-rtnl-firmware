@@ -21,7 +21,7 @@
 </tr>
 <tr>
 	<td class="head" id="statusOPMode">
-		<input type="hidden" id="inpOperationMode" value="<% getCfgZero(1, "OperationMode"); %>">
+		<input type="hidden" id="inpOperationMode" value='<% getCfgZero(1, "OperationMode"); %>'>
 		Operation Mode
 	</td>
 	<td id="tdOperationMode">&nbsp;</td>
@@ -35,8 +35,12 @@
 	<td><% getCfgGeneral(1, "wanConnectionMode"); %> </td>
 </tr>
 <tr>
-	<td class="head" id="statusWANIPAddr">WAN IP Address</td>
-	<td><% getWanIp(); %>&nbsp;</td>
+    <td class="head" id="statusINTIPAddr">Internet/VPN IP Address</td>
+    <td><% getIntIp(); %>&nbsp;</td>
+  </tr>
+  <tr>
+    <td class="head" id="statusWANIPAddr">Physical WAN IP Address</td>
+    <td><% getWanIp(); %>&nbsp;</td>
 </tr>
 <tr>
 	<td class="head" id="statusSubnetMask">Subnet Mask</td>

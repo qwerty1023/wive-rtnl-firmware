@@ -22,16 +22,12 @@ function changeMode()
 {
 	var form = document.opmode;
 
-	if (form.opMode[0].checked)
+	if (document.opmode.opMode[0].checked)
 		opmode = 0;
-	else if (form.opMode[1].checked)
+	else if (form.opMode[1].checked || form.opMode[3].checked)
 		opmode = 1;
 	else if (form.opMode[2].checked)
 		opmode = 2;
-	else if (form.opMode[3].checked)
-		opmode = 3;
-	else if (form.opMode[4].checked)
-		opmode = 4;
 }
 
 function initTranslation()
@@ -109,19 +105,19 @@ function initValue()
 <form method="POST" name="opmode" action="/goform/setOpMode">
 <dl>
 	<dt>
-		<input type="radio" name="opMode" id="opMode" value="0" onClick="changeMode()"><b id="oModeB">AP-Bridge:</b>
+		<input type="radio" name="opMode" id="opMode" value="0" onClick="changeMode()"><b id="oModeB">Bridge:</b>
 	</dt>
 	<dd id="oModeBIntro"></dd>
 	<dt id="gwdt">
-		<input type="radio" name="opMode" id="opMode" value="1" onClick="changeMode()"><b id="oModeG">AP-Gateway:</b>
+		<input type="radio" name="opMode" id="opMode" value="1" onClick="changeMode()"><b id="oModeG">Gateway:</b>
 	</dt>
 	<dd id="oModeGIntro"></dd>
 	<dt id="stadt">
-		<input type="radio" name="opMode" id="opMode" value="2" onClick="changeMode()"><b id="oModeE">Client-Gateway:</b>
+		<input type="radio" name="opMode" id="opMode" value="2" onClick="changeMode()"><b id="oModeE">Ethernet Converter:</b>
 	</dt>
 	<dd id="stadd"></dd>
 	<dt id="apclidt">
-		<input type="radio" name="opMode" id="opMode" value="3" onClick="changeMode()"><b id="oModeA">Client-AP-Gateway:</b>
+		<input type="radio" name="opMode" id="opMode" value="3" onClick="changeMode()"><b id="oModeA">Wi-Fi Client-Gateway:</b>
 	</dt>
 	<dd id="apclidd"></dd>
 	<dt id="spotdt">

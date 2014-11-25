@@ -22,8 +22,7 @@
 #include	<unistd.h>
 #include	<sys/types.h>
 #include	<sys/wait.h>
-#include	<sys/ioctl.h>
-
+#include        <sys/ioctl.h>
 #include	<syslog.h>
 
 #include	"utils.h"
@@ -46,10 +45,6 @@ void	formDefineUserMgmt(void);
 #endif
 
 /*********************************** Locals ***********************************/
-/*
- *	Change configuration here
- */
-
 static char_t		*rootWeb = T("/tmp/web");		/* Root web directory */
 static char_t		*password = T("");			/* Security password */
 static char_t		*gopid = T("/var/run/goahead.pid");	/* pid file */
@@ -58,214 +53,62 @@ static int		port = 80;				/* Server port */
 static int		retries = 5;				/* Server port retries */
 static int		finished;				/* Finished flag */
 
-/****************************** Forward Declarations **************************/
-
-extern void defaultErrorHandler(int etype, char_t *msg);
-extern void defaultTraceHandler(int level, char_t *buf);
-extern void formDefineWireless(void);
-
-static int writeGoPid(void);
-static int writeGoStarted(void);
-static void InitSignals(int helper);
-static int initWebs(void);
-static int websHomePageHandler(webs_t wp, char_t *urlPrefix, char_t *webDir, int arg, char_t *url, char_t *path, char_t *query);
-
 #ifdef B_STATS
 static void printMemStats(int handle, char_t *fmt, ...);
 static void memLeaks();
 #endif
 
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-static void goaSigReset(int signum);
-static void goaSigWPSHold(int signum);
-static void goaSigWPSHlpr(int signum);
-#endif
+/****************************** Forward Declarations **************************/
+extern void defaultErrorHandler(int etype, char_t *msg);
+extern void defaultTraceHandler(int level, char_t *buf);
+extern void formDefineWireless(void);
 
-
-/*********************************** Code *************************************/
 /*
- *	Main -- entry point from LINUX
+ * WPS Single Trigger Signal handler.
  */
-
-int main(int argc, char** argv)
+#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
+static void goaSigWPSHold(int signum)
 {
-/*
- *	Initialize the memory allocator. Allow use of malloc and start 
- *	with a 60K heap.  For each page request approx 8KB is allocated.
- *	60KB allows for several concurrent page requests.  If more space
- *	is required, malloc will be used for the overflow.
- */
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-	int pid;
-#endif
-	char *auth_mode;
-
-	bopen(NULL, (60 * 1024), B_USE_MALLOC);
-	signal(SIGPIPE, SIG_IGN);
-
-	openlog("goahead", LOG_PID|LOG_NDELAY, LOG_USER);
-	syslog(LOG_INFO, T("version %s started"), WEBS_VERSION);
-
-	//Boot = Orange ON
-	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green LED
-	ledAlways(GPIO_POWER_LED_ORANGE, LED_ON);	//Turn on orange LED
-
-	ledAlways(GPIO_LED_WAN_GREEN, LED_OFF);		//Turn off green LED
-	ledAlways(GPIO_LED_WAN_ORANGE, LED_ON);		//Turn on orange LED
-
-	/* Set flag goahead run to scripts */
-	if (writeGoPid() < 0)
-		return -1;
-
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-	pid = fork();
-
-	if (pid == -1) {
-		error(E_L, E_LOG, T("goahead.c: cannot fork WPS helper"));
-	} else if (pid == 0) {
-		/* Helper that should just process signals, other time it just sleeps */
-		InitSignals(1);
-		while (1) sleep(1000000);
-	}
-#endif
-	/* Registr signals */
-	InitSignals(0);
-
-	/* Initialize the web server */
-	if (initWebs() < 0) {
-		/* Clean-up and exit */
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-	    if (pid > 0)
-		kill(pid, SIGTERM);
-#endif
-		printf("GOAHEAD NOT STARTED. CHECK WEB PAGES EXIST.");
-		return -1;
-	} else {
-#ifdef WEBS_SSL_SUPPORT
-	    websSSLOpen();
-#endif
-    	    /* Start needed services */
-	    initInternet();
-
-#ifdef CONFIG_USB
-	    /* Rescan usb devices after start */
-	    //doSystem("service hotplug rescan");
-#endif
-
-	    /* Backup nvram setting and save rwfs */
-	    doSystem("[ ! -f /etc/backup/nvram_backup.dat ] && (sleep 20 && fs backup_nvram && fs save) &");
-
-
-	    //Work - Green ON
-	    ledAlways(GPIO_POWER_LED_ORANGE, LED_OFF);	//Turn off power LED
-        ledAlways(GPIO_POWER_LED, LED_ON);		//Turn on power LED 
-        
-        ledAlways(GPIO_LED_WAN_ORANGE, LED_OFF);	//Turn off orange LED            
-	    ledAlways(GPIO_LED_WAN_GREEN, LED_ON);	//Turn on green LED
-
-		if (writeGoStarted() < 0) syslog(LOG_WARNING, T("write start flag file fail!"));
-	}
-
-/*
- *	Basic event loop. SocketReady returns true when a socket is ready for
- *	service. SocketSelect will block until an event occurs. SocketProcess
- *	will actually do the servicing.
- */
-	while (!finished) {
-		if (socketReady(-1) || socketSelect(-1, 1000)) {
-			socketProcess(-1);
-		}
-		websCgiCleanup();
-		emfSchedProcess();
-	}
-
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-	//Kill helper
-	kill(pid, SIGTERM);
-#endif
-
-#ifdef WEBS_SSL_SUPPORT
-	websSSLClose();
-#endif
-
-#ifdef USER_MANAGEMENT_SUPPORT
-	umClose();
-#endif
-
-/*
- *	Close the socket module, report memory leaks and close the memory allocator
- */
-	websCloseServer();
-	socketClose();
-#ifdef B_STATS
-	memLeaks();
-#endif
-	//Exit - Orange ON
-	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green power LED
-    ledAlways(GPIO_POWER_LED_ORANGE, LED_ON);		//Turn on orange power LED 
-    
-	ledAlways(GPIO_LED_WAN_GREEN, LED_OFF);		//Turn off green LED
-    ledAlways(GPIO_LED_WAN_ORANGE, LED_ON);		//Turn on orange LED
-
-	//closelog();
-
-	bclose();
-	return 0;
+       doSystem("/etc/scripts/OnHoldWPS.button");
 }
 
-/******************************************************************************/
-/*
- *	Write pid to the pid file
- */
-int writeGoPid(void)
+static void goaSigWPSHlpr(int signum)
 {
-	FILE *fp;
-
-	fp = fopen(gopid, "w+");
-	if (NULL == fp) {
-		error(E_L, E_LOG, T("goahead.c: cannot open pid file"));
-		return (-1);
+	int ppid;
+	char *WPSHlprmode = nvram_get(RT2860_NVRAM, "UserWPSHlpr");
+	if (!strcmp(WPSHlprmode, "1")) {
+    	    doSystem("/etc/scripts/OnPressWPS.button");
+	    return;
 	}
-	fprintf(fp, "%d", getpid());
-	fclose(fp);
-    return 0;
+	ppid = getppid();
+	if (kill(ppid, SIGHUP))
+		printf("goahead.c: (helper) can't send SIGHUP to parent %d", ppid);
 }
+#endif
 
-/******************************************************************************/
-/*
- *	Write start flag file
- */
-int writeGoStarted(void)
-{
-	FILE *fp;
-
-	fp = fopen(gostart, "w+");
-	if (NULL == fp) {
-		error(E_L, E_LOG, T("goahead.c: cannot open start flag file"));
-		return (-1);
-	}
-	fprintf(fp, "started");
-	fclose(fp);
-    return 0;
-}
-
-#ifdef CONFIG_RALINK_GPIO
+#ifdef CONFIG_USER_WSC
 static void goaSigHandler(int signum)
 {
-#ifdef CONFIG_USER_WSC
-#ifdef CONFIG_RT2860V2_STA_WSC
 	char *opmode = nvram_get(RT2860_NVRAM, "OperationMode");
 
+	// WPS single trigger is launch now and AP is as enrollee
+	g_isEnrollee = 1;
+	resetTimerAll();
+	setTimer(WPS_AP_CATCH_CONFIGURED_TIMER * 1000, WPSAPTimerHandler);
+
+#ifdef CONFIG_RT2860V2_STA_WSC
 	if (!strcmp(opmode, "2"))	// wireless sta isp mode
 		WPSSTAPBCStartEnr();	// STA WPS default is "Enrollee mode".
 	else
 #endif
 		WPSAPPBCStartAll();
-#else
-	printf("goaSigHandler: wsc not compiled, no think to do...");
-#endif
 }
+#endif
 
+/******************************************************************************/
+/*
+ *	Initialize System Parameters
+ */
 static void goaInitGpio(int helper)
 {
 	int fd;
@@ -319,52 +162,102 @@ ioctl_err:
 	return;
 }
 
-static void fs_nvram_reset_handler (int signum)
+#ifndef CONFIG_USER_WSC
+static void short_reset_handler (int signum)
 {
-	printf("fs_nvram_reset_handler: load nvram default and restore original rwfs...");
+	printf("short_reset_handler: nothing...");
+}
+#endif
+
+static void long_reset_handler (int signum)
+{
+	printf("long_reset_handler: load nvram default and restore original rwfs...");
 
         system("fs nvramreset");
         system("fs restore");
 }
-#endif
 
-/******************************************************************************/
-/*
- *	Initialize System Parameters
- */
 static void InitSignals(int helper)
 {
-
-//--------REGISTER SIGNALS-------------------------
-#ifdef CONFIG_RALINK_GPIO
 #ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-	if (helper) {
-	    signal(SIGUSR1, goaSigWPSHlpr);
-	    signal(SIGUSR2, goaSigWPSHold);
-	} else {
+	if (!helper) {
 #endif
 #ifdef CONFIG_USER_WSC
-	    signal(SIGXFSZ, WPSSingleTriggerHandler);
-#endif
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-	    signal(SIGUSR1, goaSigReset);
-	    signal(SIGHUP,  goaSigHandler);
-#else
+	    /* call helper to switch to listen wsc mode */
 	    signal(SIGUSR1, goaSigHandler);
+#else
+	    /* stub */
+	    signal(SIGUSR1, short_reset_handler);
 #endif
-	    signal(SIGUSR2, fs_nvram_reset_handler);
+	    /* write defaults to flash and reboot */
+	    signal(SIGUSR2, long_reset_handler);
 #ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
+	} else {
+	    signal(SIGUSR1, goaSigWPSHlpr);
+	    signal(SIGUSR2, goaSigWPSHold);
 	}
 #endif
 	goaInitGpio(helper);
-#endif
+}
+
+/******************************************************************************/
+/*
+ *	Write pid to the pid file
+ */
+static int writeGoPid(void)
+{
+	FILE *fp;
+
+	fp = fopen(gopid, "w+");
+	if (NULL == fp) {
+		error(E_L, E_LOG, T("goahead.c: cannot open pid file"));
+		return (-1);
+	}
+	fprintf(fp, "%d", getpid());
+	fclose(fp);
+
+	return 0;
+}
+
+/******************************************************************************/
+/*
+ *	Write start flag file
+ */
+int writeGoStarted(void)
+{
+	FILE *fp;
+
+	fp = fopen(gostart, "w+");
+	if (NULL == fp) {
+		error(E_L, E_LOG, T("goahead.c: cannot open start flag file"));
+		return (-1);
+	}
+	fprintf(fp, "started");
+	fclose(fp);
+    return 0;
+}
+
+/******************************************************************************/
+/*
+ *	Home page handler
+ */
+static int websHomePageHandler(webs_t wp, char_t *urlPrefix, char_t *webDir,
+	int arg, char_t *url, char_t *path, char_t *query)
+{
+	/*
+	 *	If the empty or "/" URL is invoked, redirect default URLs to the home page
+	 */
+	if (*url == '\0' || gstrcmp(url, T("/")) == 0) {
+		websRedirect(wp, T("home.asp"));
+		return 1;
+	}
+	return 0;
 }
 
 /******************************************************************************/
 /*
  *	Initialize the web server.
  */
-
 static int initWebs(void)
 {
 	struct in_addr	intaddr;
@@ -374,20 +267,21 @@ static int initWebs(void)
 	char_t			wbuf[128];
 	int			web_port=80;
 
-/*
- *	Initialize the socket subsystem
- */
+	/*
+	 *	Initialize the socket subsystem
+	 */
 	socketOpen();
 
 #ifdef USER_MANAGEMENT_SUPPORT
-/*
- *	Initialize the User Management database
- */
+	/*
+	 *	Initialize the User Management database
+	 */
 	char *admu = nvram_get(RT2860_NVRAM, "Login");
 	char *admp = nvram_get(RT2860_NVRAM, "Password");
 	umOpen();
-	//umRestore(T("umconfig.txt"));
-	//winfred: instead of using umconfig.txt, we create 'the one' adm defined in nvram
+	/* umRestore(T("umconfig.txt"));
+	 * winfred: instead of using umconfig.txt, we create 'the one' adm defined in nvram
+	 */
 	umAddGroup(T("adm"), 0x07, AM_DIGEST, FALSE, FALSE);
 	if (admu && strcmp(admu, "") && admp && strcmp(admp, "")) {
 		umAddUser(admu, admp, T("adm"), FALSE, FALSE);
@@ -397,9 +291,9 @@ static int initWebs(void)
 		error(E_L, E_LOG, T("gohead.c: Warning: empty administrator account or password"));
 #endif
 
-/*
- * get ip address from nvram configuration (we executed initInternet)
- */
+	/*
+	 * get ip address from nvram configuration (we executed initInternet)
+	 */
 	if (NULL == lan_ip) {
 		error(E_L, E_LOG, T("initWebs: cannot find lan_ip in NVRAM"));
 		return -1;
@@ -411,50 +305,50 @@ static int initWebs(void)
 		return -1;
 	}
 
-/*
- *	Set rootWeb as the root web. Modify this to suit your needs
- */
+	/*
+	 *	Set rootWeb as the root web. Modify this to suit your needs
+	 */
 	sprintf(webdir, "%s", rootWeb);
 
-/*
- *	Configure the web server options before opening the web server
- */
+	/*
+	 *	Configure the web server options before opening the web server
+	 */
 	websSetDefaultDir(webdir);
 	cp = inet_ntoa(intaddr);
 	ascToUni(wbuf, cp, min(strlen(cp) + 1, sizeof(wbuf)));
 	websSetIpaddr(wbuf);
-	//use ip address (already in wbuf) as host
+	/* use ip address (already in wbuf) as host */
 	websSetHost(wbuf);
 
-/*
- *	Configure the web server options before opening the web server
- */
+	/*
+	 *	Configure the web server options before opening the web server
+	 */
 	websSetDefaultPage(T("default.asp"));
 	websSetPassword(password);
 
-/* 
- *	Open the web server on the given port. If that port is taken, try
- *	the next sequential port for up to "retries" attempts.
- */
+	/*
+	 *	Open the web server on the given port. If that port is taken, try
+	 *	the next sequential port for up to "retries" attempts.
+	 */
 	web_port = atoi(nvram_get(RT2860_NVRAM, "RemoteManagementPort"));
 	if ((web_port) && (web_port != 80))
 	    port=web_port;
 
 	websOpenServer(port, retries);
 
-/*
- * 	First create the URL handlers. Note: handlers are called in sorted order
- *	with the longest path handler examined first. Here we define the security 
- *	handler, forms handler and the default web page handler.
- */
+	/*
+	 * 	First create the URL handlers. Note: handlers are called in sorted order
+	 *	with the longest path handler examined first. Here we define the security 
+	 *	handler, forms handler and the default web page handler.
+	 */
 	websUrlHandlerDefine(T(""), NULL, 0, websSecurityHandler, WEBS_HANDLER_FIRST);
 	websUrlHandlerDefine(T("/goform"), NULL, 0, websFormHandler, 0);
 	websUrlHandlerDefine(T("/cgi-bin"), NULL, 0, websCgiHandler, 0);
 	websUrlHandlerDefine(T(""), NULL, 0, websDefaultHandler, WEBS_HANDLER_LAST); 
 
-/*
- *	Define our functions
- */
+	/*
+	 *	Define our functions
+	 */
 	formDefineUtilities();
 	formDefineInternet();
 	formDefineServices();
@@ -464,6 +358,9 @@ static int initWebs(void)
 #ifdef CONFIG_USB
 	formDefineUSB();
 #endif
+#ifdef CONFIG_USER_STORAGE
+	//formDefineSTORAGE();
+#endif
 	formDefineWireless();
 #if defined(CONFIG_RT2860V2_STA) || defined(CONFIG_RT2860V2_STA_MODULE)
 	formDefineStation();
@@ -471,37 +368,139 @@ static int initWebs(void)
 	formDefineFirewall();
 	formDefineManagement();
 
-/*
- *	Create a handler for the default home page
- */
+	/*
+	 *	Create a handler for the default home page
+	 */
 	websUrlHandlerDefine(T("/"), NULL, 0, websHomePageHandler, 0); 
 	return 0;
 }
 
-/******************************************************************************/
+/*********************************** Code *************************************/
 /*
- *	Home page handler
+ *	Main -- entry point from LINUX
  */
 
-static int websHomePageHandler(webs_t wp, char_t *urlPrefix, char_t *webDir,
-	int arg, char_t *url, char_t *path, char_t *query)
+int main(int argc, char** argv)
 {
-/*
- *	If the empty or "/" URL is invoked, redirect default URLs to the home page
- */
-	if (*url == '\0' || gstrcmp(url, T("/")) == 0) {
-		websRedirect(wp, T("home.asp"));
-		return 1;
+	/*
+	 *	Initialize the memory allocator. Allow use of malloc and start 
+	 *	with a 60K heap.  For each page request approx 8KB is allocated.
+	 *	60KB allows for several concurrent page requests.  If more space
+	 *	is required, malloc will be used for the overflow.
+	 */
+#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
+	int pid;
+#endif
+	char *auth_mode;
+
+	bopen(NULL, (60 * 1024), B_USE_MALLOC);
+	signal(SIGPIPE, SIG_IGN);
+
+	openlog("goahead", LOG_PID|LOG_NDELAY, LOG_USER);
+	syslog(LOG_INFO, "version %s started", WEBS_VERSION);
+
+	/* Boot = All Orange ON */
+	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_POWER_LED_ORANGE, LED_ON);	//Turn on orange LED
+	ledAlways(GPIO_LED_WAN_GREEN, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_LED_WAN_ORANGE, LED_ON);		//Turn on orange LED
+
+	/* Set flag goahead run to scripts */
+	if (writeGoPid() < 0)
+		return -1;
+
+#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
+	pid = fork();
+
+	if (pid == -1) {
+		error(E_L, E_LOG, T("goahead.c: cannot fork WPS helper"));
+	} else if (pid == 0) {
+		/* Helper that should just process signals, other time it just sleeps */
+		InitSignals(1);
+		while (1) sleep(1000000);
 	}
+#endif
+	/* Registr signals */
+	InitSignals(0);
+
+	/* Initialize the web server */
+	if (initWebs() < 0) {
+		/* Clean-up and exit */
+#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
+	    if (pid > 0)
+		kill(pid, SIGTERM);
+#endif
+		printf("GOAHEAD NOT STARTED. CHECK WEB PAGES EXIST.");
+		return -1;
+	} else {
+#ifdef WEBS_SSL_SUPPORT
+	    websSSLOpen();
+#endif
+    	    /* Start needed services */
+	    initInternet();
+#ifdef CONFIG_USB
+	    /* Rescan usb devices after start */
+	    doSystem("service hotplug rescan");
+#endif
+	    /* Backup nvram setting and save rwfs */
+	    doSystem("[ ! -f /etc/backup/nvram_backup.dat ] && (sleep 20 && fs backup_nvram && fs save) &");
+
+	    /* Work - All Green ON */
+	    ledAlways(GPIO_POWER_LED_ORANGE, LED_OFF);	//Turn off power LED
+        ledAlways(GPIO_POWER_LED, LED_ON);		//Turn on power LED
+        ledAlways(GPIO_LED_WAN_ORANGE, LED_OFF);	//Turn off orange LED
+	    ledAlways(GPIO_LED_WAN_GREEN, LED_ON);	//Turn on green LED
+
+	    if (writeGoStarted() < 0) syslog(LOG_WARNING, T("write start flag file fail!"));
+	}
+
+	/*
+	 *	Basic event loop. SocketReady returns true when a socket is ready for
+	 *	service. SocketSelect will block until an event occurs. SocketProcess
+	 *	will actually do the servicing.
+	 */
+	while (!finished) {
+		if (socketReady(-1) || socketSelect(-1, 1000)) {
+			socketProcess(-1);
+		}
+		websCgiCleanup();
+		emfSchedProcess();
+	}
+
+#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
+	/* Kill helper */
+	kill(pid, SIGTERM);
+#endif
+#ifdef WEBS_SSL_SUPPORT
+	websSSLClose();
+#endif
+#ifdef USER_MANAGEMENT_SUPPORT
+	umClose();
+#endif
+	/*
+	 *	Close the socket module, report memory leaks and close the memory allocator
+	 */
+	websCloseServer();
+	socketClose();
+#ifdef B_STATS
+	memLeaks();
+#endif
+	/* Exit - Orange ON */
+	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_POWER_LED_ORANGE, LED_ON);	//Turn on orange LED
+	ledAlways(GPIO_LED_WAN_GREEN, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_LED_WAN_ORANGE, LED_ON);		//Turn on orange LED
+
+	bclose();
 	return 0;
 }
+
 
 /******************************************************************************/
 /*
  *	Default error handler.  The developer should insert code to handle
  *	error messages in the desired manner.
  */
-
 void defaultErrorHandler(int etype, char_t *msg)
 {
 	write(1, msg, gstrlen(msg));
@@ -511,7 +510,6 @@ void defaultErrorHandler(int etype, char_t *msg)
 /*
  *	Trace log. Customize this function to log trace output
  */
-
 void defaultTraceHandler(int level, char_t *buf)
 {
 /*
@@ -541,7 +539,6 @@ char_t *websGetCgiCommName(webs_t wp)
 /*
  *	Launch the CGI process and return a handle to it.
  */
-
 int websLaunchCgiProc(char_t *cgiPath, char_t **argp, char_t **envp,
 					  char_t *stdIn, char_t *stdOut)
 {
@@ -559,30 +556,30 @@ int websLaunchCgiProc(char_t *cgiPath, char_t **argp, char_t **envp,
 
  	rc = pid = fork();
  	if (pid == 0) {
-/*
- *		if pid == 0, then we are in the child process
- */
-		if (execve(cgiPath, argp, envp) == -1) {
-			printf("content-type: text/html\n\n"
+	    /*
+	    * if pid == 0, then we are in the child process
+	    */
+	    if (execve(cgiPath, argp, envp) == -1) {
+		printf("content-type: text/html\n\n"
 				"Execution of cgi process failed\n");
-		}
-		exit (0);
-	} 
+	    }
+	    exit (0);
+	}
 
 DONE:
 	if (hstdout >= 0) {
-		dup2(hstdout, 1);
-      close(hstdout);
+	    dup2(hstdout, 1);
+	    close(hstdout);
 	}
 	if (hstdin >= 0) {
-		dup2(hstdin, 0);
-      close(hstdin);
+	    dup2(hstdin, 0);
+	    close(hstdin);
 	}
 	if (fdout >= 0) {
-		close(fdout);
+	    close(fdout);
 	}
 	if (fdin >= 0) {
-		close(fdin);
+	    close(fdin);
 	}
 	return rc;
 }
@@ -591,12 +588,11 @@ DONE:
 /*
  *	Check the CGI process.  Return 0 if it does not exist; non 0 if it does.
  */
-
 int websCheckCgiProc(int handle, int *status)
 {
-/*
- *	Check to see if the CGI child process has terminated or not yet.  
- */
+	/*
+	 *	Check to see if the CGI child process has terminated or not yet.
+	 */
 	if (waitpid(handle, status, WNOHANG) == handle) {
 		return 0;
 	} else {
@@ -605,9 +601,8 @@ int websCheckCgiProc(int handle, int *status)
 }
 
 /******************************************************************************/
-
 #ifdef B_STATS
-static void memLeaks() 
+static void memLeaks()
 {
 	int		fd;
 
@@ -621,7 +616,6 @@ static void memLeaks()
 /*
  *	Print memory usage / leaks
  */
-
 static void printMemStats(int handle, char_t *fmt, ...)
 {
 	va_list		args;
@@ -632,31 +626,4 @@ static void printMemStats(int handle, char_t *fmt, ...)
 	va_end(args);
 	write(handle, buf, strlen(buf));
 }
-#endif
-
-#ifdef CONFIG_RALINK_GPIO
-#ifdef CONFIG_USER_GOAHEAD_HAS_WPSBTN
-static void goaSigReset(int signum)
-{
-	reboot_now();
-}
-
-static void goaSigWPSHold(int signum)
-{
-       doSystem("/etc/scripts/OnHoldWPS.button");
-}
-
-static void goaSigWPSHlpr(int signum)
-{
-	int ppid;
-	char *WPSHlprmode = nvram_get(RT2860_NVRAM, "UserWPSHlpr");
-	if (!strcmp(WPSHlprmode, "1")) {
-    	    doSystem("/etc/scripts/OnPressWPS.button");
-	    return;
-	}
-	ppid = getppid();
-	if (kill(ppid, SIGHUP))
-		printf("goahead.c: (helper) can't send SIGHUP to parent %d", ppid);
-}
-#endif
 #endif

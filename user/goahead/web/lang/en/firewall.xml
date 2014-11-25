@@ -2,7 +2,7 @@
   <message msgid="firewall disable" msgstr="Disable" />
   <message msgid="firewall enable" msgstr="Enable" />
   <message msgid="firewall apply" msgstr="Apply" />
-  <message msgid="firewall reset" msgstr="Cancel" />
+  <message msgid="firewall reset" msgstr="Reset" />
   <message msgid="firewall del select" msgstr="Delete Selected" />
   <message msgid="firewall no" msgstr=" No." />
   <message msgid="firewall protocol" msgstr="Protocol" />

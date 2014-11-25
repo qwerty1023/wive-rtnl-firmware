@@ -244,7 +244,6 @@ void dhcpStoreAliases(const char *dhcp_config)
 		// Output routing table to file
 		fwrite(dhcp_config, strlen(dhcp_config), 1, fd);
 		fclose(fd);
-		sync();
 
 		// Call rwfs to store data
 		system("fs save");
@@ -362,7 +361,7 @@ const parameter_fetch_t service_misc_flags[] =
 	{ T("upnpEnbl"), "upnpEnabled", 0, T("0") },
 	{ T("xupnpdEnbl"), "xupnpd", 0, T("0") },
 	{ T("radvdEnbl"), "radvdEnabled", 0, T("0") },
-	{ T("pppoeREnbl"), "pppoeREnabled", 0, T("0") },
+	{ T("dhcpv6Enbl"), "dhcpv6Enabled", 0, T("0") },
 	{ T("dnspEnbl"), "dnsPEnabled", 0, T("0") },
 	{ T("rmtHTTP"), "RemoteManagement", 0, T("0") },
 	{ T("RemoteManagementPort"), "RemoteManagementPort", 0, T("80") },
@@ -412,7 +411,7 @@ static void setMiscServices(webs_t wp, char_t *path, char_t *query)
 	char_t *nat_fp = nvram_bufget(RT2860_NVRAM, "offloadMode");
 	if (CHK_IF_DIGIT(nat_fp, 2) || CHK_IF_DIGIT(nat_fp, 3))
 	{
-		char_t *nat_th = websGetVar(wp, "hwnatThreshold", "30");
+		char_t *nat_th = websGetVar(wp, "hwnatThreshold", "15");
 		if (nat_th != NULL)
 			nvram_bufset(RT2860_NVRAM, "hw_nat_bind", nat_th);
 	}

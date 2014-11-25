@@ -6,6 +6,8 @@
  *	$Id: internet.h,v 1.8 2008-03-17 07:47:16 yy Exp $
  */
 
+#define ETH_SIG	"eth"
+#define BR_SIG	"br"
 #if defined(CONFIG_RAETH_ROUTER) || defined(CONFIG_RT_3052_ESW)				/* internal ralink esw */
 #define WAN_DEF "eth2.2"
 #elif !defined(CONFIG_RAETH_GMAC2) && defined(CONFIG_MAC_TO_MAC_MODE)			/* vetisse or rtl8367m one phy */
@@ -40,15 +42,8 @@
 #endif
 
 void formDefineInternet(void);
-int getIfLive(char *ifname);
-int getIfMac(char *ifname, char *if_hw);
-int getIfIp(char *ifname, char *if_addr);
-static int getIfIsUp(char *ifname);
-static int getIfNetmask(char *ifname, char *if_net);
-char* getWanIfName(void);
-static char* getPPPIfName(void);
-char* getWanIfNamePPP(void);
-char* getLanIfName(void);
-char *getLanWanNamebyIf(char *ifname);
 void initInternet(void);
-void ripdRestart(void);
+char* getLanIfName(void);
+char* getWanIfName(void);
+int getIfIp(char *ifname, char *if_addr);
+int getIfMac(char *ifname, char *if_hw);

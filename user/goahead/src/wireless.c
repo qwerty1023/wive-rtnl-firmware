@@ -439,7 +439,7 @@ static int getWlanCurrentMac(int eid, webs_t wp, int argc, char_t **argv)
 {
 	char if_hw[18] = {0};
 
-	if (-1 == getIfMac("ra0", if_hw))
+	if (getIfMac("ra0", if_hw) == -1)
 		return websWrite(wp, T(" "));
 	return websWrite(wp, T("%s"), if_hw);
 }
@@ -495,7 +495,8 @@ static int getWlanStaInfo(int eid, webs_t wp, int argc, char_t **argv)
 	    // RSSI
 #if defined(CONFIG_RALINK_RT3050_1T1R)
 	    websWrite(wp, T("<td>%d</td>"), (int)(pe->AvgRssi0));
-#elif defined(CONFIG_RALINK_RT3051_1T2R) || defined(CONFIG_RALINK_RT3052_2T2R) || defined(CONFIG_RALINK_RT3352_2T2R) || defined(CONFIG_RALINK_RT3662_2T2R)
+#elif defined(CONFIG_RALINK_RT3051_1T2R) || defined(CONFIG_RALINK_RT3052_2T2R) || defined(CONFIG_RALINK_RT3352_2T2R) \
+	    || defined(CONFIG_RALINK_RT3662_2T2R) || defined(CONFIG_RALINK_MT7620)
 	    websWrite(wp, T("<td>%d,%d</td>"), (int)(pe->AvgRssi0), (int)(pe->AvgRssi1));
 #else
 	    websWrite(wp, T("<td>%d,%d,%d</td>"), (int)(pe->AvgRssi0), (int)(pe->AvgRssi1), (int)(pe->AvgRssi2));
@@ -887,9 +888,9 @@ static void wirelessBasic(webs_t wp, char_t *path, char_t *query)
 	revise_mbss_updated_values(wp, new_bssid_num);
 
 	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
 	if (! submitUrl[0])
 	{
-#ifdef PRINT_DEBUG
 		//debug print
 		websHeader(wp);
 		websWrite(wp, T("<h2>mode: %s</h2><br>\n"), wirelessmode);
@@ -917,10 +918,9 @@ static void wirelessBasic(webs_t wp, char_t *path, char_t *query)
 		websWrite(wp, T("tx_stream: %s<br>\n"), tx_stream);
 		websWrite(wp, T("rx_stream: %s<br>\n"), rx_stream);
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
-	}
-	else
+	} else
+#endif
 		websRedirect(wp, submitUrl);
 
 #if defined(CONFIG_RT2860V2_AP_WSC) || defined(CONFIG_RT2860V2_STA_WSC)
@@ -1063,8 +1063,8 @@ static void wirelessAdvanced(webs_t wp, char_t *path, char_t *query)
 	nvram_close(RT2860_NVRAM);
 
 	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
-	if (! submitUrl[0]) {
 #ifdef PRINT_DEBUG
+	if (! submitUrl[0]) {
 		//debug print
 		websHeader(wp);
 		websWrite(wp, T("bg_protection: %s<br>\n"), bg_protection);
@@ -1085,9 +1085,9 @@ static void wirelessAdvanced(webs_t wp, char_t *path, char_t *query)
 		websWrite(wp, T("mcast_mcs: %s<br>\n"), mcast_mcs);
 #endif
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
 	} else
+#endif
 		websRedirect(wp, submitUrl);
 
     // restart wireless network
@@ -1127,9 +1127,9 @@ static void wirelessWds(webs_t wp, char_t *path, char_t *query)
 	nvram_close(RT2860_NVRAM);
 
 	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
 	if (! submitUrl[0])
 	{
-#ifdef PRINT_DEBUG
 		//debug print
 		websHeader(wp);
 		websWrite(wp, T("wds_mode: %s<br>\n"), wds_mode);
@@ -1141,10 +1141,9 @@ static void wirelessWds(webs_t wp, char_t *path, char_t *query)
 		websWrite(wp, T("wds_encryp_key3: %s<br>\n"), wds_encryp_key3);
 		websWrite(wp, T("wds_list: %s<br>\n"), wds_list);
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
-	}
-	else
+	} else
+#endif
 		websRedirect(wp, submitUrl);
 
 	// restart wireless network
@@ -1632,17 +1631,16 @@ void Security(int nvram, webs_t wp, char_t *path, char_t *query)
 		trace(0, "** error in AccessPolicyHandle()\n");
 
 	submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
 	if (! submitUrl[0])
 	{
-#ifdef PRINT_DEBUG
 		//debug print
 		websHeader(wp);
 		websWrite(wp, T("<h2>MBSSID index: %d, Security Mode: %s Done</h2><br>\n"), mbssid, security_mode);
 		websFooter(wp);
-#endif
 		websDone(wp, 200);
-	}
-	else
+	} else
+#endif
 		websRedirect(wp, submitUrl);
 
 	doSystem("internet.sh wifionly");
