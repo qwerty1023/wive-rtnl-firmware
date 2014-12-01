@@ -456,7 +456,7 @@ static void setMiscServices(webs_t wp, char_t *path, char_t *query)
 				"<script language=\"JavaScript\" type=\"text/javascript\">\n"
 				"ajaxReloadDelayedPage(%ld, \"http://%s\");\n"
 				"</script>"),
-				50000, lan_if_ip
+				60000, lan_if_ip
 			);
 		}
 		else
@@ -469,7 +469,7 @@ static void setMiscServices(webs_t wp, char_t *path, char_t *query)
 				"<script language=\"JavaScript\" type=\"text/javascript\">\n"
 				"ajaxReloadDelayedPage(%ld, \"http://%s:%s\");\n"
 				"</script>"),
-				50000, lan_if_ip, http_port
+				60000, lan_if_ip, http_port
 			);
 		}
 		websFooter(wp);

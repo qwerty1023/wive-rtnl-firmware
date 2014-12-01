@@ -376,9 +376,9 @@ int main (int argc, char *argv[])
 	if (reset_rwfs)
 	{
 		system("/bin/mtd_write erase RW-FS > /dev/null");
-		html_success(18*(IMAGE1_SIZE/0x100000) + 55);
+		html_success(18*(IMAGE1_SIZE/0x100000) + 60);
 	} else
-		html_success(18*(IMAGE1_SIZE/0x100000) + 45);
+		html_success(18*(IMAGE1_SIZE/0x100000) + 50);
 
 	// flash write
 	if (mtd_write_firmware(filename, (int)file_begin, (file_end - file_begin)) == -1)
