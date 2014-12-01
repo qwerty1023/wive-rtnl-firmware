@@ -207,7 +207,7 @@ It takes about 2 minute to upload firmware &amp; upgrade flash. Please be patien
             <td colspan="2" class="title">RW-FS Upload</td>
           </tr>
           <tr>
-            <td class="head" id="uploadRWFSLocation">Filename:</td>
+            <td class="head" id="uploadRWFSLocation">RW-FS Upload:</td>
             <td class="value"><form method="POST" name="UploadRWFS" action="/cgi-bin/upload_rwfs.cgi" enctype="multipart/form-data">
                 <input type="file" name="filename" maxlength="256">
                 <input type="button" value="Load" id="uploadRWFSApply" class="half" onclick="onUploadRWFSSubmit(this.form);">
