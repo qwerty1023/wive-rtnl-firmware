@@ -1055,7 +1055,6 @@ VOID APPeerDisassocReqAction(
 		RTMPSendWirelessEvent(pAd, IW_DISASSOC_EVENT_FLAG, Addr2, 0, 0);
         ApLogEvent(pAd, Addr2, EVENT_DISASSOCIATED);
 
-		MacTableDeleteEntry(pAd, Elem->Wcid, Addr2);
 
 #ifdef MAC_REPEATER_SUPPORT
 		if (pAd->ApCfg.bMACRepeaterEn == TRUE)
@@ -1068,13 +1067,14 @@ VOID APPeerDisassocReqAction(
 			{
 				apCliIdx = pReptEntry->MatchApCliIdx;
 				CliIdx = pReptEntry->MatchLinkIdx;
-				MlmeEnqueue(pAd, APCLI_CTRL_STATE_MACHINE, APCLI_CTRL_DISCONNECT_REQ, 0, NULL,
-								(64 + MAX_EXT_MAC_ADDR_SIZE*apCliIdx + CliIdx));
-				RTMP_MLME_HANDLER(pAd);
+
+				RTMPRemoveRepeaterDisconnectEntry(pAd, apCliIdx, CliIdx);
 				RTMPRemoveRepeaterEntry(pAd, apCliIdx, CliIdx);
 			}
 		}
 #endif /* MAC_REPEATER_SUPPORT */
+
+		MacTableDeleteEntry(pAd, Elem->Wcid, Addr2);
     }
 }
 
@@ -1098,7 +1098,27 @@ VOID MbssKickOutStas(
 	{
 		pEntry = &pAd->MacTab.Content[i];
 		if (pEntry && IS_ENTRY_CLIENT(pEntry) && pEntry->apidx == apidx)
+		{
+#ifdef MAC_REPEATER_SUPPORT
+			if (pAd->ApCfg.bMACRepeaterEn == TRUE)
+			{
+				UCHAR apCliIdx, CliIdx;
+				REPEATER_CLIENT_ENTRY *pReptEntry = NULL;
+
+				pReptEntry = RTMPLookupRepeaterCliEntry(pAd, TRUE, pEntry->Addr);
+				if (pReptEntry && (pReptEntry->CliConnectState != 0))
+				{
+					apCliIdx = pReptEntry->MatchApCliIdx;
+					CliIdx = pReptEntry->MatchLinkIdx;
+
+					RTMPRemoveRepeaterDisconnectEntry(pAd, apCliIdx, CliIdx);
+					RTMPRemoveRepeaterEntry(pAd, apCliIdx, CliIdx);
+				}
+			}
+#endif /* MAC_REPEATER_SUPPORT */
+
 			APMlmeKickOutSta(pAd, pEntry->Addr, pEntry->Aid, Reason);
+	}
 	}
 
 	return;
@@ -1714,8 +1734,9 @@ USHORT APBuildAssociation(
 
 				/* Use STA Capability */
 #ifdef MCS_LUT_SUPPORT
-				MlmeSetHwTxRateTable(pAd, pEntry);
+				asic_mcs_lut_update(pAd, pEntry);
 #endif /* MCS_LUT_SUPPORT */
+
 			}
 
 			if (pEntry->AuthMode < Ndis802_11AuthModeWPA)
@@ -1770,8 +1791,9 @@ static void ap_assoc_info_debugshow(
 {
 	PUCHAR	sAssoc = isReassoc ? (PUCHAR)"ReASSOC" : (PUCHAR)"ASSOC";
 
-	printk("%s - Assign AID=%d to STA %02x:%02x:%02x:%02x:%02x:%02x\n",	sAssoc, pEntry->Aid, PRINT_MAC(pEntry->Addr));
-	printk(HTCapability_Len ? "%s - 11n HT STA\n" : "%s - legacy STA\n", sAssoc);
+	printk(HTCapability_Len ? "%s - assign 11n HT STA - AID=%d %02x:%02x:%02x:%02x:%02x:%02x\n" :
+		"%s - assign Legacy STA - AID=%d %02x:%02x:%02x:%02x:%02x:%02x\n",
+		sAssoc, pEntry->Aid, PRINT_MAC(pEntry->Addr));
 
 #ifdef DOT11_N_SUPPORT
 	if (HTCapability_Len && (pAd->CommonCfg.PhyMode >= PHY_11ABGN_MIXED))
