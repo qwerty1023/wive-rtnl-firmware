@@ -610,7 +610,7 @@ int control_finish (struct tunnel *t, struct call *c)
 #endif
         t->hello = schedule (tv, hello, (void *) t);
         l2tp_log (LOG_NOTICE,
-		  "Connection established to %s, %d.  Local: %d, Remote: %d (ref=%u/%u).\n",
+		  "Connection established to %s:%d. Local: %d, Remote: %d (ref=%u/%u).\n",
 		  IPADDY (t->peer.sin_addr),
 		  ntohs (t->peer.sin_port), t->ourtid, t->tid, t->refme, t->refhim);
 
@@ -999,8 +999,8 @@ int control_finish (struct tunnel *t, struct call *c)
         start_pppd (c, po);
         opt_destroy (po);
         l2tp_log (LOG_NOTICE,
-             "Call established with %s, Local: %d, Remote: %d, Serial: %d\n",
-             IPADDY (t->peer.sin_addr), c->ourcid, c->cid,
+             "Call established with %s, User: %s, Local: %d, Remote: %d, Serial: %d\n",
+             IPADDY (t->peer.sin_addr), c->lns->authname, c->ourcid, c->cid,
              c->serno);
         break;
 #ifndef DISABLE_OCRP_OCCN
