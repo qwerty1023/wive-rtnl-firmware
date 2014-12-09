@@ -105,7 +105,17 @@ mount_err() {
   fi
 }
 
-fs drop_caches
+touchservices() {
+    # restart only if not cold boot
+    sync
+    if [ -f /tmp/bootgood ] && [ "$MDEV_LABEL" != "optware" ] && [ "$MDEV_TYPE" != "swap" ]; then
+	# restart HDD depended services
+	service xupnpd restart
+	service samba restart
+	service transmission restart
+    service minidlna restart
+    fi
+}
 
 if [ "$ACTION" = "add" ]; then
   # wait for disc appear, max 15 sec
@@ -139,11 +149,13 @@ if [ "$ACTION" = "add" ]; then
   esac
 elif [ "$ACTION" = "mount" ]; then
   $LOG "device $MDEV_PATH mount OK"
+  touchservices
   exit 0
 
 elif [ "$ACTION" = "umount" ]; then
   if [ -d "/media/$MDEV" ]; then
-  rmdir "/media/$MDEV"
+    touchservices
+    rmdir "/media/$MDEV"
   fi
   exit 0
 
@@ -151,18 +163,6 @@ else
   $LOG "remove $MDEV_PATH"
   try_umount
   swap_off
-fi
-
-if [ "$MDEV_LABEL" != "optware" ] && [ "$MDEV_TYPE" != "swap" ]; then
-    # restart only if not cold boot
-    . /etc/scripts/web_wait.sh
-    web_wait
-    # restart HDD depended services
-    sync
-    service xupnpd restart
-    service samba restart
-    service transmission restart
-    service minidlna restart
 fi
 
 exit 0

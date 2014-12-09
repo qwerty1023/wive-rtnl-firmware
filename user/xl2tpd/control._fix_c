@@ -361,7 +361,7 @@ int control_finish (struct tunnel *t, struct call *c)
         {
             if (DEBUG)
                 l2tp_log (LOG_DEBUG,
-                     "%s: Peer did not specify assigned tunnel ID.  Closing.\n",
+                     "%s: Peer did not specify assigned tunnel ID. Closing.\n",
                      __FUNCTION__);
             set_error (c, VENDOR_ERROR, "Specify your assigned tunnel ID");
             c->needclose = -1;
@@ -383,7 +383,7 @@ int control_finish (struct tunnel *t, struct call *c)
         {
             if (DEBUG)
                 l2tp_log (LOG_DEBUG,
-                     "%s: Peer did not specify framing capability.  Closing.\n",
+                     "%s: Peer did not specify framing capability. Closing.\n",
                      __FUNCTION__);
             set_error (c, VENDOR_ERROR, "Specify framing capability");
             c->needclose = -1;
@@ -507,7 +507,7 @@ int control_finish (struct tunnel *t, struct call *c)
         {
             if (DEBUG)
                 l2tp_log (LOG_DEBUG,
-                     "%s: Peer did not specify framing capability.  Closing.\n",
+                     "%s: Peer did not specify framing capability. Closing.\n",
                      __FUNCTION__);
             set_error (c, VENDOR_ERROR, "Specify framing capability");
             c->needclose = -1;
@@ -529,7 +529,7 @@ int control_finish (struct tunnel *t, struct call *c)
         {
             if (DEBUG)
                 l2tp_log (LOG_DEBUG,
-                     "%s: Peer did not specify hostname.  Closing.\n",
+                     "%s: Peer did not specify hostname. Closing.\n",
                      __FUNCTION__);
             set_error (c, VENDOR_ERROR, "Specify your hostname");
             c->needclose = -1;
@@ -539,7 +539,7 @@ int control_finish (struct tunnel *t, struct call *c)
         {
             if (DEBUG)
                 l2tp_log (LOG_DEBUG,
-                     "%s: Peer did not specify assigned tunnel ID.  Closing.\n",
+                     "%s: Peer did not specify assigned tunnel ID. Closing.\n",
                      __FUNCTION__);
             set_error (c, VENDOR_ERROR, "Specify your assigned tunnel ID");
             c->needclose = -1;
@@ -610,7 +610,7 @@ int control_finish (struct tunnel *t, struct call *c)
 #endif
         t->hello = schedule (tv, hello, (void *) t);
         l2tp_log (LOG_NOTICE,
-		  "Connection established to %s, %d.  Local: %d, Remote: %d (ref=%u/%u).\n",
+		  "Connection established to %s:%d. Local: %d, Remote: %d (ref=%u/%u).\n",
 		  IPADDY (t->peer.sin_addr),
 		  ntohs (t->peer.sin_port), t->ourtid, t->tid, t->refme, t->refhim);
 
@@ -638,7 +638,7 @@ int control_finish (struct tunnel *t, struct call *c)
         }
         t->state = SCCCN;
         l2tp_log (LOG_NOTICE,
-             "Connection established to %s, %d.  Local: %d, Remote: %d (ref=%u/%u).  LNS session is '%s'\n",
+             "Connection established to %s:%d. Local: %d, Remote: %d (ref=%u/%u). LNS session is '%s'\n",
 		  IPADDY (t->peer.sin_addr),
 		  ntohs (t->peer.sin_port), t->ourtid, t->tid, t->refme, t->refhim,
 		  t->lns->entname);
@@ -692,7 +692,7 @@ int control_finish (struct tunnel *t, struct call *c)
             return -EINVAL;
         }
         l2tp_log (LOG_INFO,
-             "%s: Connection closed to %s, port %d (%s), Local: %d, Remote: %d\n",
+             "%s: Connection closed to %s:%d (%s), Local: %d, Remote: %d\n",
              __FUNCTION__, IPADDY (t->peer.sin_addr),
              ntohs (t->peer.sin_port), t->self->errormsg, t->ourtid, t->tid);
         c->needclose = 0;
@@ -1064,7 +1064,7 @@ int control_finish (struct tunnel *t, struct call *c)
 
         /*  jz: just show some information */
         l2tp_log (LOG_INFO,
-		  "parameters: Local: %d , Remote: %d , Serial: %d , Pid: %d , Tunnelid: %d , Phoneid: %s\n",
+		  "parameters: Local: %d, Remote: %d, Serial: %d, Pid: %d, Tunnelid: %d, Phoneid: %s\n",
 		  c->ourcid, c->cid, c->serno, c->pppd, t->ourtid, c->dial_no); 
 
         opt_destroy (po);
