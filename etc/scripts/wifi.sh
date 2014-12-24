@@ -31,7 +31,7 @@ if [ "$OperationMode" = "2" ]; then
   exit 0
 fi
 ########################################APMODE param#########################################
-eval `nvram_buf_get 2860 AutoChannelSelect Channel RadioOff GreenAP HT_OpMode`
+eval `nvram_buf_get 2860 AutoChannelSelect RadioOff GreenAP HT_OpMode`
 #########################################ON/OFF param########################################
 if [ "$RadioOff" = "1" ]; then
     iwpriv "$1" set RadioOn=0
@@ -71,11 +71,6 @@ if [ "$AutoChannelSelect" = "1" ]; then
     iwpriv "$1" set SiteSurvey=1
     # second select channel
     iwpriv "$1" set AutoChannelSel=1
-else
-    if [ "$1" != "rai0" ]; then
-	# set channel manual
-	iwpriv "$1" set Channel="$Channel"
-    fi
 fi
 ###########################################ALWAYS END########################################
 # rescan coexist mode
