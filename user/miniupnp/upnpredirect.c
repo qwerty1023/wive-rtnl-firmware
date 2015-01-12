@@ -308,7 +308,7 @@ upnp_redirect(const char * rhost, unsigned short eport,
 #endif /* CHECK_PORTINUSE */
 	} else {
 		timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
-		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
+		syslog(LOG_NOTICE, "redirecting port %hu to %s:%hu protocol %s for: %s",
 			eport, iaddr, iport, protocol, desc);
 		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
 		                              desc, timestamp);
