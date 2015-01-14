@@ -1420,8 +1420,8 @@ BOOLEAN WDS_StatsGet(
 	pStats->rx_packets = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.ReceivedFragmentCount.QuadPart;
 	pStats->tx_packets = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.TransmittedFragmentCount.QuadPart;
 
-	pStats->rx_bytes = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.ReceivedByteCount;
-	pStats->tx_bytes = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.TransmittedByteCount;
+	pStats->rx_bytes = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.ReceivedByteCount.QuadPart;
+	pStats->tx_bytes = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.TransmittedByteCount.QuadPart;
 
 	pStats->rx_errors = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.RxErrors;
 	pStats->tx_errors = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.TxErrors;
