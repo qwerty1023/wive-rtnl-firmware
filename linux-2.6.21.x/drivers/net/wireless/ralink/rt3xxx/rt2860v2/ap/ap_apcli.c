@@ -2867,7 +2867,7 @@ BOOLEAN ApCli_StatsGet(
 	pStats->rx_errors = pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.RxErrors;
 	pStats->tx_errors = pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.TxErrors;
 
-	pStats->multicast = pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.MulticastReceivedFrameCount.QuadPart;   /* multicast packets received */
+	pStats->multicast = pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.MulticastReceivedFrameCount;   /* multicast packets received */
 	pStats->collisions = pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.OneCollision + pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.MoreCollisions;  /* Collision packets */
 
 	pStats->rx_over_errors = pAd->ApCfg.ApCliTab[ifIndex].ApCliCounter.RxNoBuffer;                   /* receiver ring buff overflow */

@@ -1426,7 +1426,7 @@ BOOLEAN WDS_StatsGet(
 	pStats->rx_errors = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.RxErrors;
 	pStats->tx_errors = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.TxErrors;
 
-	pStats->multicast = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.MulticastReceivedFrameCount.QuadPart;   /* multicast packets received */
+	pStats->multicast = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.MulticastReceivedFrameCount;   /* multicast packets received */
 	pStats->collisions = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.OneCollision + pAd->WdsTab.WdsEntry[index].WdsCounter.MoreCollisions;  /* Collision packets */
 
 	pStats->rx_over_errors = pAd->WdsTab.WdsEntry[WDS_apidx].WdsCounter.RxNoBuffer;                   /* receiver ring buff overflow */

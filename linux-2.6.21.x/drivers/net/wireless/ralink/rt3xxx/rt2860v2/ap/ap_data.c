@@ -4394,7 +4394,7 @@ VOID APHandleRxDataFrame(
 			if (pRxD->Mcast || pRxD->Bcast)
 			{
 #ifdef STATS_COUNT_SUPPORT						
-				INC_COUNTER64(pAd->ApCfg.ApCliTab[pEntry->MatchAPCLITabIdx].ApCliCounter.MulticastReceivedFrameCount);
+				pAd->ApCfg.ApCliTab[pEntry->MatchAPCLITabIdx].ApCliCounter.MulticastReceivedFrameCount++;
 #endif /* STATS_COUNT_SUPPORT */
 
 				/* Process the received broadcast frame for AP-Client. */
@@ -4976,7 +4976,7 @@ BOOLEAN APRxDoneInterruptHandle(
 				INC_COUNTER64(pAd->WdsTab.WdsEntry[pEntry->MatchWDSTabIdx].WdsCounter.ReceivedFragmentCount);
 
 				if(IS_MULTICAST_MAC_ADDR(pHeader->Addr3))
-					INC_COUNTER64(pAd->WdsTab.WdsEntry[pEntry->MatchWDSTabIdx].WdsCounter.MulticastReceivedFrameCount);
+					pAd->WdsTab.WdsEntry[pEntry->MatchWDSTabIdx].WdsCounter.MulticastReceivedFrameCount++;
 
 			}
 #endif /* STATS_COUNT_SUPPORT */
@@ -5119,7 +5119,7 @@ BOOLEAN APHandleRxDonePacket(
 			INC_COUNTER64(pAd->WdsTab.WdsEntry[pEntry->MatchWDSTabIdx].WdsCounter.ReceivedFragmentCount);
 
 			if(IS_MULTICAST_MAC_ADDR(pHeader->Addr3))
-				INC_COUNTER64(pAd->WdsTab.WdsEntry[pEntry->MatchWDSTabIdx].WdsCounter.MulticastReceivedFrameCount);
+				pAd->WdsTab.WdsEntry[pEntry->MatchWDSTabIdx].WdsCounter.MulticastReceivedFrameCount++;
 		}
 #endif /* STATS_COUNT_SUPPORT */
 	}

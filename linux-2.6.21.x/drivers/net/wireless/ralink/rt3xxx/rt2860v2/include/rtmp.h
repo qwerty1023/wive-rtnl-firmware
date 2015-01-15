@@ -2810,7 +2810,7 @@ typedef struct _WDS_COUNTER {
 	LARGE_INTEGER TransmittedByteCount;
 	ULONG RxErrors;
 	ULONG TxErrors;
-	LARGE_INTEGER MulticastReceivedFrameCount;
+	ULONG MulticastReceivedFrameCount;
 	ULONG OneCollision;
 	ULONG MoreCollisions;
 	ULONG RxNoBuffer;
@@ -2930,7 +2930,7 @@ typedef struct _APCLI_COUNTER {
 	LARGE_INTEGER TransmittedByteCount;
 	ULONG RxErrors;
 	ULONG TxErrors;
-	LARGE_INTEGER MulticastReceivedFrameCount;
+	ULONG MulticastReceivedFrameCount;
 	ULONG OneCollision;
 	ULONG MoreCollisions;
 	ULONG RxNoBuffer;
