@@ -3218,7 +3218,7 @@ static void netdev_wait_allrefs(struct net_device *dev)
 
 			/* wait count exeed - break and warn of leak */
 			if (count > 10) {
-			    printk(KERN_EMERG "unregister_netdevice %s refcnt leak. need fix. Usage count = %d\n", dev->name, refcnt);
+			    //printk(KERN_EMERG "unregister_netdevice %s refcnt leak. need fix. Usage count = %d\n", dev->name, refcnt);
 			    refcnt = 0;
 			    atomic_set (&dev->refcnt, 0);
 			    break;
