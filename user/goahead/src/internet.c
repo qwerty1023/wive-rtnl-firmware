@@ -2256,6 +2256,11 @@ static void setWan(webs_t wp, char_t *path, char_t *query)
 		nvram_bufset(RT2860_NVRAM, "wan_primary_dns", pd);
 		nvram_bufset(RT2860_NVRAM, "wan_secondary_dns", sd);
 	}
+	else
+	{
+		nvram_bufset(RT2860_NVRAM, "wan_primary_dns", "");
+		nvram_bufset(RT2860_NVRAM, "wan_secondary_dns", "");
+	}
 
 	// NAT
 	if (strcmp(opmode, "0") != 0)

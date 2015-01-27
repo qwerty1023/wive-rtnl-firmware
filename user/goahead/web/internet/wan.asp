@@ -24,8 +24,7 @@ function connectionTypeSwitch(form)
 	var conn_type = form.connectionType.value;
 	displayElement('staticDHCP', conn_type == 'STATIC');
 	displayElement('dhcpReqIPRow', conn_type == 'DHCP');
-	displayElement('staticDNSAssignRow', conn_type != 'ZERO');
-
+	
 	dnsSwitchClick(form);
 }
 
@@ -61,8 +60,6 @@ function CheckValue(form)
 				return false;
 			}
 	}
-	else if (c_type == 'ZERO')
-		form.wStaticDnsEnable.checked = true;
 
 	if (form.wStaticDnsEnable.checked)
 	{
@@ -156,8 +153,7 @@ function initValue()
 function dnsSwitchClick(form)
 {
 	var visible = (form.wStaticDnsEnable.checked) ? '' : 'none';
-	displayElement( ['priDNSrow', 'secDNSrow' ],
-		(form.wStaticDnsEnable.checked) || (form.connectionType.value == 'ZERO'));
+	displayElement( ['priDNSrow', 'secDNSrow' ], form.wStaticDnsEnable.checked);
 }
 
 function wanMtuChange(form)
