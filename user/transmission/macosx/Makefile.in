@@ -100,7 +100,6 @@ GREP = @GREP@
 GTK_CFLAGS = @GTK_CFLAGS@
 GTK_LIBS = @GTK_LIBS@
 GTK_MINIMUM = @GTK_MINIMUM@
-HAVE_CXX = @HAVE_CXX@
 INSTALL = @INSTALL@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
@@ -265,9 +264,9 @@ EXTRA_DIST = \
     fr.lproj \
     it.lproj \
     nl.lproj \
-    pt.lproj \
     pt_PT.lproj \
     ru.lproj \
+    tr.lproj \
     AboutWindowController.h \
     AboutWindowController.m \
     AddMagnetWindowController.h \
@@ -376,6 +375,10 @@ EXTRA_DIST = \
     PrefsWindow.m \
     ProgressGradients.h \
     ProgressGradients.m \
+    ShareToolbarItem.h \
+    ShareToolbarItem.m \
+    ShareTorrentFileHelper.h \
+    ShareTorrentFileHelper.m \
     StatsWindowController.h \
     StatsWindowController.m \
     StatusBarController.h \
