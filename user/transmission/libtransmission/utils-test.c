@@ -1,13 +1,3 @@
-/*
- * This file Copyright (C) 2013-2014 Mnemosyne LLC
- *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
- *
- * $Id$
- */
-
-#include <limits.h> /* INT_MAX */
 #include <math.h> /* sqrt () */
 #include <string.h> /* strlen () */
 
@@ -204,7 +194,7 @@ test_lowerbound (void)
   int i;
   const int A[] = { 1, 2, 3, 3, 3, 5, 8 };
   const int expected_pos[] = { 0, 1, 2, 5, 5, 6, 6, 6, 7, 7 };
-  const bool expected_exact[] = { true, true, true, false, true, false, false, true, false, false };
+  const int expected_exact[] = { true, true, true, false, true, false, false, true, false, false };
   const int N = sizeof (A) / sizeof (A[0]);
 
   for (i=1; i<=10; i++)

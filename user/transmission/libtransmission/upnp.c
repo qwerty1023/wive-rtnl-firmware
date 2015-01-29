@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2007-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This file is licensed by the GPL version 2. Works owned by the
+ * Transmission project are granted a special exemption to clause 2 (b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -16,6 +19,10 @@
 #else
   #include <miniupnp/miniupnpc.h>
   #include <miniupnp/upnpcommands.h>
+#endif
+
+#ifdef SYS_DARWIN
+  #define HAVE_MINIUPNP_16 1
 #endif
 
 #include "transmission.h"
@@ -83,22 +90,20 @@ tr_upnpClose (tr_upnp * handle)
 static struct UPNPDev *
 tr_upnpDiscover (int msec)
 {
-  struct UPNPDev * ret;
-  bool have_err;
+    struct UPNPDev * ret = NULL;
 
-#if (MINIUPNPC_API_VERSION >= 8) /* adds ipv6 and error args */
-  int err = UPNPDISCOVER_SUCCESS;
-  ret = upnpDiscover (msec, NULL, NULL, 0, 0, &err);
-  have_err = err != UPNPDISCOVER_SUCCESS;
-#else
-  ret = upnpDiscover (msec, NULL, NULL, 0);
-  have_err = ret == NULL;
+#if defined (HAVE_MINIUPNP_16)
+    int err = UPNPDISCOVER_SUCCESS;
+    ret = upnpDiscover (msec, NULL, NULL, 0, 0, &err);
+    if (err != UPNPDISCOVER_SUCCESS)
+#elif defined (HAVE_MINIUPNP_15)
+    ret = upnpDiscover (msec, NULL, NULL, 0);
+    if (ret == NULL)
 #endif
 
-  if (have_err)
-    tr_logAddNamedDbg (getKey (), "upnpDiscover failed (errno %d - %s)", errno, tr_strerror (errno));
+        tr_logAddNamedDbg (getKey (), "upnpDiscover failed (errno %d - %s)", errno, tr_strerror (errno));
 
-  return ret;
+    return ret;
 }
 
 static int
@@ -112,42 +117,14 @@ tr_upnpGetSpecificPortMappingEntry (tr_upnp * handle, const char * proto)
     *intClient = '\0';
     *intPort = '\0';
 
-    tr_snprintf (portStr, sizeof(portStr), "%d", (int)handle->port);
+    tr_snprintf (portStr, sizeof (portStr), "%d", (int)handle->port);
 
-#if (MINIUPNPC_API_VERSION >= 10) /* adds remoteHost arg */
-
-    err = UPNP_GetSpecificPortMappingEntry (handle->urls.controlURL, 
-                                            handle->data.first.servicetype, 
-                                            portStr,
-                                            proto,
-                                            NULL /*remoteHost*/, 
-                                            intClient,
-                                            intPort,
-                                            NULL /*desc*/, 
-                                            NULL /*enabled*/,
-                                            NULL /*duration*/);
-
-#elif (MINIUPNPC_API_VERSION >= 8) /* adds desc, enabled and leaseDuration args */
-
-    err = UPNP_GetSpecificPortMappingEntry (handle->urls.controlURL,
-                                            handle->data.first.servicetype,
-                                            portStr,
-                                            proto,
-                                            intClient,
-                                            intPort,
-                                            NULL /*desc*/,
-                                            NULL /*enabled*/,
-                                            NULL /*duration*/);
-
+#if defined (HAVE_MINIUPNP_16)
+    err = UPNP_GetSpecificPortMappingEntry (handle->urls.controlURL, handle->data.first.servicetype, portStr, proto, intClient, intPort, NULL, NULL, NULL);
+#elif defined (HAVE_MINIUPNP_15)
+    err = UPNP_GetSpecificPortMappingEntry (handle->urls.controlURL, handle->data.first.servicetype, portStr, proto, intClient, intPort);
 #else
-
-    err = UPNP_GetSpecificPortMappingEntry (handle->urls.controlURL,
-                                            handle->data.first.servicetype,
-                                            portStr,
-                                            proto,
-                                            intClient,
-                                            intPort);
-
+    err = UPNPCOMMAND_UNKNOWN_ERROR;
 #endif
 
     return err;
@@ -163,10 +140,12 @@ tr_upnpAddPortMapping (const tr_upnp * handle, const char * proto, tr_port port,
 
     tr_snprintf (portStr, sizeof (portStr), "%d", (int)port);
 
-#if (MINIUPNPC_API_VERSION >= 8)
+#if defined (HAVE_MINIUPNP_16)
     err = UPNP_AddPortMapping (handle->urls.controlURL, handle->data.first.servicetype, portStr, portStr, handle->lanaddr, desc, proto, NULL, NULL);
-#else
+#elif defined (HAVE_MINIUPNP_15)
     err = UPNP_AddPortMapping (handle->urls.controlURL, handle->data.first.servicetype, portStr, portStr, handle->lanaddr, desc, proto, NULL);
+#else
+    err = UPNPCOMMAND_UNKNOWN_ERROR;
 #endif
 
     if (err)

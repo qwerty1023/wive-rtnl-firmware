@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2007-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU GPL versions 2 or 3
- * or any future license endorsed by Mnemosyne LLC.
+ * This file is licensed by the GPL version 2. Works owned by the
+ * Transmission project are granted a special exemption to clause 2 (b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -251,7 +254,7 @@ parseHandshake (tr_handshake *    handshake,
   tr_torrent * tor;
   uint8_t peer_id[PEER_ID_LEN];
 
-  dbgmsg (handshake, "payload: need %d, got %"TR_PRIuSIZE,
+  dbgmsg (handshake, "payload: need %d, got %zu",
           HANDSHAKE_SIZE, evbuffer_get_length (inbuf));
 
   if (evbuffer_get_length (inbuf) < HANDSHAKE_SIZE)
@@ -562,7 +565,7 @@ readPadD (tr_handshake    * handshake,
 {
   const size_t needlen = handshake->pad_d_len;
 
-  dbgmsg (handshake, "pad d: need %"TR_PRIuSIZE", got %"TR_PRIuSIZE,
+  dbgmsg (handshake, "pad d: need %zu, got %zu",
           needlen, evbuffer_get_length (inbuf));
   if (evbuffer_get_length (inbuf) < needlen)
     return READ_LATER;
@@ -590,7 +593,7 @@ readHandshake (tr_handshake    * handshake,
   uint8_t reserved[HANDSHAKE_FLAGS_LEN];
   uint8_t hash[SHA_DIGEST_LENGTH];
 
-  dbgmsg (handshake, "payload: need %d, got %"TR_PRIuSIZE,
+  dbgmsg (handshake, "payload: need %d, got %zu",
           INCOMING_HANDSHAKE_LEN, evbuffer_get_length (inbuf));
 
   if (evbuffer_get_length (inbuf) < INCOMING_HANDSHAKE_LEN)
@@ -731,7 +734,7 @@ readYa (tr_handshake    * handshake,
   const uint8_t * secret;
   int len;
 
-  dbgmsg (handshake, "in readYa... need %d, have %"TR_PRIuSIZE,
+  dbgmsg (handshake, "in readYa... need %d, have %zu",
           KEY_LEN, evbuffer_get_length (inbuf));
   if (evbuffer_get_length (inbuf) < KEY_LEN)
     return READ_LATER;
@@ -881,7 +884,7 @@ readIA (tr_handshake    * handshake,
   struct evbuffer * outbuf;
   uint32_t crypto_select;
 
-  dbgmsg (handshake, "reading IA... have %"TR_PRIuSIZE", need %"TR_PRIuSIZE,
+  dbgmsg (handshake, "reading IA... have %zu, need %zu",
           evbuffer_get_length (inbuf), needlen);
   if (evbuffer_get_length (inbuf) < needlen)
     return READ_LATER;
@@ -958,7 +961,7 @@ readPayloadStream (tr_handshake    * handshake,
   int i;
   const size_t needlen = HANDSHAKE_SIZE;
 
-  dbgmsg (handshake, "reading payload stream... have %"TR_PRIuSIZE", need %"TR_PRIuSIZE,
+  dbgmsg (handshake, "reading payload stream... have %zu, need %zu",
           evbuffer_get_length (inbuf), needlen);
   if (evbuffer_get_length (inbuf) < needlen)
     return READ_LATER;
@@ -1173,7 +1176,7 @@ gotError (tr_peerIo  * io,
 **/
 
 static void
-handshakeTimeout (evutil_socket_t foo UNUSED, short bar UNUSED, void * handshake)
+handshakeTimeout (int foo UNUSED, short bar UNUSED, void * handshake)
 {
   tr_handshakeAbort (handshake);
 }

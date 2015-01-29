@@ -21,9 +21,6 @@
 #include "internet.h"
 #include "helpers.h"
 
-static void firewall_rebuild(void);
-static void websSysFirewall(webs_t wp, char_t *path, char_t *query);
-
 static int isMacValid(char *str)
 {
 	int i, len = strlen(str);
@@ -1293,154 +1290,6 @@ static int getPortFilteringRules(int eid, webs_t wp, int argc, char_t **argv)
 	return 0;
 }
 
-static int showDMZIPAddressASP(int eid, webs_t wp, int argc, char_t **argv)
-{
-	char *DMZIPAddress = nvram_get(RT2860_NVRAM, "DMZIPAddress");
-
-	if(!DMZIPAddress)
-		return 0;
-	if(!strlen(DMZIPAddress))
-		return 0;
-
-	websWrite(wp, T("%s"), DMZIPAddress);
-	return 0;
-}
-
-static void portForward(webs_t wp, char_t *path, char_t *query)
-{
-	char *pfe               = websGetVar(wp, T("portForwardEnabled"), T(""));
-	char *PortForwardRules  = websGetVar(wp, T("portForwardRules"), T(""));
-
-	if ((pfe==NULL) || (strcmp(pfe, "1")!=0))
-		pfe = "0";
-
-	// Commit
-	nvram_init(RT2860_NVRAM);
-	nvram_bufset(RT2860_NVRAM, "PortForwardEnable", pfe);
-	if (strcmp(pfe, "1") == 0)
-		nvram_bufset(RT2860_NVRAM, "PortForwardRules", PortForwardRules);
-	nvram_commit(RT2860_NVRAM);
-	nvram_close(RT2860_NVRAM);
-
-	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
-#ifdef PRINT_DEBUG
-	if (! submitUrl[0])
-	{
-		websHeader(wp);
-		websWrite(wp, T("portForwardEnabled: %s<br>\n"), pfe);
-		websFooter(wp);
-		websDone(wp, 200);
-	} else
-#endif
-		websRedirect(wp, submitUrl);
-
-	// call iptables
-	firewall_rebuild();
-}
-
-static void portFiltering(webs_t wp, char_t *path, char_t *query)
-{
-	char *firewall_enable   = websGetVar(wp, T("portFilterEnabled"), T(""));
-	char *default_policy    = websGetVar(wp, T("defaultFirewallPolicy"), T("0"));
-	char *firewall_rules    = websGetVar(wp, T("portFilteringRules"), T(""));
-
-	if ((firewall_enable == NULL) || (strcmp(firewall_enable, "1") != 0))
-		firewall_enable = "0";
-	if ((default_policy == NULL) || (strcmp(default_policy, "1") != 0))
-		default_policy = "0";
-
-	nvram_init(RT2860_NVRAM);
-	nvram_bufset(RT2860_NVRAM, "IPPortFilterEnable", firewall_enable);
-	if (strcmp(firewall_enable, "1") == 0)
-	{
-		// Store default firewall policy & rules
-		nvram_bufset(RT2860_NVRAM, "DefaultFirewallPolicy", default_policy);
-		nvram_bufset(RT2860_NVRAM, "IPPortFilterRules", firewall_rules);
-	}
-
-	nvram_commit(RT2860_NVRAM);
-	nvram_close(RT2860_NVRAM);
-
-	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
-#ifdef PRINT_DEBUG
-	if (! submitUrl[0])
-	{
-		websHeader(wp);
-		websWrite(wp, T("portFilteringEnabled: %s<br>\n"), firewall_enable);
-		websWrite(wp, T("default_policy: %s<br>\n"), default_policy);
-		websFooter(wp);
-		websDone(wp, 200);
-	} else
-#endif
-		websRedirect(wp, submitUrl);
-
-	// Call iptables
-	firewall_rebuild();
-}
-
-static void DMZ(webs_t wp, char_t *path, char_t *query)
-{
-	char *dmzE, *ip_address, *dmzLoopback;
-
-	dmzE = websGetVar(wp, T("DMZEnabled"), T(""));
-	ip_address = websGetVar(wp, T("DMZIPAddress"), T(""));
-	dmzLoopback = websGetVar(wp, T("dmzLoopback"), T("off"));
-
-	if (CHK_IF_DIGIT(dmzE, 0)) // disable
-	{
-		nvram_set(RT2860_NVRAM, "DMZEnable", "0");
-	}
-	else if (CHK_IF_DIGIT(dmzE, 1)) // enable
-	{
-		if (!isIpValid(ip_address))
-			return;
-
-		nvram_init(RT2860_NVRAM);
-		nvram_bufset(RT2860_NVRAM, "DMZEnable", "1");
-		nvram_bufset(RT2860_NVRAM, "DMZIPAddress", ip_address);
-		nvram_bufset(RT2860_NVRAM, "DMZNATLoopback", CHK_IF_DIGIT(dmzLoopback, 1) ? "1" : "0");
-		nvram_commit(RT2860_NVRAM);
-		nvram_close(RT2860_NVRAM);
-	}
-	else
-		return;
-
-	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
-#ifdef PRINT_DEBUG
-	if (! submitUrl[0])
-	{
-		websHeader(wp);
-		websWrite(wp, T("DMZEnabled: %s<br>\n"), dmzE);
-		websWrite(wp, T("ip_address: %s<br>\n"), ip_address);
-		websFooter(wp);
-		websDone(wp, 200);
-	} else
-#endif
-		websRedirect(wp, submitUrl);
-
-	// Call iptables
-	firewall_rebuild();
-}
-
-static void websSysFirewall(webs_t wp, char_t *path, char_t *query)
-{
-	char *wpfE = websGetVar(wp, T("pingFrmWANFilterEnabled"), T(""));
-
-	// someone use malform page.....
-	if(!wpfE || !strlen(wpfE))
-		return;
-
-
-	websHeader(wp);
-	websWrite(wp, T("WANPingFilter: %s<br>\n"), wpfE);
-	websFooter(wp);
-	websDone(wp, 200);
-
-	// call iptables
-	firewall_rebuild();
-}
-
-
 /* Same as the file "linux/netfilter_ipv4/ipt_webstr.h" */
 #define BLK_JAVA                0x01
 #define BLK_ACTIVE              0x02
@@ -1543,84 +1392,6 @@ static void iptablesWebsFilterRun(void)
 		printf("Content filter disabled.\n");
 }
 
-const parameter_fetch_t content_filtering_args[] =
-{
-	{ T("urlFiltering"),           "websURLFilters",       0,   T("") },
-	{ T("hostFiltering"),          "websHostFilters",      0,   T("") },
-	{ T("websFilterProxy"),        "websFilterProxy",      2,   T("") },
-	{ T("websFilterJava"),         "websFilterJava",       2,   T("") },
-	{ T("websFilterActivex"),      "websFilterActivex",    2,   T("") },
-	{ T("websFilterCookies"),      "websFilterCookies",    2,   T("") },
-
-	{ NULL, NULL, 0, NULL } // Terminator
-};
-
-static void webContentFilterSetup(webs_t wp, char_t *path, char_t *query)
-{
-	// Store firewall parameters
-	setupParameters(wp, content_filtering_args, 1);
-
-	//call iptables
-	firewall_rebuild();
-
-	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
-	if ((submitUrl != NULL) && (submitUrl[0]))
-		websRedirect(wp, submitUrl);
-	else
-		websDone(wp, 200);
-
-}
-
-/* goform/setFirewallAlg */
-const parameter_fetch_t alg_params[] =
-{
-	{ "alg_ftp",		T("fwAlgFTP"),			2,   T("") },
-	{ "alg_gre",		T("fwAlgGRE"),			2,   T("") },
-	{ "alg_h323",		T("fwAlgH323"),			2,   T("") },
-	{ "alg_pptp",		T("fwAlgPPTP"),			2,   T("") },
-	{ "alg_sip",		T("fwAlgSIP"),			2,   T("") },
-	{ "alg_rtsp",		T("fwAlgRTSP"),			2,   T("") },
-	{ NULL, NULL, 0, NULL } // Terminator
-};
-
-static void setFirewallAlg(webs_t wp, char_t *path, char_t *query)
-{
-	// Store firewall parameters
-	setupParameters(wp, alg_params, 1);
-
-	//call iptables
-	firewall_rebuild();
-
-	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
-	if ((submitUrl != NULL) && (submitUrl[0]))
-		websRedirect(wp, submitUrl);
-	else
-		websDone(wp, 200);
-
-}
-
-void formDefineFirewall(void)
-{
-	websFormDefine(T("portFiltering"), portFiltering);
-
-	websAspDefine(T("getPortFilteringRules"), getPortFilteringRules);
-	websFormDefine(T("getRulesPacketCount"), getRulesPacketCount);
-
-	websFormDefine(T("DMZ"), DMZ);
-	websAspDefine(T("getDMZEnableASP"), getDMZEnableASP);
-	websAspDefine(T("showDMZIPAddressASP"), showDMZIPAddressASP);
-
-	websFormDefine(T("setFirewallAlg"), setFirewallAlg);
-
-	websAspDefine(T("getPortForwardRules"), getPortForwardRules);
-	websFormDefine(T("portForward"), portForward);
-
-	websFormDefine(T("websSysFirewall"), websSysFirewall);
-	websFormDefine(T("webContentFilterSetup"), webContentFilterSetup);
-
-	websAspDefine(T("checkIfUnderBridgeModeASP"), checkIfUnderBridgeModeASP);
-}
-
 void firewall_rebuild_etc(void)
 {
 	//rebuild firewall scripts in etc
@@ -1648,10 +1419,240 @@ void firewall_rebuild_etc(void)
 	iptablesWebsFilterRun();
 }
 
-static void firewall_rebuild(void)
+void firewall_rebuild(void)
 {
 	//rebuild firewall scripts in etc
 	firewall_rebuild_etc();
 	//no backgroudn it!!!!
 	doSystem("service iptables restart");
+}
+
+static int showDMZIPAddressASP(int eid, webs_t wp, int argc, char_t **argv)
+{
+	char *DMZIPAddress = nvram_get(RT2860_NVRAM, "DMZIPAddress");
+
+	if(!DMZIPAddress)
+		return 0;
+	if(!strlen(DMZIPAddress))
+		return 0;
+
+	websWrite(wp, T("%s"), DMZIPAddress);
+	return 0;
+}
+
+static void portForward(webs_t wp, char_t *path, char_t *query)
+{
+	char *pfe               = websGetVar(wp, T("portForwardEnabled"), T(""));
+	char *PortForwardRules  = websGetVar(wp, T("portForwardRules"), T(""));
+
+	if ((pfe==NULL) || (strcmp(pfe, "1")!=0))
+		pfe = "0";
+
+	// Commit
+	nvram_init(RT2860_NVRAM);
+	nvram_bufset(RT2860_NVRAM, "PortForwardEnable", pfe);
+	if (strcmp(pfe, "1") == 0)
+		nvram_bufset(RT2860_NVRAM, "PortForwardRules", PortForwardRules);
+	nvram_commit(RT2860_NVRAM);
+	nvram_close(RT2860_NVRAM);
+
+	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
+	if (!submitUrl || !submitUrl[0])
+	{
+		websHeader(wp);
+		websWrite(wp, T("portForwardEnabled: %s<br>\n"), pfe);
+		websFooter(wp);
+		websDone(wp, 200);
+	} else
+#endif
+		websRedirect(wp, submitUrl);
+
+	// call iptables
+	firewall_rebuild();
+}
+
+static void portFiltering(webs_t wp, char_t *path, char_t *query)
+{
+	char *firewall_enable   = websGetVar(wp, T("portFilterEnabled"), T(""));
+	char *default_policy    = websGetVar(wp, T("defaultFirewallPolicy"), T("0"));
+	char *firewall_rules    = websGetVar(wp, T("portFilteringRules"), T(""));
+
+	if ((firewall_enable == NULL) || (strcmp(firewall_enable, "1") != 0))
+		firewall_enable = "0";
+	if ((default_policy == NULL) || (strcmp(default_policy, "1") != 0))
+		default_policy = "0";
+
+	nvram_init(RT2860_NVRAM);
+	nvram_bufset(RT2860_NVRAM, "IPPortFilterEnable", firewall_enable);
+	if (strcmp(firewall_enable, "1") == 0)
+	{
+		// Store default firewall policy & rules
+		nvram_bufset(RT2860_NVRAM, "DefaultFirewallPolicy", default_policy);
+		nvram_bufset(RT2860_NVRAM, "IPPortFilterRules", firewall_rules);
+	}
+
+	nvram_commit(RT2860_NVRAM);
+	nvram_close(RT2860_NVRAM);
+
+	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
+	if (!submitUrl || !submitUrl[0])
+	{
+		websHeader(wp);
+		websWrite(wp, T("portFilteringEnabled: %s<br>\n"), firewall_enable);
+		websWrite(wp, T("default_policy: %s<br>\n"), default_policy);
+		websFooter(wp);
+		websDone(wp, 200);
+	} else
+#endif
+		websRedirect(wp, submitUrl);
+
+	// Call iptables
+	firewall_rebuild();
+}
+
+static void DMZ(webs_t wp, char_t *path, char_t *query)
+{
+	char *dmzE, *ip_address, *dmzLoopback;
+
+	dmzE = websGetVar(wp, T("DMZEnabled"), T(""));
+	ip_address = websGetVar(wp, T("DMZIPAddress"), T(""));
+	dmzLoopback = websGetVar(wp, T("dmzLoopback"), T("off"));
+
+	if (CHK_IF_DIGIT(dmzE, 0)) // disable
+	{
+		nvram_set(RT2860_NVRAM, "DMZEnable", "0");
+	}
+	else if (CHK_IF_DIGIT(dmzE, 1)) // enable
+	{
+		if (!isIpValid(ip_address))
+			return;
+
+		nvram_init(RT2860_NVRAM);
+		nvram_bufset(RT2860_NVRAM, "DMZEnable", "1");
+		nvram_bufset(RT2860_NVRAM, "DMZIPAddress", ip_address);
+		nvram_bufset(RT2860_NVRAM, "DMZNATLoopback", CHK_IF_DIGIT(dmzLoopback, 1) ? "1" : "0");
+		nvram_commit(RT2860_NVRAM);
+		nvram_close(RT2860_NVRAM);
+	}
+	else
+		return;
+
+	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
+	if (!submitUrl || !submitUrl[0])
+	{
+		websHeader(wp);
+		websWrite(wp, T("DMZEnabled: %s<br>\n"), dmzE);
+		websWrite(wp, T("ip_address: %s<br>\n"), ip_address);
+		websFooter(wp);
+		websDone(wp, 200);
+	} else
+#endif
+		websRedirect(wp, submitUrl);
+
+	// Call iptables
+	firewall_rebuild();
+}
+
+static void websSysFirewall(webs_t wp, char_t *path, char_t *query)
+{
+	char *wpfE = websGetVar(wp, T("pingFrmWANFilterEnabled"), T(""));
+
+	// someone use malform page.....
+	if(!wpfE || !strlen(wpfE))
+		return;
+
+
+	websHeader(wp);
+	websWrite(wp, T("WANPingFilter: %s<br>\n"), wpfE);
+	websFooter(wp);
+	websDone(wp, 200);
+
+	// call iptables
+	firewall_rebuild();
+}
+
+
+const parameter_fetch_t content_filtering_args[] =
+{
+	{ T("urlFiltering"),           "websURLFilters",       0,   T("") },
+	{ T("hostFiltering"),          "websHostFilters",      0,   T("") },
+	{ T("websFilterProxy"),        "websFilterProxy",      2,   T("") },
+	{ T("websFilterJava"),         "websFilterJava",       2,   T("") },
+	{ T("websFilterActivex"),      "websFilterActivex",    2,   T("") },
+	{ T("websFilterCookies"),      "websFilterCookies",    2,   T("") },
+
+	{ NULL, NULL, 0, NULL } // Terminator
+};
+
+static void webContentFilterSetup(webs_t wp, char_t *path, char_t *query)
+{
+	// Store firewall parameters
+	setupParameters(wp, content_filtering_args, 1);
+
+	//call iptables
+	firewall_rebuild();
+
+	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
+	if (!submitUrl || !submitUrl[0])
+		websDone(wp, 200);
+	else
+#endif
+		websRedirect(wp, submitUrl);
+
+}
+
+/* goform/setFirewallAlg */
+const parameter_fetch_t alg_params[] =
+{
+	{ "alg_ftp",		T("fwAlgFTP"),			2,   T("") },
+	{ "alg_gre",		T("fwAlgGRE"),			2,   T("") },
+	{ "alg_h323",		T("fwAlgH323"),			2,   T("") },
+	{ "alg_pptp",		T("fwAlgPPTP"),			2,   T("") },
+	{ "alg_sip",		T("fwAlgSIP"),			2,   T("") },
+	{ "alg_rtsp",		T("fwAlgRTSP"),			2,   T("") },
+	{ NULL, NULL, 0, NULL } // Terminator
+};
+
+static void setFirewallAlg(webs_t wp, char_t *path, char_t *query)
+{
+	// Store firewall parameters
+	setupParameters(wp, alg_params, 1);
+
+	//call iptables
+	firewall_rebuild();
+
+	char *submitUrl = websGetVar(wp, T("submit-url"), T(""));   // hidden page
+#ifdef PRINT_DEBUG
+	if (!submitUrl || !submitUrl[0])
+		websDone(wp, 200);
+	else
+#endif
+		websRedirect(wp, submitUrl);
+
+}
+
+void formDefineFirewall(void)
+{
+	websFormDefine(T("portFiltering"), portFiltering);
+
+	websAspDefine(T("getPortFilteringRules"), getPortFilteringRules);
+	websFormDefine(T("getRulesPacketCount"), getRulesPacketCount);
+
+	websFormDefine(T("DMZ"), DMZ);
+	websAspDefine(T("getDMZEnableASP"), getDMZEnableASP);
+	websAspDefine(T("showDMZIPAddressASP"), showDMZIPAddressASP);
+
+	websFormDefine(T("setFirewallAlg"), setFirewallAlg);
+
+	websAspDefine(T("getPortForwardRules"), getPortForwardRules);
+	websFormDefine(T("portForward"), portForward);
+
+	websFormDefine(T("websSysFirewall"), websSysFirewall);
+	websFormDefine(T("webContentFilterSetup"), webContentFilterSetup);
+
+	websAspDefine(T("checkIfUnderBridgeModeASP"), checkIfUnderBridgeModeASP);
 }

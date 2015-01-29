@@ -1,8 +1,11 @@
 /*
- * This file Copyright (C) 2009-2014 Mnemosyne LLC
+ * This file Copyright (C) Mnemosyne LLC
  *
- * It may be used under the GNU Public License v2 or v3 licenses,
- * or any future license endorsed by Mnemosyne LLC.
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2
+ * as published by the Free Software Foundation.
+ *
+ * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
  *
  * $Id$
  */
@@ -698,7 +701,6 @@ Session :: exec (const char * json)
       reply->setProperty (REQUEST_DATA_PROPERTY_KEY, requestData);
       connect (reply, SIGNAL (downloadProgress (qint64,qint64)), this, SIGNAL (dataReadProgress ()));
       connect (reply, SIGNAL (uploadProgress (qint64,qint64)), this, SIGNAL (dataSendProgress ()));
-      connect (reply, SIGNAL(error(QNetworkReply::NetworkError)), this, SIGNAL(error(QNetworkReply::NetworkError)));
 
 #ifdef DEBUG_HTTP
       std::cerr << "sending " << "POST " << qPrintable (myUrl.path ()) << std::endl;
@@ -735,7 +737,7 @@ Session :: onFinished (QNetworkReply * reply)
     }
     else if (reply->error () != QNetworkReply::NoError)
     {
-        emit (errorMessage(reply->errorString ()));
+        std::cerr << "http error: " << qPrintable (reply->errorString ()) << std::endl;
     }
     else
     {
@@ -744,7 +746,6 @@ Session :: onFinished (QNetworkReply * reply)
         int jsonLength (response.size ());
         if (jsonLength>0 && json[jsonLength-1] == '\n') --jsonLength;
         parseResponse (json, jsonLength);
-        emit (error(QNetworkReply::NoError));
     }
 
     reply->deleteLater ();

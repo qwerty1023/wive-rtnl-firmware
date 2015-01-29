@@ -44,8 +44,6 @@
 #import "GlobalOptionsPopoverViewController.h"
 #import "ButtonToolbarItem.h"
 #import "GroupToolbarItem.h"
-#import "ShareToolbarItem.h"
-#import "ShareTorrentFileHelper.h"
 #import "ToolbarSegmentedCell.h"
 #import "BlocklistDownloader.h"
 #import "StatusBarController.h"
@@ -80,7 +78,6 @@
 #define TOOLBAR_PAUSE_RESUME_SELECTED   @"Toolbar Pause / Resume Selected"
 #define TOOLBAR_FILTER                  @"Toolbar Toggle Filter"
 #define TOOLBAR_QUICKLOOK               @"Toolbar QuickLook"
-#define TOOLBAR_SHARE                   @"Toolbar Share"
 
 typedef enum
 {
@@ -524,12 +521,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     if ([NSApp isOnMountainLionOrBetter])
         [[NSUserNotificationCenterMtLion defaultUserNotificationCenter] setDelegate: self];
-    
-    // remove Share menu items
-    if (![NSApp isOnMountainLionOrBetter]) {
-        [[fShareMenuItem menu] removeItem:fShareMenuItem];
-        [[fShareContextMenuItem menu] removeItem:fShareContextMenuItem];
-    }
     
     //observe notifications
     NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
@@ -1792,11 +1783,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [self applyFilter];
 }
 
-- (NSArray *)selectedTorrents
-{
-    return [fTableView selectedTorrents];
-}
-
 - (void) showPreferenceWindow: (id) sender
 {
     NSWindow * window = [fPrefsController window];
@@ -2884,14 +2870,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             [item release];
         }
     }
-    else if (menu == fShareMenu || menu == fShareContextMenu) {
-        [menu removeAllItems];
-        
-        for (NSMenuItem * item in [[ShareTorrentFileHelper sharedHelper] menuItems])
-        {
-            [menu addItem:item];
-        }
-    }
     else;
 }
 
@@ -2930,14 +2908,11 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fStatusBar updateSpeedFieldsToolTips];
     
     if (![[dict objectForKey: @"ByUser"] boolValue])
-        [GrowlApplicationBridge notifyWithTitle: isLimited ? NSLocalizedString(@"Speed Limit Auto Enabled", "Growl notification title") : NSLocalizedString(@"Speed Limit Auto Disabled", "Growl notification title")
-                                    description: NSLocalizedString(@"Bandwidth settings changed", "Growl notification description")
-                               notificationName: GROWL_AUTO_SPEED_LIMIT
-                                       iconData: nil
-                                       priority: 0
-                                       isSticky: NO
-                                   clickContext: nil
-                                     identifier: GROWL_AUTO_SPEED_LIMIT];
+        [GrowlApplicationBridge notifyWithTitle: isLimited
+                ? NSLocalizedString(@"Speed Limit Auto Enabled", "Growl notification title")
+                : NSLocalizedString(@"Speed Limit Auto Disabled", "Growl notification title")
+            description: NSLocalizedString(@"Bandwidth settings changed", "Growl notification description")
+            notificationName: GROWL_AUTO_SPEED_LIMIT iconData: nil priority: 0 isSticky: NO clickContext: nil];
     
     [dict release];
 }
@@ -3645,13 +3620,13 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 {
     const BOOL show = fFilterBar == nil;
     
-    //disable filtering when hiding (have to do before showFilterBar:animate:)
-    if (!show)
-        [fFilterBar reset: NO];
-    
     [self showFilterBar: show animate: YES];
     [fDefaults setBool: show forKey: @"FilterBar"];
     [[fWindow toolbar] validateVisibleItems];
+    
+    //disable filtering when hiding
+    if (!show)
+        [fFilterBar reset: NO];
     
     [self applyFilter]; //do even if showing to ensure tooltips are updated
 }
@@ -3829,34 +3804,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     }
 }
 
-- (void) showToolbarShare: (id) sender
-{
-    NSParameterAssert([sender isKindOfClass:[NSButton class]]);
-    
-    NSSharingServicePicker * picker = [[NSSharingServicePicker alloc] initWithItems: [[ShareTorrentFileHelper sharedHelper] shareTorrentURLs]];
-    picker.delegate = self;
-    
-    [picker showRelativeToRect:[sender bounds] ofView:sender preferredEdge:NSMinYEdge];
-}
-
-- (id<NSSharingServiceDelegate>)sharingServicePicker:(NSSharingServicePicker *)sharingServicePicker delegateForSharingService:(NSSharingService *)sharingService
-{
-    return self;
-}
-
-- (NSWindow *)sharingService:(NSSharingService *)sharingService sourceWindowForShareItems:(NSArray *)items sharingContentScope:(NSSharingContentScope *)sharingContentScope
-{
-    return fWindow;
-}
-
 - (ButtonToolbarItem *) standardToolbarButtonWithIdentifier: (NSString *) ident
 {
-    return [self toolbarButtonWithIdentifier: ident forToolbarButtonClass: [ButtonToolbarItem class]];
-}
-
-- (id) toolbarButtonWithIdentifier: (NSString *) ident forToolbarButtonClass:(Class)class
-{
-    ButtonToolbarItem * item = [[class alloc] initWithItemIdentifier: ident];
+    ButtonToolbarItem * item = [[ButtonToolbarItem alloc] initWithItemIdentifier: ident];
     
     NSButton * button = [[NSButton alloc] init];
     [button setBezelStyle: NSTexturedRoundedBezelStyle];
@@ -4057,23 +4007,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         return item;
     }
-    else if ([ident isEqualToString: TOOLBAR_SHARE])
-    {
-        ShareToolbarItem * item = [self toolbarButtonWithIdentifier: ident forToolbarButtonClass: [ShareToolbarItem class]];
-        
-        [item setLabel: NSLocalizedString(@"Share", "Share toolbar item -> label")];
-        [item setPaletteLabel: NSLocalizedString(@"Share", "Share toolbar item -> palette label")];
-        [item setToolTip: NSLocalizedString(@"Share torrent file", "Share toolbar item -> tooltip")];
-        [item setImage: [NSImage imageNamed: NSImageNameShareTemplate]];
-        [item setVisibilityPriority: NSToolbarItemVisibilityPriorityLow];
-        
-        NSButton *itemButton = (NSButton *)[item view];
-        [itemButton setTarget: self];
-        [itemButton setAction: @selector(showToolbarShare:)];
-        [itemButton sendActionOn:NSLeftMouseDownMask];
-        
-        return item;
-    }
     else
         return nil;
 }
@@ -4110,30 +4043,22 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (NSArray *) toolbarAllowedItemIdentifiers: (NSToolbar *) toolbar
 {
-    NSMutableArray *items = [NSMutableArray arrayWithObjects:
-                             TOOLBAR_CREATE, TOOLBAR_OPEN_FILE, TOOLBAR_OPEN_WEB, TOOLBAR_REMOVE,
-                             TOOLBAR_PAUSE_RESUME_SELECTED, TOOLBAR_PAUSE_RESUME_ALL,
-                             TOOLBAR_SHARE, TOOLBAR_QUICKLOOK, TOOLBAR_FILTER, TOOLBAR_INFO,
-                             NSToolbarSeparatorItemIdentifier,
-                             NSToolbarSpaceItemIdentifier,
-                             NSToolbarFlexibleSpaceItemIdentifier,
-                             NSToolbarCustomizeToolbarItemIdentifier, nil];
-    if (![NSApp isOnMountainLionOrBetter]) {
-        [items removeObject:TOOLBAR_SHARE];
-    }
-    return items;
+    return [NSArray arrayWithObjects:
+            TOOLBAR_CREATE, TOOLBAR_OPEN_FILE, TOOLBAR_OPEN_WEB, TOOLBAR_REMOVE,
+            TOOLBAR_PAUSE_RESUME_SELECTED, TOOLBAR_PAUSE_RESUME_ALL,
+            TOOLBAR_QUICKLOOK, TOOLBAR_FILTER, TOOLBAR_INFO,
+            NSToolbarSeparatorItemIdentifier,
+            NSToolbarSpaceItemIdentifier,
+            NSToolbarFlexibleSpaceItemIdentifier,
+            NSToolbarCustomizeToolbarItemIdentifier, nil];
 }
 
 - (NSArray *) toolbarDefaultItemIdentifiers: (NSToolbar *) toolbar
 {
-    NSMutableArray *items = [NSMutableArray arrayWithObjects:
-                             TOOLBAR_CREATE, TOOLBAR_OPEN_FILE, TOOLBAR_REMOVE, NSToolbarSpaceItemIdentifier,
-                             TOOLBAR_PAUSE_RESUME_ALL, NSToolbarFlexibleSpaceItemIdentifier,
-                             TOOLBAR_SHARE, TOOLBAR_QUICKLOOK, TOOLBAR_FILTER, TOOLBAR_INFO, nil];
-    if (![NSApp isOnMountainLionOrBetter]) {
-        [items removeObject:TOOLBAR_SHARE];
-    }
-    return items;
+    return [NSArray arrayWithObjects:
+            TOOLBAR_CREATE, TOOLBAR_OPEN_FILE, TOOLBAR_REMOVE, NSToolbarSpaceItemIdentifier,
+            TOOLBAR_PAUSE_RESUME_ALL, NSToolbarFlexibleSpaceItemIdentifier,
+            TOOLBAR_QUICKLOOK, TOOLBAR_FILTER, TOOLBAR_INFO, nil];
 }
 
 - (BOOL) validateToolbarItem: (NSToolbarItem *) toolbarItem
@@ -4200,11 +4125,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [(NSButton *)[toolbarItem view] setState: [QLPreviewPanel sharedPreviewPanelExists] && [[QLPreviewPanel sharedPreviewPanel] isVisible]];
         return YES;
     }
-    
-    //enable share item
-    if ([ident isEqualToString: TOOLBAR_SHARE])
-        return [fTableView numberOfSelectedRows] > 0;
-    
+
     return YES;
 }
 

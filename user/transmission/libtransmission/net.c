@@ -59,7 +59,7 @@ const tr_address tr_inaddr_any = { TR_AF_INET, { { { { INADDR_ANY, 0x00, 0x00, 0
 void
 tr_netInit (void)
 {
-    static bool initialized = false;
+    static int initialized = false;
 
     if (!initialized)
     {
@@ -283,7 +283,7 @@ tr_netOpenPeerSocket (tr_session        * session,
         tmperrno = sockerrno;
         if ((tmperrno != ENETUNREACH && tmperrno != EHOSTUNREACH)
                 || addr->type == TR_AF_INET)
-            tr_logAddDebug (_("Couldn't connect socket %d to %s, port %d (errno %d - %s)"),
+            tr_logAddError (_("Couldn't connect socket %d to %s, port %d (errno %d - %s)"),
                     s, tr_address_to_string (addr), (int)ntohs (port), tmperrno,
                     tr_strerror (tmperrno));
         tr_netClose (session, s);

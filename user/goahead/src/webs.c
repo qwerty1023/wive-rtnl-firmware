@@ -17,7 +17,7 @@
 
 /********************************* Includes ***********************************/
 
-//#include <syslog.h>
+#include <syslog.h>
 
 #include	"wsIntrn.h"
 #ifdef DIGEST_ACCESS_SUPPORT
@@ -1447,6 +1447,12 @@ void websRedirect(webs_t wp, char_t *url)
 
 	websStats.redirects++;
 	msgbuf = urlbuf = NULL;
+
+	if (!url || !url[0]) {
+	    syslog(LOG_INFO, "goahead: not set redirect url - fix it!");
+	    //printf("goahead: not set redirect url - PLS fix it.");
+	    return;
+	}
 
 /*
  *	Some browsers require a http://host qualified URL for redirection
@@ -3090,6 +3096,3 @@ static time_t dateParse(time_t tip, char_t *cmd)
 }
 
 #endif /* WEBS_IF_MODIFIED_SUPPORT */
-
-/******************************************************************************/
-
