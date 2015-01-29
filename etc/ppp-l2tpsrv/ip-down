@@ -10,6 +10,9 @@ PPP_LOCAL="$4"
 PPP_REMOTE="$5"
 PPP_IPPARAM="$6"
 PPP_NUM=`echo $PPP_IFACE | sed 's/[^0-65535]//g'`
+LOG="logger -t L2TP server"
+
+eval `nvram_buf_get 2860 l2tp_srv_proxyarp parproutedEnabled RemoteSSHPort FtpPort TransRPCPort`
 
 # disable proxyarp
 if [ "$l2tp_srv_proxyarp" = "1" ] || [ "$parproutedEnabled" = "1" ]; then
@@ -36,5 +39,9 @@ iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $FtpP
 
 # DNS
 iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p udp --dport 53 -j ACCEPT > /dev/null 2>&1
+
+# TransmissionUI
+iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $TransRPCPort -j ACCEPT > /dev/null 2>&1
+
 
 export PPP_IFACE PPP_TTY PPP_SPEED PPP_LOCAL PPP_REMOTE PPP_IPPARAM
