@@ -283,7 +283,7 @@ tr_netOpenPeerSocket (tr_session        * session,
         tmperrno = sockerrno;
         if ((tmperrno != ENETUNREACH && tmperrno != EHOSTUNREACH)
                 || addr->type == TR_AF_INET)
-            tr_logAddError (_("Couldn't connect socket %d to %s, port %d (errno %d - %s)"),
+            tr_logAddDebug (_("Couldn't connect socket %d to %s, port %d (errno %d - %s)"),
                     s, tr_address_to_string (addr), (int)ntohs (port), tmperrno,
                     tr_strerror (tmperrno));
         tr_netClose (session, s);
