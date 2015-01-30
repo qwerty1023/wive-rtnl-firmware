@@ -1,0 +1,137 @@
+#EXTM3U name="osnova" type=mpeg
+#EXTINF:-1 tvg-name="" ,  Детинец
+http://iptvsrv.osnova.tv:8991
+#EXTINF:-1 tvg-name="Pyervyy natsionalnyy TRK Era" ,  Перший нацiональний
+http://iptvsrv.osnova.tv:8264
+#EXTINF:-1 tvg-name="1plus1" ,  1+1
+http://iptvsrv.osnova.tv:8881
+#EXTINF:-1 tvg-name="" ,  Чернiгiвське ТБ
+http://iptvsrv.osnova.tv:8762
+#EXTINF:-1 tvg-name="TVi" ,  TBi
+http://iptvsrv.osnova.tv:8254
+#EXTINF:-1 tvg-name="5_kanal" ,5 канал Украина
+http://iptvsrv.osnova.tv:8352
+#EXTINF:-1 tvg-name="TYET" ,  ТЕТ
+http://iptvsrv.osnova.tv:8116
+#EXTINF:-1 tvg-name="Novyy_kanal" ,  Новий канал
+http://iptvsrv.osnova.tv:8251
+#EXTINF:-1 tvg-name="Ukraina" ,  Украина
+http://iptvsrv.osnova.tv:8425
+#EXTINF:-1 tvg-name="K1" ,  К1
+http://iptvsrv.osnova.tv:8313
+#EXTINF:-1 tvg-name="Tonis" ,  Тонiс
+http://iptvsrv.osnova.tv:8241
+#EXTINF:-1 tvg-name="STB" ,  СТБ
+http://iptvsrv.osnova.tv:8263
+#EXTINF:-1 tvg-name="Intyer" ,  Iнтер
+http://iptvsrv.osnova.tv:8763
+#EXTINF:-1 tvg-name="ICTV" ,  ICTV
+http://iptvsrv.osnova.tv:8255
+#EXTINF:-1 tvg-name="NTN" ,  HTH
+http://iptvsrv.osnova.tv:8323
+#EXTINF:-1 tvg-name="Rada" ,  Парламентський телеканал Рада
+http://iptvsrv.osnova.tv:8113
+#EXTINF:-1 tvg-name="Shopping TV" ,  SHOPping TV
+http://iptvsrv.osnova.tv:8124
+#EXTINF:-1 tvg-name="Беларусь 24" ,  Беларусь 24
+http://iptvsrv.osnova.tv:8246
+#EXTINF:-1 tvg-name="ZIK" ,  ZIK
+http://iptvsrv.osnova.tv:8851
+#EXTINF:-1 tvg-name="2plus2" ,  2+2
+http://iptvsrv.osnova.tv:8115
+#EXTINF:-1 tvg-name="Zoom" ,  ZOOM
+http://iptvsrv.osnova.tv:8315
+#EXTINF:-1 tvg-name="Myega" ,  Мега
+http://iptvsrv.osnova.tv:8321
+#EXTINF:-1 tvg-name="K2" ,  К2
+http://iptvsrv.osnova.tv:8314
+#EXTINF:-1 tvg-name="OTV" ,  ОTV
+http://iptvsrv.osnova.tv:8243
+#EXTINF:-1 tvg-name="Enter-film" ,  Enter-фильм
+http://iptvsrv.osnova.tv:8311
+#EXTINF:-1 tvg-name="NewsOne" , NewsOne
+http://iptvsrv.osnova.tv:8565
+#EXTINF:-1 tvg-name="Ryetro" ,  РЕТРО
+http://iptvsrv.osnova.tv:8431
+#EXTINF:-1 tvg-name="NLO TV" ,  НЛО-ТВ
+http://iptvsrv.osnova.tv:8474
+#EXTINF:-1 tvg-name="Piksyel" ,  Пiксель
+http://iptvsrv.osnova.tv:8312
+#EXTINF:-1 tvg-name="" ,  Еспресо
+http://iptvsrv.osnova.tv:8153
+#EXTINF:-1 tvg-name="TIM" , TIM
+http://iptvsrv.osnova.tv:8356
+#EXTINF:-1 tvg-name="Nashye kino" ,  Наше Любимое кино
+http://iptvsrv.osnova.tv:8683
+#EXTINF:-1 tvg-name="112 Ukraina" ,  112 Украина
+http://iptvsrv.osnova.tv:8274
+#EXTINF:-1 tvg-name="M1" ,  М1
+http://iptvsrv.osnova.tv:8253
+#EXTINF:-1 tvg-name="Business" ,  Business
+http://iptvsrv.osnova.tv:8135
+#EXTINF:-1 tvg-name="Униан" ,  Униан
+http://iptvsrv.osnova.tv:8134
+#EXTINF:-1 tvg-name="Gumor TB" ,  Гумор TБ
+http://iptvsrv.osnova.tv:8272
+#EXTINF:-1 tvg-name="RTVI" ,  RTVI
+http://iptvsrv.osnova.tv:8651
+#EXTINF:-1 tvg-name="Viasat Nature CEE" ,  Viasat Nature
+http://iptvsrv.osnova.tv:8163
+#EXTINF:-1 tvg-name="TV1000 Action East" ,  TV1000 Action
+http://iptvsrv.osnova.tv:8162
+#EXTINF:-1 tvg-name="MusicBox UA" ,  Music BOX
+http://iptvsrv.osnova.tv:8271
+#EXTINF:-1 tvg-name="QTV" ,  Q-TV
+http://iptvsrv.osnova.tv:8262
+#EXTINF:-1 tvg-name="" ,  Телеканал 100
+http://iptvsrv.osnova.tv:8136
+#EXTINF:-1 tvg-name="Discovery Ukraina" ,  Discovery Ukraine
+http://iptvsrv.osnova.tv:8773
+#EXTINF:-1 tvg-name="24 Tyelyekanal novostyey 24" audio-track="1",  News 24
+http://iptvsrv.osnova.tv:8261
+#EXTINF:-1 tvg-name="Nashye novoye kino" ,  Наше новое кино
+http://iptvsrv.osnova.tv:8811
+#EXTINF:-1 tvg-name="TV1000_East" ,  TV 1000 East
+http://iptvsrv.osnova.tv:8222
+#EXTINF:-1 tvg-name="Sontsye" ,  Сонце UA
+http://iptvsrv.osnova.tv:8354
+#EXTINF:-1 tvg-name="Ohota i rybalka" ,  Охота и Рыбалка
+http://iptvsrv.osnova.tv:8433
+#EXTINF:-1 tvg-name="Viasat Sport Rossiya" ,  Viasat Sport
+http://iptvsrv.osnova.tv:8211
+#EXTINF:-1 tvg-name="Animal_Planet_HD" ,  Animal Planet
+http://iptvsrv.osnova.tv:8782
+#EXTINF:-1 tvg-name="Viasat History" audio-track="1",  Viasat History
+http://iptvsrv.osnova.tv:8232
+#EXTINF:-1 tvg-name="TV1000 Russkoye kino" ,  TV - 1000 Русское кино
+http://iptvsrv.osnova.tv:8221
+#EXTINF:-1 tvg-name="Nickelodeon SNG" audio-track="3",  Nickelodeon
+http://iptvsrv.osnova.tv:8482
+#EXTINF:-1 tvg-name="Zdorovoye TV" ,  Здоровое ТБ
+http://iptvsrv.osnova.tv:8434
+#EXTINF:-1 tvg-name="Viasat Explore CEE" ,  Viasat Explorer
+http://iptvsrv.osnova.tv:8231
+#EXTINF:-1 tvg-name="" ,  UBR
+http://iptvsrv.osnova.tv:8242
+#EXTINF:-1 tvg-name="TV1000 Comedy HD" ,  TV1000 Comedy SD
+http://iptvsrv.osnova.tv:8171
+#EXTINF:-1 tvg-name="TLC Ukraina" ,  TLC Ukraine
+http://iptvsrv.osnova.tv:8774
+#EXTINF:-1 tvg-name="Dyetskiy" ,  Детский мир
+http://iptvsrv.osnova.tv:8682
+#EXTINF:-1 tvg-name="HD-life" ,  HD life
+http://iptvsrv.osnova.tv:8852
+#EXTINF:-1 tvg-name="Бигуди" ,  Бигуди
+http://iptvsrv.osnova.tv:8334
+#EXTINF:-1 tvg-name="ПлюсПлюс" ,  ПлюсПлюс
+http://iptvsrv.osnova.tv:8992
+#EXTINF:-1 tvg-name="Камера Мегацентр" ,  Камера Мегацентр
+http://cams.osnova.tv/live/cam_mir49a/index.m3u8
+#EXTINF:-1 tvg-name="Камера горсад" ,  Камера горсад
+http://cams.osnova.tv/live/cam_gorsad/index.m3u8
+#EXTINF:-1 tvg-name="Камера площадь" ,  Камера площадь
+http://cams.osnova.tv/live/cam_plosch/index.m3u8
+#EXTINF:-1 tvg-name="Камера Аллея героев" ,  Камера Аллея героев
+http://cams.osnova.tv/live/cam_geroev1/index.m3u8
+#EXTINF:-1 tvg-name="Камера Екатерининская церковь" ,  Камера Екатерининская церковь
+http://cams.osnova.tv/live/cam_geroev2/index.m3u8
