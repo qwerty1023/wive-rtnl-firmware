@@ -13,18 +13,23 @@ umount_all() {
     mounted=`mount | grep -vE "tmpfs|ramfs|squashfs|proc|sysfs|root|pts" | cut -f1 -d" " | cut -f3 -d "/"`
     if [ -n "$mounted" ]; then
 	for disk in $mounted; do
-	    $LOG "Umount external drive /dev/$disk."
+	    $LOG "umount external drive /dev/$disk."
 	    (sync && umount -fl /dev/$disk && sync) &
 	done
 	sleep 2
     fi
 
     # disable swaps
-    if [ -f /bin/swapoff ]; then
-	$LOG "Disable swaps."
+    $LOG "disable swaps..."
+    if [ -f /proc/swaps ] && [ -f /bin/swapoff ]; then
+	swapparts=`cat /proc/swaps | grep dev | awk {' print $1 '}`
+	for disk in $swapparts; do
+	    $LOG "swap off dev $disk"
+	    swapoff "$disk"
+    	    sleep 2
+	done
 	swapoff -a
     fi
-
 }
 
 umount_all

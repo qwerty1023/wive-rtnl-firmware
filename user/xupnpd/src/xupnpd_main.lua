@@ -1,4 +1,4 @@
--- Copyright (C) 2011-2013 Anton Burdinuk
+-- Copyright (C) 2011-2015 Anton Burdinuk
 -- clark15b@gmail.com
 -- https://tsdemuxer.googlecode.com/svn/trunk/xupnpd
 
@@ -114,12 +114,12 @@ function subscribe(event,sid,callback,ttl)
         if callback=='' then return end
         s={}
         subscr[sid]=s
-        s.event=event
-        s.sid=sid
-        s.callback=callback
-        s.timestamp=os.time()
-        s.ttl=tonumber(ttl)
-        s.seq=0
+    s.event=event
+    s.sid=sid
+    s.callback=callback
+    s.timestamp=os.time()
+    s.ttl=tonumber(ttl)
+    s.seq=0
     end
 
     if cfg.debug>0 then print('subscribe: '..s.sid..', '..s.event..', '..s.callback) end
