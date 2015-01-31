@@ -137,11 +137,10 @@
 #define WEBS_POST			0x4			/* POST without content */
 #define WEBS_POST_CLEN		0x8			/* Ready to read content for POST */
 #define WEBS_PROCESSING		0x10		/* Processing request */
-#define WEBS_KEEP_TIMEOUT	15000		/* Keep-alive timeout (15 secs) */
 #define WEBS_TIMEOUT		60000		/* General request timeout (60) */
 
-#define PAGE_READ_BUFSIZE	512			/* bytes read from page files */
-#define MAX_PORT_LEN		10			/* max digits in port number */
+#define PAGE_READ_BUFSIZE	1024			/* bytes read from page files */
+#define MAX_PORT_LEN		16			/* max digits in port number */
 #define WEBS_SYM_INIT		64			/* initial # of sym table entries */
 
 /*
