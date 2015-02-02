@@ -32,7 +32,7 @@ export $(LDFLAGS)
 SUBDIRS_APP =  goahead iptables miniupnp rt2880_app wpa_supplicant ethtool
 SUBDIRS_APP += igmpproxy lldt ppp strace wsc_upnp busybox inadyn udpxy xl2tpd
 SUBDIRS_APP += 802.1x dnsmasq gdbserver iproute2 wive-utils kabinet radvd dhcp6 wireless_tools zebra dropbear
-SUBDIRS_APP += ntfs-3g p910nd transmission openssl samba samba3 cdp-tools xupnpd e2fsprogs minidlna
+SUBDIRS_APP += ntfs-3g p910nd transmission openssl samba samba3 cdp-tools xupnpd e2fsprogs minidlna hdparm
 #
 # must run the vendor build first
 #
@@ -77,6 +77,7 @@ dir_$(CONFIG_USER_TCPDUMP)		    += tcpdump
 
 #for usb support
 dir_$(CONFIG_USER_E2FSPROGS)		    += e2fsprogs
+dir_$(CONFIG_USER_E2FSPROGS)		    += hdparm
 dir_$(CONFIG_USB_MODESWITCH)                += usb_modeswitch
 dir_$(CONFIG_USER_P910ND)		    += p910nd
 dir_$(CONFIG_USER_NTFS3G)		    += ntfs-3g
