@@ -16,7 +16,7 @@ install:
 romfs:
 	$(ROMFSINST) -S init.d/W75xupnpd /etc/rc.d/W75xupnpd
 	$(ROMFSINST) -s /etc/rc.d/W75xupnpd /etc/init.d/xupnpd
-	cp -fv src/xupnpd $(ROMFSDIR)/bin/xupnpd
+	$(ROMFSINST) -S src/xupnpd /bin/xupnpd
 	rm -rf $(ROMFSDIR)/etc/xupnpd
 	mkdir -p $(ROMFSDIR)/etc/xupnpd
 	cp -fv src/*.lua $(ROMFSDIR)/etc/xupnpd

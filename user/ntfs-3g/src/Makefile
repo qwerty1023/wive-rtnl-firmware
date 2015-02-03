@@ -20,4 +20,4 @@ clean:
 	rm -f *.o $(TARGET_probe) $(TARGET_ntfs)
 
 romfs:
-	$(ROMFSINST) -S /bin/$(TARGET_ntfs)
+	$(ROMFSINST) -S $(TARGET_ntfs) /bin/$(TARGET_ntfs)

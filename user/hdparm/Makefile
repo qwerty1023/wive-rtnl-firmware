@@ -21,7 +21,7 @@ fwdownload.o: fwdownload.c sgio.h hdparm.h
 install: all hdparm.8
 
 romfs:
-	$(ROMFSINST) /sbin/hdparm
+	$(ROMFSINST) -S hdparm /bin/hdparm
 
 clean:
 	-rm -f hdparm $(OBJS) core 2>/dev/null

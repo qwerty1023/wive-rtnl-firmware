@@ -77,7 +77,6 @@ dir_$(CONFIG_USER_TCPDUMP)		    += tcpdump
 
 #for usb support
 dir_$(CONFIG_USER_E2FSPROGS)		    += e2fsprogs
-dir_$(CONFIG_USER_E2FSPROGS)		    += hdparm
 dir_$(CONFIG_USB_MODESWITCH)                += usb_modeswitch
 dir_$(CONFIG_USER_P910ND)		    += p910nd
 dir_$(CONFIG_USER_NTFS3G)		    += ntfs-3g
