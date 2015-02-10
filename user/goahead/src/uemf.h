@@ -551,6 +551,7 @@ typedef struct stat gstat_t;
 
 #define E_MAX_ERROR			4096
 #define URL_MAX				4096
+#define E_MAX_REQUEST		2048		/* Request safeguard max */
 
 /*
  * Error types
@@ -804,6 +805,7 @@ extern int		cronFree(cron_t *cp);
 #define SOCKET_LISTENING		0x100	/* Socket is server listener */
 #define SOCKET_CLOSING			0x200	/* Socket is closing */
 #define SOCKET_CONNRESET		0x400	/* Socket connection was reset */
+#define SOCKET_MYOWNBUFFERS		0x800	/* Not using inBuf/outBuf ringq */
 
 #define SOCKET_PORT_MAX			0xffff	/* Max Port size */
 

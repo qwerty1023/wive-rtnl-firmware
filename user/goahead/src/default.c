@@ -347,7 +347,7 @@ int websValidateUrl(webs_t wp, char_t *path)
      write past the end of the array 'parts'.
     */
 
-#define kMaxUrlParts 64
+#define kMaxUrlParts 16
 	char_t	*parts[kMaxUrlParts];	/* Array of ptr's to URL parts */
 	char_t	*token, *dir, *lpath; 
    int	      i, len, npart;

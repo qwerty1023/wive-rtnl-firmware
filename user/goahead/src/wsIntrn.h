@@ -140,7 +140,7 @@
 #define WEBS_TIMEOUT		60000		/* General request timeout (60) */
 
 #define PAGE_READ_BUFSIZE	1024			/* bytes read from page files */
-#define MAX_PORT_LEN		16			/* max digits in port number */
+#define MAX_PORT_LEN		10			/* max digits in port number */
 #define WEBS_SYM_INIT		64			/* initial # of sym table entries */
 
 /*

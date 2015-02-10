@@ -161,9 +161,7 @@ int websSecurityHandler(webs_t wp, char_t *urlPrefix, char_t *webDir, int arg,
 
 			if (gstrcmp(wp->digest, digestCalc) != 0) {
 				websStats.access++;
-            /* 16 Jun 03 -- error code changed from 405 to 401 -- thanks to
-             * Jay Chalfant.
-             */
+
 				websError(wp, 401, T("Access Denied\nWrong Password"));
 				syslog(LOG_WARNING, T("Access Denied - Wrong Password from %s:%s"), wp->ipaddr, wp->userAgent);
 				nRet = 1;

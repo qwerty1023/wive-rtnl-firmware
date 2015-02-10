@@ -99,26 +99,39 @@ read_permission_line(struct upnpperm * perm,
 			return -1;
 		q++;
 		p = q;
-		while(isdigit(*q) || (*q == '.'))
+		while(isdigit(*q))
 			q++;
+		if(*q == '.')
+		{
+			while(*q == '.' || isdigit(*q))
+				q++;
+			if(!isspace(*q))
+				return -1;
 			*q = '\0';
-
-		unsigned short i, mask[4];
-		unsigned char *am = (unsigned char *) &(perm->mask.s_addr);
-		if (sscanf(p, "%3hu.%3hu.%3hu.%3hu", &mask[0], &mask[1], &mask[2], &mask[3]) == 4) {
-			for (i = 0; i < 4; i++)
-				am[i] = (unsigned char) mask[i];
-		} else {
+			if(!inet_aton(p, &perm->mask))
+				return -1;
+		}
+		else if(!isspace(*q))
+			return -1;
+		else
+		{
+			*q = '\0';
 			n_bits = atoi(p);
-			perm->mask.s_addr = htonl(n_bits ? (0xffffffff << (32 - n_bits)) : 0);
+			if(n_bits > 32)
+				return -1;
+			perm->mask.s_addr = htonl(n_bits ? (0xffffffffu << (32 - n_bits)) : 0);
 		}
 	}
-	else
+	else if(isspace(*q))
 	{
 		*q = '\0';
 		if(!inet_aton(p, &perm->address))
 			return -1;
-		perm->mask.s_addr = 0xffffffff;
+		perm->mask.s_addr = 0xffffffffu;
+	}
+	else
+	{
+		return -1;
 	}
 	p = q + 1;
 
