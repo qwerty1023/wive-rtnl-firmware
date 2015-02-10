@@ -32,7 +32,7 @@
  *	code must not be modified.
  */
 #define WEBS_NAME				T("WebServer")
-#define WEBS_VERSION			T("2.1.8")
+#define WEBS_VERSION			T("2.1.9")
 
 #define WEBS_HEADER_BUFINC 		512			/* Header buffer size */
 #define WEBS_ASP_BUFINC			512			/* Asp expansion increment */

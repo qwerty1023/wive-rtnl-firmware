@@ -246,9 +246,8 @@ int	socketGets(int sid, char_t **buf)
  * 		Validate length of request.  Ignore long strings without newlines to
  * 		safeguard against long URL attacks.
  */
-		if (ringqLen(lq) > E_MAX_REQUEST) {
+		if (ringqLen(lq) > E_MAX_REQUEST)
 			c = '\n';
-		}
 /*
  *		If a newline is seen, return the data excluding the new line to the
  *		caller. If carriage return is seen, just eat it.
@@ -603,10 +602,8 @@ int socketAlloc(char *host, int port, socketAccept_t accept, int flags)
 /*
  *	Preserve only specified flags from the callers open
  */
-	a_assert((flags & ~(SOCKET_BROADCAST|SOCKET_DATAGRAM|SOCKET_BLOCK|
-						SOCKET_LISTENING)) == 0);
-	sp->flags = flags & (SOCKET_BROADCAST | SOCKET_DATAGRAM | SOCKET_BLOCK |
-						SOCKET_LISTENING | SOCKET_MYOWNBUFFERS);
+	a_assert((flags & ~(SOCKET_BROADCAST | SOCKET_DATAGRAM | SOCKET_BLOCK | SOCKET_LISTENING)) == 0);
+	sp->flags = flags & (SOCKET_BROADCAST | SOCKET_DATAGRAM | SOCKET_BLOCK | SOCKET_LISTENING | SOCKET_MYOWNBUFFERS);
 
 	if (!(flags & SOCKET_MYOWNBUFFERS)) { 
 /*
