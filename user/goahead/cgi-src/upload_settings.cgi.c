@@ -4,23 +4,24 @@ void import(char *filename, int offset, int len)
 {
 	char cmd[4096];
 	char data;
+	char *pname;
 	FILE *fp, *src;
-	char *pname = tempnam("/var", "set");
 
 	snprintf(cmd, 4096, "cp %s /var/tmpcgi", filename);
 	system(cmd);
 
+	pname = tempnam("/var", "set");
 	if (!( fp = fopen(pname, "w+")))
 		return;
 
-	if(!( src = fopen(filename, "r")))
+	if(!(src = fopen(filename, "r")))
 	{
 		fclose(fp);
 		return;
 	}
 
 	if (fseek(src, offset, SEEK_SET) == -1)
-		printf("fseek error\n");
+		printf("goahead: fseek error\n");
 
 	while (len > 0)
 	{
@@ -30,8 +31,8 @@ void import(char *filename, int offset, int len)
 		len--;
 	}
 
-	fclose(fp);
 	fclose(src);
+	fclose(fp);
 
 	system("ralink_init clear 2860");
 	snprintf(cmd, 4096, "ralink_init renew 2860 %s", pname);
@@ -65,9 +66,7 @@ int main (int argc, char *argv[])
 	boundary_len = line_end - line_begin;
 	boundary = getMemInFile(filename, line_begin, boundary_len);
 
-	// sth like this..
 	// Content-Disposition: form-data; name="filename"; filename="\\192.168.3.171\tftpboot\a.out"
-	//
 	char *line, *semicolon, *user_filename;
 	line_begin = line_end + 2;
 	if ((line_end = findStrInFile(filename, line_begin, "\r\n", 2)) == -1)

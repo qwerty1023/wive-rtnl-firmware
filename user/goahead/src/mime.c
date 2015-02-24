@@ -33,18 +33,35 @@ websMimeType websMimeList[] = {
 	{ T("text/html"), T(".html") },
 	{ T("text/xml"), T(".xml") },
 	{ T("image/gif"), T(".gif") },
-	{ T("image/jpeg"), T(".jpg") },
 	{ T("image/png"), T(".png") },
+	{ T("image/jpeg"), T(".jpg") },
+<<<<<<< HEAD
+	{ T("image/jpeg"), T(".jpeg") },
+	{ T("image/jpeg"), T(".jpe") },
+=======
+	{ T("image/png"), T(".png") },
+>>>>>>> b9c456a55c6a81d625e9361cea908664a9479f0a
 	{ T("image/vnd.microsoft.icon"), T(".ico") },
 	{ T("text/css"), T(".css") },
 	{ T("text/plain"), T(".txt") },
 	{ T("application/x-javascript"), T(".js") },
 	{ T("application/x-shockwave-flash"), T(".swf") },
+<<<<<<< HEAD
+	{ T("application/octet-stream"), T(".bin") },
+	{ T("application/gzip"), T(".gz") },
+	{ T("application/x-tar"), T(".tar") },
+	{ T("application/x-tgz"), T(".tgz") },
+	{ T("application/zip"), T(".zip") },
+=======
+>>>>>>> b9c456a55c6a81d625e9361cea908664a9479f0a
 
 #ifdef MORE_MIME_TYPES
 	{ T("application/octet-stream"), T(".bin") },
 	{ T("application/binary"), T(".exe") },
+<<<<<<< HEAD
+=======
 	{ T("application/gzip"), T(".gz") },
+>>>>>>> b9c456a55c6a81d625e9361cea908664a9479f0a
 	{ T("application/compress"), T(".z") },
 	{ T("application/oda"), T(".oda") },
 	{ T("application/pdf"), T(".pdf") },
@@ -68,8 +85,11 @@ websMimeType websMimeList[] = {
 	{ T("application/x-shar"), T(".shar") },
 	{ T("application/x-sv4cpio"), T(".sv4cpio") },
 	{ T("application/x-sv4crc"), T(".sv4crc") },
+<<<<<<< HEAD
+=======
 	{ T("application/x-tar"), T(".tar") },
 	{ T("application/x-tgz"), T(".tgz") },
+>>>>>>> b9c456a55c6a81d625e9361cea908664a9479f0a
 	{ T("application/x-tcl"), T(".tcl") },
 	{ T("application/x-tex"), T(".tex") },
 	{ T("application/x-texinfo"), T(".texinfo") },
@@ -82,7 +102,6 @@ websMimeType websMimeList[] = {
 	{ T("application/x-troff-ms"), T(".ms") },
 	{ T("application/x-ustar"), T(".ustar") },
 	{ T("application/x-wais-source"), T(".src") },
-	{ T("application/zip"), T(".zip") },
 	{ T("audio/basic"), T(".au snd") },
 	{ T("audio/x-aiff"), T(".aif") },
 	{ T("audio/x-aiff"), T(".aiff") },
@@ -90,8 +109,6 @@ websMimeType websMimeList[] = {
 	{ T("audio/x-wav"), T(".wav") },
 	{ T("audio/x-wav"), T(".ram") },
 	{ T("image/ief"), T(".ief") },
-	{ T("image/jpeg"), T(".jpeg") },
-	{ T("image/jpeg"), T(".jpe") },
 	{ T("image/tiff"), T(".tiff") },
 	{ T("image/tiff"), T(".tif") },
 	{ T("image/x-cmu-raster"), T(".ras") },

@@ -152,9 +152,7 @@ VOID UpdateChannelInfo(
 		*/
 
 		RTMP_IO_READ32(pAd, CH_BUSY_STA, &BusyTime);
-#ifdef AP_QLOAD_SUPPORT
 		pAd->pChannelInfo->chanbusytime[ch_index] = (BusyTime * 100) / AUTO_CHANNEL_SEL_TIMEOUT;
-#endif /* AP_QLOAD_SUPPORT */
 	}
 	else
 		DBGPRINT(RT_DEBUG_ERROR, ("pAd->pChannelInfo equal NULL.\n"));
@@ -413,11 +411,7 @@ static inline UCHAR SelectClearChannelCCA(
 					pAd->ChannelList[channel_idx].Channel,
 					pChannelInfo->dirtyness[channel_idx],
 					pChannelInfo->FalseCCA[channel_idx],
-#ifdef AP_QLOAD_SUPPORT
 					pChannelInfo->chanbusytime[channel_idx],
-#else
-					0,
-#endif // AP_QLOAD_SUPPORT
 					(pChannelInfo->SkipList[channel_idx] == TRUE) ? "TRUE" : "FALSE");
 	}
 	printk("=====================================================\n");
@@ -723,22 +717,18 @@ static inline UCHAR SelectClearChannelApCnt(
    }/* Calculate Dirtiness */
 
 	AutoChannelSkipListSetDirty(pAd);
-	
+/*	
 	printk("=====================================================\n");
 	for (channel_index=0 ; channel_index < pAd->ChannelListNum ; channel_index++)
-		/* debug messages */
+		// debug messages
 		printk("Channel %d : Dirty = %ld, ApCnt=%ld, Busy Time = %d, Skip Channel = %s\n", 
 				pAd->ChannelList[channel_index].Channel,
 				pChannelInfo->dirtyness[channel_index], 
 				pChannelInfo->ApCnt[channel_index],
-#ifdef AP_QLOAD_SUPPORT
 				pChannelInfo->chanbusytime[channel_index],
-#else
-				0,
-#endif /* AP_QLOAD_SUPPORT */
 				(pChannelInfo->SkipList[channel_index] == TRUE) ? "TRUE" : "FALSE");
 	printk("=====================================================\n");
-
+*/
 	pAd->ApCfg.AutoChannel_Channel = 0;
 	
 	/* RULE 1. pick up a good channel that no one used */

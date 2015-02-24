@@ -180,9 +180,10 @@ void setupParameters(webs_t wp, const parameter_fetch_t *fetch, int transaction)
 		}
 		
 		if (nvram_bufset(RT2860_NVRAM, (char_t *)fetch->nvram_param, (void *)str)!=0) //!!!
-			printf("Set %s nvram error!", fetch->nvram_param);
-		
+			printf("goahead: Set %s nvram error!", fetch->nvram_param);
+#ifdef PRINT_DEBUG		
 		printf("%s value : %s\n", fetch->nvram_param, str);
+#endif
 		fetch++;
 	}
 	
@@ -332,4 +333,3 @@ int freeSplitter(string_split_t *buf)
 	}
 	return 0;
 }
-
