@@ -476,7 +476,7 @@ int getWANRxPacketASP(int eid, webs_t wp, int argc, char_t **argv)
 {
 	char_t buf[32];
 	long long data = getIfStatistic(getWanIfName(), RXPACKET);
-	snprintf(buf, 32, "%lld", data);	
+	snprintf(buf, 32, "%lld", data);
 	websWrite(wp, T("%s"), buf);
 	return 0;
 }
@@ -555,13 +555,13 @@ int getAllNICStatisticASP(int eid, webs_t wp, int argc, char_t **argv)
 	FILE *fp = fopen(PROC_IF_STATISTIC, "r");
 	if (fp == NULL)
 	{
-		printf("no proc?\n");
+		printf("goahead: no proc?\n");
 		return -1;
 	}
 
 	if ((skfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
 	{
-		printf("open socket failed\n");
+		printf("goahead: open socket failed\n");
 		fclose(fp);
 		return -1;
 	}
@@ -843,11 +843,6 @@ error:
 }
 #endif
 
-static int getGAPBuilt(int eid, webs_t wp, int argc, char_t **argv)
-{
-	return websWrite(wp, T("0"));
-}
-
 void formDefineManagement(void)
 {
 	websFormDefine(T("setSysAdm"), setSysAdm);
@@ -856,7 +851,6 @@ void formDefineManagement(void)
 #ifdef CONFIG_DATE
 	websFormDefine(T("NTPSyncWithHost"), NTPSyncWithHost);
 #endif
-	websAspDefine(T("getGAPBuilt"), getGAPBuilt);
 #ifdef CONFIG_USER_INADYN
 	websFormDefine(T("DDNS"), DDNS);
 #endif

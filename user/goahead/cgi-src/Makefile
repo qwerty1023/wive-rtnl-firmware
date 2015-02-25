@@ -43,6 +43,7 @@ $(UPLOAD_SETTINGS): upload_settings.cgi.o
 
 romfs:
 	$(ROMFSINST) $(UPLOAD_CGI) $(ROOT_DIRECTORY)/cgi-bin/$(UPLOAD_CGI)
+	$(ROMFSINST) $(UPLOAD_RWFS) $(ROOT_DIRECTORY)/cgi-bin/$(UPLOAD_RWFS)
 	$(ROMFSINST) $(UPLOAD_SETTINGS)  $(ROOT_DIRECTORY)/cgi-bin/$(UPLOAD_SETTINGS)
 	$(ROMFSINST) -S unpackrwfs.sh /bin/unpackrwfs.sh
 	$(ROMFSINST) reboot.sh $(ROOT_DIRECTORY)/cgi-bin/reboot.sh

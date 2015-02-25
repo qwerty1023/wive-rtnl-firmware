@@ -46,12 +46,7 @@ enum flag {
 
 /************************** Forward Declarations ******************************/
 
-<<<<<<< HEAD
 static int  dsnprintf(char_t **s, int size, char_t *fmt, va_list arg, int msize);
-=======
-static int 	dsnprintf(char_t **s, int size, char_t *fmt, va_list arg,
-				int msize);
->>>>>>> b9c456a55c6a81d625e9361cea908664a9479f0a
 static int	gstrnlen(char_t *s, unsigned int n);
 static void	put_char(strbuf_t *buf, char_t c);
 static void put_string(strbuf_t *buf, char_t *s, int len, int width, int prec, enum flag f);
