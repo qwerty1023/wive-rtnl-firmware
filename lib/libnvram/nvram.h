@@ -12,13 +12,7 @@
 
 #define NV_DEV "/dev/nvram"
 
-#ifdef CONFIG_LIB_LIBNVRAM_SSTRDUP
-#define NVRAM_LIB_LIBNVRAM_SSTRDUP
-#endif
-
 #define BUFSZ			1024
-#define MAX_NV_VALUE_LEN	64
-#define NV_BUFFERS_COUNT	128
 #define ENV_BLK_SIZE		0x1000
 
 #ifdef CONFIG_DUAL_IMAGE
