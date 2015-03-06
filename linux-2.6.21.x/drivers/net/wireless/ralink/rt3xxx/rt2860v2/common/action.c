@@ -1179,7 +1179,6 @@ VOID PeerPublicAction(
 						
 						if (bNeedFallBack)
 						{
-							printk("bNeedFallBack1=TRUE\n");
 							pBssCoexistIe->field.Intolerant40 = 1;
 							pBssCoexistIe->field.BSS20WidthReq = 1;
 						}
@@ -1189,7 +1188,6 @@ VOID PeerPublicAction(
 					{
 						int apidx;
 						
-						printk("bNeedFallBack2=TRUE\n");
 						NdisMoveMemory((PUCHAR)&pAd->CommonCfg.LastBSSCoexist2040, (PUCHAR)pBssCoexistIe, sizeof(BSS_2040_COEXIST_IE));
 						pAd->CommonCfg.Bss2040CoexistFlag |= BSS_2040_COEXIST_INFO_SYNC;
 

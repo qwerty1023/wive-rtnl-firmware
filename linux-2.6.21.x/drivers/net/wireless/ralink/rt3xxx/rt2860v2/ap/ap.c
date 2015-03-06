@@ -2501,13 +2501,11 @@ VOID APOverlappingBSSScan(
 		{
 			needFallBack = TRUE;
 			DBGPRINT(RT_DEBUG_TRACE, ("needFallBack=TRUE due to OP/OT!\n"));
-			printk("needFallBack=TRUE due to OP/OT!\n");
 		}
 		if ((pAd->ChannelList[index].bEffectedChannel & EFFECTED_CH_SECONDARY)  && (index != curSecChIdx))
 		{
 			needFallBack = TRUE;
 			DBGPRINT(RT_DEBUG_TRACE, ("needFallBack=TRUE due to OS!\n"));
-			printk("needFallBack=TRUE due to OS!\n");
 		}
 	}
 	
@@ -2516,14 +2514,13 @@ VOID APOverlappingBSSScan(
 		&& (pAd->CommonCfg.BssCoexApCnt > pAd->CommonCfg.BssCoexApCntThr)
 	)
 	{
-		printk("needFallBack - ignore\n");
-/*
 		pAd->CommonCfg.AddHTInfo.AddHtInfo.RecomWidth = 0;
 		pAd->CommonCfg.AddHTInfo.AddHtInfo.ExtChanOffset = 0;
 		pAd->CommonCfg.LastBSSCoexist2040.field.BSS20WidthReq = 1;
 		pAd->CommonCfg.Bss2040CoexistFlag |= BSS_2040_COEXIST_INFO_SYNC;
+		/* 2012/10/11 MTK patch while AP fall back to 20M, base band register didn't fall back to 20M */
+		pAd->CommonCfg.Bss2040NeedFallBack = 1;
 		pAd->CommonCfg.RegTransmitSetting.field.EXTCHA = 0;
-*/
 	}
 
 	return;	
