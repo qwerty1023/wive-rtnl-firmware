@@ -1,7 +1,7 @@
-/* $Id: minissdp.c,v 1.72 2014/10/22 11:54:45 nanard Exp $ */
+/* $Id: minissdp.c,v 1.73 2015/01/17 11:26:05 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
- * (c) 2006-2014 Thomas Bernard
+ * (c) 2006-2015 Thomas Bernard
  * This software is subject to the conditions detailed
  * in the LICENCE file provided within the distribution */
 
@@ -647,31 +647,31 @@ SendSSDPNotifies(int s, const char * host, unsigned short http_port,
 
 		/* iterate all services / devices */
 		for(i = 0; known_service_types[i].s; i++) {
-			if(i==0)
-				ver_str[0] = '\0';
-			else
-				snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
+		if(i==0)
+			ver_str[0] = '\0';
+		else
+			snprintf(ver_str, sizeof(ver_str), "%d", known_service_types[i].version);
+		SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
+		               host, http_port,
+#ifdef ENABLE_HTTPS
+		               https_port,
+#endif
+		               known_service_types[i].s, ver_str,	/* NT: */
+		               known_service_types[i].uuid, "::",
+		               known_service_types[i].s, /* ver_str,	USN: */
+		               lifetime);
+			/* for devices, also send NOTIFY on the uuid */
+		if(0==memcmp(known_service_types[i].s,
+			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1)) {
 			SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
 			               host, http_port,
 #ifdef ENABLE_HTTPS
 			               https_port,
 #endif
-			               known_service_types[i].s, ver_str,	/* NT: */
-			               known_service_types[i].uuid, "::",
-			               known_service_types[i].s, /* ver_str,	USN: */
+			               known_service_types[i].uuid, "",	/* NT: */
+			               known_service_types[i].uuid, "", "", /* ver_str,	USN: */
 			               lifetime);
-			/* for devices, also send NOTIFY on the uuid */
-			if(0==memcmp(known_service_types[i].s,
-			             "urn:schemas-upnp-org:device", sizeof("urn:schemas-upnp-org:device")-1)) {
-				SendSSDPNotify(s, (struct sockaddr *)&sockname, sockname_len, dest_str,
-				               host, http_port,
-#ifdef ENABLE_HTTPS
-				               https_port,
-#endif
-				               known_service_types[i].uuid, "",	/* NT: */
-				               known_service_types[i].uuid, "", "", /* ver_str,	USN: */
-				               lifetime);
-			}
+		}
 		} /* for(i = 0; known_service_types[i].s; i++) */
 #ifdef ENABLE_IPV6
 	} /* for(j = 0; (mcast_addrs[j].p1 != 0 && ipv6) || j < 1; j++) */
@@ -888,7 +888,11 @@ ProcessSSDPData(int s, const char *bufr, int n,
 			{
 				if (lan_addr == NULL)
 				{
-					/* syslog(LOG_DEBUG, "Can't find in which sub network the client is"); */
+					/*
+					syslog(LOG_ERR,
+					       "Can't find in which sub network the client %s is",
+					       sender_str);
+					*/
 					return;
 				}
 				announced_host = lan_addr->str;
