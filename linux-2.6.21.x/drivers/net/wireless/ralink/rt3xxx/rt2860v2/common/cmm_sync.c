@@ -538,7 +538,7 @@ VOID ScanNextChannel(
 			UINT32	Data = 0, macStatus;
 			UINT32 MTxCycle;
 
-			AsicSwitchChannel(pAd, pAd->CommonCfg.CentralChannel, TRUE);
+			AsicSwitchChannel(pAd, pAd->CommonCfg.CentralChannel, FALSE);
 			AsicLockChannel(pAd, pAd->CommonCfg.CentralChannel);
 			
 			//Disable MAC Tx/Rx
@@ -569,7 +569,7 @@ VOID ScanNextChannel(
 		}
 		else
 		{
-			AsicSwitchChannel(pAd, pAd->CommonCfg.Channel, TRUE);
+			AsicSwitchChannel(pAd, pAd->CommonCfg.Channel, FALSE);
 			AsicLockChannel(pAd, pAd->CommonCfg.Channel);
 
 			

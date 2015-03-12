@@ -1997,7 +1997,7 @@ VOID RTMPWriteTxWI_Data(
 			}
 		}
 
-		if ((pAd->CommonCfg.BBPCurrentBW == BW_20) && (pMacEntry->bIAmBadAtheros))
+		if (pMacEntry->bIAmBadAtheros)
 			pTxWI->MpduDensity = 7;
 		else
 			pTxWI->MpduDensity = pMacEntry->MpduDensity;
@@ -2143,7 +2143,7 @@ VOID RTMPWriteTxWI_Cache(
 		}
 	}
 
-	if ((pAd->CommonCfg.BBPCurrentBW == BW_20) && (pMacEntry->bIAmBadAtheros))
+	if (pMacEntry->bIAmBadAtheros)
 		pTxWI->MpduDensity = 7;
 
 #endif /* DOT11_N_SUPPORT */
