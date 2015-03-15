@@ -28,6 +28,7 @@ var m2uEnabled = '<% getCfgZero(1, "M2UEnabled"); %>';
 var txPower = '<% getCfgZero(1, "TxPower"); %>';
 var mcastMcs = defaultNumber('<% getCfgZero(1, "McastMcs"); %>', '0');
 var video_turbine_built='<% getVideoTurbineBuilt(); %>';
+var draft3_built='<% getDOT11N_DRAFT3Built(); %>';
 var video_turbine = '<% getCfgZero(1, "VideoTurbine"); %>';
 var lnaGain = '<% getCfgZero(1, "HiPower"); %>';
 var htNoiseThresh = '<% getCfgZero(1, "HT_BSSCoexApCntThr"); %>';
@@ -147,7 +148,20 @@ function initValue()
 		else
 			displayElement('video_turbine_row', false);
 	}
-	
+	// CONFIG 80211N_DRAFT3
+	if (draft3_built == '1')
+	{
+		form.HT_BSSCoexistence[0].checked = (htNoiseCoex == '1');
+		form.HT_BSSCoexistence[1].checked = (htNoiseCoex != '1');
+		form.AP2040Rescan[0].checked = (ap2040Rescan == '1');
+		form.AP2040Rescan[1].checked = (ap2040Rescan != '1');
+	}
+	else
+	{
+		displayElement('draft3_row', false);
+		form.HT_BSSCoexistence[0].checked = false;
+		form.HT_BSSCoexistence[1].checked = true;
+	}
 	// Set-up TX power combo
 	for (var i=0; i<form.tx_power.options.length; i++)
 	{
@@ -168,13 +182,8 @@ function initValue()
 	}
 	
 	form.HT_BSSCoexApCntThr.value = htNoiseThresh;
-	form.HT_BSSCoexistence[0].checked = (htNoiseCoex == '1');
-	form.HT_BSSCoexistence[1].checked = (htNoiseCoex != '1');
-	form.AP2040Rescan[0].checked = (ap2040Rescan == '1');
-	form.AP2040Rescan[1].checked = (ap2040Rescan != '1');
 	form.WmmCapable[0].checked = (wmmCapable == '1');
 	form.WmmCapable[1].checked = (wmmCapable != '1');
-
 	
 	wifiCoexThrChange(form);
 }
@@ -316,7 +325,7 @@ function CheckValue(form)
 		<input type="text" name="rts" class="half" maxlength="4" value="<% getCfgZero(1, "RTSThreshold"); %>"> <font color="#808080" id="advRTSRange">(range 1 - 2347)</font>
 	</td>
 </tr>
-<tr> 
+<tr id="draft3_row"> 
 	<td class="head">Wi-Fi coexistence</td>
 	<td>
 		<input type="radio" name="HT_BSSCoexistence" value="1" onchange="wifiCoexThrChange(this.form);">Enable&nbsp;
@@ -384,7 +393,7 @@ function CheckValue(form)
 		<input type="radio" name="lnaGainEnable" value="0" checked>Disable
 	</td>
 </tr>
-<tr>
+<tr id="draft3_row">
 	<td class="head">Rescan HT Mode</td>
 	<td>
 		<input type="radio" name="AP2040Rescan" value="1">Enable&nbsp;

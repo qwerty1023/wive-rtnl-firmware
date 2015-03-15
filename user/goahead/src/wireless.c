@@ -61,6 +61,7 @@ static void AntennaDiversity(webs_t wp, char_t *path, char_t *query);
 static void getAntenna(webs_t wp, char_t *path, char_t *query);
 #endif
 static int getVideoTurbineBuilt(int eid, webs_t wp, int argc, char_t **argv);
+static int getDOT11N_DRAFT3Built(int eid, webs_t wp, int argc, char_t **argv);
 
 typedef struct country_code_t
 {
@@ -176,6 +177,7 @@ const country_code_t country_codes[] =
 void formDefineWireless(void)
 {
 	websAspDefine(T("getVideoTurbineBuilt"), getVideoTurbineBuilt);
+	websAspDefine(T("getDOT11N_DRAFT3Built"), getDOT11N_DRAFT3Built);
 	websAspDefine(T("getWlan11aChannels"), getWlan11aChannels);
 	websAspDefine(T("getWlan11bChannels"), getWlan11bChannels);
 	websAspDefine(T("getWlan11gChannels"), getWlan11gChannels);
@@ -937,6 +939,16 @@ static int getVideoTurbineBuilt(int eid, webs_t wp, int argc, char_t **argv)
 	#else
 		websWrite(wp, T("0"));
 	#endif
+#else
+	websWrite(wp, T("0"));
+#endif
+	return 0;
+}
+
+static int getDOT11N_DRAFT3Built(int eid, webs_t wp, int argc, char_t **argv)
+{
+#ifdef CONFIG_RT2860V2_AP_80211N_DRAFT3
+	websWrite(wp, T("1"));
 #else
 	websWrite(wp, T("0"));
 #endif
