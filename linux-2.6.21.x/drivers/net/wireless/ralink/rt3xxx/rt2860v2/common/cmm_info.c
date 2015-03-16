@@ -3517,7 +3517,7 @@ VOID	RTMPCommSiteSurveyData(
 		sprintf(msg+strlen(msg),"%-33s", Ssid);      
 		
 		/*BSSID*/
-		sprintf(msg+strlen(msg),"%02x:%02x:%02x:%02x:%02x:%02x   ", 
+		sprintf(msg+strlen(msg),"%02x:%02x:%02x:%02x:%02x:%02x ", 
 			pBss->Bssid[0], 
 			pBss->Bssid[1],
 			pBss->Bssid[2], 
@@ -3628,7 +3628,7 @@ VOID	RTMPCommSiteSurveyData(
 			Rssi_Quality = (UINT)(((Rssi + 90) * 26)/10);
 		else    /* < -84 dbm*/
 			Rssi_Quality = 0;
-		sprintf(msg+strlen(msg),"%-9d", Rssi_Quality);
+		sprintf(msg+strlen(msg),"%3d (%d) ", Rssi_Quality, Rssi);
 		
 		/* Wireless Mode*/
 		wireless_mode = NetworkTypeInUseSanity(pBss);
@@ -3709,7 +3709,7 @@ VOID RTMPIoctlGetSiteSurvey(
 	memset(msg, 0 , TotalLen);
 	sprintf(msg,"%s","\n");
 
-	sprintf(msg+strlen(msg),"%-4s%-33s%-20s%-23s%-9s%-7s%-7s%-3s\n",
+	sprintf(msg+strlen(msg),"%-4s%-33s%-18s%-23s%-10s%-7s%-7s%-3s\n",
 	    "Ch", "SSID", "BSSID", "Security", "Siganl(%)", "W-Mode", " ExtCH"," NT");	
 
 #ifdef WSC_INCLUDED
