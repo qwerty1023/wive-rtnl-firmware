@@ -2862,7 +2862,17 @@ VOID	RTMPSetHT(
 		RTMPSetIndividualHT(pAd, 0);
 		}
 #endif /* CONFIG_STA_SUPPORT */
-
+printk("RTMPSetHT: HT_mode(%d), ExtOffset(%d), MCS(%d), BW(%d), STBC(%d), SHORTGI(%d)\n",
+										pHTPhyMode->HtMode, pHTPhyMode->ExtOffset, 
+										pHTPhyMode->MCS, pHTPhyMode->BW,
+										pHTPhyMode->STBC, pHTPhyMode->SHORTGI);
+printk("RTMPSetHT: AMsduSize=%d, MimoPs=%d, MpduDensity=%d, MaxRAmpduFactor=%d, TxSTBC(%d), RxSTBC(%d)\n", 
+										pAd->CommonCfg.DesiredHtPhy.AmsduSize, 
+										pAd->CommonCfg.DesiredHtPhy.MimoPs,
+										pAd->CommonCfg.DesiredHtPhy.MpduDensity,
+										pAd->CommonCfg.DesiredHtPhy.MaxRAmpduFactor,
+										pAd->CommonCfg.DesiredHtPhy.TxSTBC,
+										pAd->CommonCfg.DesiredHtPhy.RxSTBC);
 }
 
 /*
