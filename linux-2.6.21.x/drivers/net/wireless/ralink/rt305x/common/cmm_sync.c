@@ -1005,6 +1005,8 @@ VOID Handle_BSS_Width_Trigger_Events(
 	IN PRTMP_ADAPTER pAd) 
 {
 	ULONG Now32;
+
+printk("Rcv BSS Width Trigger Event: 40Mhz --> 20Mhz\n");
 	
 	if ((pAd->CommonCfg.HtCapability.HtCapInfo.ChannelWidth == BW_40) &&
 		(pAd->CommonCfg.Channel <=14))
@@ -1012,7 +1014,8 @@ VOID Handle_BSS_Width_Trigger_Events(
 		DBGPRINT(RT_DEBUG_TRACE, ("Rcv BSS Width Trigger Event: 40Mhz --> 20Mhz \n"));
         NdisGetSystemUpTime(&Now32);
 		pAd->CommonCfg.LastRcvBSSWidthTriggerEventsTime = Now32;
-		pAd->CommonCfg.bRcvBSSWidthTriggerEvents = TRUE;
+//		pAd->CommonCfg.bRcvBSSWidthTriggerEvents = TRUE;
+		pAd->CommonCfg.bRcvBSSWidthTriggerEvents = FALSE;
 		pAd->CommonCfg.AddHTInfo.AddHtInfo.RecomWidth = 0;	
 		pAd->CommonCfg.AddHTInfo.AddHtInfo.ExtChanOffset = 0;
         DetectOverlappingPeriodicRound = 31;
