@@ -719,7 +719,7 @@ VOID WdsPeerBeaconProc(
 
 			if ((pHtCapability->HtCapInfo.ChannelWidth) && (pAd->CommonCfg.DesiredHtPhy.ChannelWidth))
 			{
-				pEntry->MaxHTPhyMode.field.BW= BW_40;
+				pEntry->MaxHTPhyMode.field.BW = BW_40;
 				pEntry->MaxHTPhyMode.field.ShortGI = ((pAd->CommonCfg.DesiredHtPhy.ShortGIfor40)&(pHtCapability->HtCapInfo.ShortGIfor40));
 			}
 			else

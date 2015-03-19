@@ -1294,22 +1294,23 @@ extern int DetectOverlappingPeriodicRound;
 VOID Handle_BSS_Width_Trigger_Events(
 	IN PRTMP_ADAPTER pAd) 
 {
-	ULONG Now32;
+	//ULONG Now32;
 
-printk("Rcv BSS Width Trigger Event: 40Mhz --> 20Mhz\n");
+printk("!!! Rcv BSS Width Trigger Event: 40Mhz --> 20Mhz\n");
 	
+/*
 	if ((pAd->CommonCfg.HtCapability.HtCapInfo.ChannelWidth == BW_40) &&
 		(pAd->CommonCfg.Channel <=14))
 	{	
 		DBGPRINT(RT_DEBUG_TRACE, ("Rcv BSS Width Trigger Event: 40Mhz --> 20Mhz \n"));
         NdisGetSystemUpTime(&Now32);
 		pAd->CommonCfg.LastRcvBSSWidthTriggerEventsTime = Now32;
-//		pAd->CommonCfg.bRcvBSSWidthTriggerEvents = TRUE;
-		pAd->CommonCfg.bRcvBSSWidthTriggerEvents = FALSE;
+		pAd->CommonCfg.bRcvBSSWidthTriggerEvents = TRUE;
 		pAd->CommonCfg.AddHTInfo.AddHtInfo.RecomWidth = 0;	
 		pAd->CommonCfg.AddHTInfo.AddHtInfo.ExtChanOffset = 0;
         DetectOverlappingPeriodicRound = 31;
 	}
+*/
 }
 #endif /* DOT11_N_SUPPORT */
 #endif /* CONFIG_AP_SUPPORT */
