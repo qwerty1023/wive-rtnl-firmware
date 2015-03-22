@@ -29,10 +29,8 @@ export $(CFLAGS)
 export $(LDFLAGS)
 
 #for all cleanap
-SUBDIRS_APP =  goahead iptables miniupnp rt2880_app wpa_supplicant ethtool
-SUBDIRS_APP += igmpproxy lldt ppp strace wsc_upnp busybox inadyn udpxy xl2tpd
-SUBDIRS_APP += 802.1x dnsmasq gdbserver iproute2 wive-utils kabinet radvd dhcp6 wireless_tools zebra dropbear
-SUBDIRS_APP += ntfs-3g p910nd transmission openssl samba samba3 cdp-tools xupnpd e2fsprogs minidlna hdparm
+SUBDIRS_APP = $(shell LC_ALL=C; ls)
+
 #
 # must run the vendor build first
 #
@@ -96,6 +94,11 @@ dir_$(CONFIG_RT2880_APP)		    += rt2880_app
 dir_$(CONFIG_USER_BUSYBOX_BUSYBOX)          += busybox
 dir_$(CONFIG_USER_GOAHEAD_HTTPD)	    += goahead
 
+OPENSSL_CONFIG = RT2880 no-camellia no-capieng no-cms no-gmp no-jpake no-krb5 no-mdc2 no-rfc3779 no-seed \
+                  no-ec no-ecdh no-ec2m no-ecdsa no-err no-threads no-idea no-rc2 no-rc5 \
+                  no-hw no-md2 no-sse2 no-dso no-ts no-ripemd no-rmd160 no-sha0 \
+                  no-smime no-ans1 no-cast no-whirlpool no-sctp no-srp no-jpake no-ssl2 no-ssl3 no-speed
+
 all:
 	CC=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-gcc ; \
 	GCC=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-gcc ; \
@@ -108,7 +111,7 @@ all:
 	STRIP=$(CONFIG_CROSS_COMPILER_PATH)/mipsel-linux-uclibc-strip ;
 ifeq ($(CONFIG_USER_OPENSSL),y)
 	# ">>>>>>>>>>>>>>>> CONFIGURE AND BUILD SSL <<<<<<<<<<<<<<<<<<<<<<<"
-	if [ ! -e openssl/libssl.so ]; then  cd openssl ; ./Configure RT2880 no-ripemd; $(MAKE) -j1 ; cd .. ; fi
+	if [ ! -e openssl/libssl.so ]; then  cd openssl ; ./Configure $(OPENSSL_CONFIG); $(MAKE) -j1 ; cd .. ; fi
 	if [ -e openssl/libssl.so ]; then  cp -fap openssl/*.so* $(ROOTDIR)/lib/lib ; cp -fapv openssl/*.a $(ROOTDIR)/lib/lib ; fi
 	if [ -e openssl/libssl.so ]; then  $(RM) -rf $(ROOTDIR)/lib/include_shared/openssl ; cp -faprL openssl/include/* $(ROOTDIR)/lib/include_shared ; fi
 endif
@@ -131,13 +134,10 @@ endif
 
 clean:
 	# ">>>>>>>>>>>>>>>> START FULL CLEANUP  <<<<<<<<<<<<<<<<<<<<<<"
-	-for i in $(sort $(dir_y) $(dir_n) $(dir_)) ; do [ ! -d $$i ] || \
-	    ($(MAKE) -C $$i clean; \
-	     $(MAKE) -C $$i dist-clean; \
-	     $(MAKE) -C $$i distclean; \
-	     $(MAKE) -C $$i mrproper) \
-	    done
+	-cd openssl ; $(MAKE) clean ; $(MAKE) dclean ; cd ..
 	-for i in $(SUBDIRS_APP); do $(MAKE) -C $$i clean; $(RM) -rf $(ROOTDIR)/user/$$i/filesystem/*; done
+	-for i in $(SUBDIRS_APP); do $(MAKE) -C $$i distclean; $(RM) -rf $(ROOTDIR)/user/$$i/filesystem/*; done
+	-for i in $(SUBDIRS_APP); do $(MAKE) -C $$i mrproper; $(RM) -rf $(ROOTDIR)/user/$$i/filesystem/*; done
 
 web:
 	$(MAKE) -C goahead all
