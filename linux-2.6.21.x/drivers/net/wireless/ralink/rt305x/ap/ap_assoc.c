@@ -1482,9 +1482,6 @@ USHORT APBuildAssociation(
 					pEntry->MaxHTPhyMode.field.ShortGI = ((pAd->CommonCfg.DesiredHtPhy.ShortGIfor20)&(pHtCapability->HtCapInfo.ShortGIfor20));
 					pAd->MacTab.fAnyStation20Only = TRUE;
 				}
-				
-#ifdef RTMP_RBUS_SUPPORT
-#endif // RTMP_RBUS_SUPPORT //
 
 				// find max fixed rate
 //				for (i=15; i>=0; i--)
