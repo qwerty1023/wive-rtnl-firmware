@@ -8816,8 +8816,10 @@ VOID dynamic_tune_be_tx_op(
 
 
 #ifdef DOT11_N_SUPPORT
+#ifdef DOT11N_DRAFT3
 VOID Handle_BSS_Width_Trigger_Events(
 	IN PRTMP_ADAPTER pAd);
+#endif /* DOT11N_DRAFT3 */
 
 void build_ext_channel_switch_ie(
 	IN PRTMP_ADAPTER pAd,

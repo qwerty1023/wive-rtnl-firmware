@@ -1313,10 +1313,13 @@ VOID PeerHTAction(
 #ifdef CONFIG_AP_SUPPORT
 				IF_DEV_CONFIG_OPMODE_ON_AP(pAd)
 				{
+#ifdef DOT11N_DRAFT3
 	    				if (pHT_info->Forty_MHz_Intolerant)
 	    				{
 	    					Handle_BSS_Width_Trigger_Events(pAd);
 	    				}
+#endif /* DOT11N_DRAFT3 */
+
 				}
 #endif // CONFIG_AP_SUPPORT //
 			}

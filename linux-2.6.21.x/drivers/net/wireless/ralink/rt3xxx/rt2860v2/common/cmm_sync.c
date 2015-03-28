@@ -1291,6 +1291,7 @@ VOID ScanNextChannel(
 #ifdef DOT11_N_SUPPORT
 extern int DetectOverlappingPeriodicRound;
 
+#ifdef DOT11N_DRAFT3
 VOID Handle_BSS_Width_Trigger_Events(
 	IN PRTMP_ADAPTER pAd) 
 {
@@ -1312,6 +1313,7 @@ printk("!!! Rcv BSS Width Trigger Event: 40Mhz --> 20Mhz\n");
 	}
 */
 }
+#endif /* DOT11N_DRAFT3 */
 #endif /* DOT11_N_SUPPORT */
 #endif /* CONFIG_AP_SUPPORT */
 

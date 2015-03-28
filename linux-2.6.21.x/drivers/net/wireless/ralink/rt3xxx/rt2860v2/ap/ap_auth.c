@@ -651,13 +651,11 @@ VOID APPeerAuthSimpleRspGenAndSend(
     if (StatusCode == MLME_SUCCESS)
     {
         DBGPRINT(RT_DEBUG_TRACE, ("AUTH_RSP - Send AUTH response (SUCCESS)...\n"));
-        printk("AUTH - send AUTH SUCCESS to %02x:%02x:%02x:%02x:%02x:%02x\n", PRINT_MAC(pHdr->Addr2));
     }
     else
     {
         /* For MAC wireless client(Macintosh), need to send AUTH_RSP with Status Code (fail reason code) to reject it. */
         DBGPRINT(RT_DEBUG_TRACE, ("AUTH_RSP - Peer AUTH fail (Status = %d)...\n", StatusCode));
-        printk("AUTH - send AUTH FAIL (Status = %d) to %02x:%02x:%02x:%02x:%02x:%02x\n", StatusCode, PRINT_MAC(pHdr->Addr2));
     }
 
 	MgtMacHeaderInit(pAd, &AuthHdr, SUBTYPE_AUTH, 0, pHdr->Addr2, 
