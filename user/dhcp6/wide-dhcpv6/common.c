@@ -1118,11 +1118,7 @@ getifhwaddr(const char *ifname, char *buf, u_int16_t *hwtypep, int ppa)
 		snprintf(fname, sizeof (fname), "/dev/%s", ifname);
 	getctl.maxlen = sizeof (getbuf);
 	getctl.buf = (char *)getbuf;
-#ifdef __linux__
-	if ((fd = open(fname, O_RDWR | O_CLOEXEC)) == -1) {
-#else
 	if ((fd = open(fname, O_RDWR)) == -1) {
-#endif
 		dl_attach_req_t dlar;
 
 		cp = fname + strlen(fname) - 1;
@@ -1138,11 +1134,7 @@ getifhwaddr(const char *ifname, char *buf, u_int16_t *hwtypep, int ppa)
 		cp++;
 		dlar.dl_ppa = atoi(cp);
 		*cp = '\0';
-#ifdef __linux__
-		if ((fd = open(fname, O_RDWR | O_CLOEXEC)) == -1)
-#else
 		if ((fd = open(fname, O_RDWR)) == -1)
-#endif
 			return (-1);
 		dlar.dl_primitive = DL_ATTACH_REQ;
 		putctl.len = sizeof (dlar);
@@ -3301,12 +3293,7 @@ ifaddrconf(cmd, ifname, addr, plen, pltime, vltime)
 		return (-1);
 	}
 
-#ifdef __linux__
-#define SOCKTYPE (SOCK_DGRAM | SOCK_CLOEXEC)
-#else
-#define SOCKTYPE SOCK_DGRAM
-#endif
-	if ((s = socket(PF_INET6, SOCKTYPE, IPPROTO_UDP)) < 0) {
+	if ((s = socket(PF_INET6, SOCK_DGRAM, IPPROTO_UDP)) < 0) {
 		debug_printf(LOG_ERR, FNAME, "can't open a temporary socket: %s",
 		    strerror(errno));
 		return (-1);
