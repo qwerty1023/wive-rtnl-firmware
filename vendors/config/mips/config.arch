@@ -228,7 +228,7 @@ endif
   endif
 	SH_LDFLAGS := $(LDFLAGS) $(SH_CRTI) -nodefaultlibs
 	SH_LDLIBS  := $(LIBC) $(LIBGCC) $(SH_CRTN)
-	#LDFLAGS += $(CRTI) -nodefaultlibs
+
 	LDLIBS   = $(LIBC) $(LIBGCC) $(CRTN)
 	CXXLIBS  = -Wl,-Bstatic $(LIBSTDCPP) -Wl,-Bdynamic $(LIBC) $(LIBGCC) $(CRTN)
 
