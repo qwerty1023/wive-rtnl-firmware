@@ -173,7 +173,7 @@ static int sig_ignored(struct task_struct *t, int sig)
 	 * signal handler may change by the time it is
 	 * unblocked.
 	 */
-	if (sigismember(&t->blocked, sig))
+	if (sigismember(&t->blocked, sig) || sigismember(&t->real_blocked, sig))
 		return 0;
 
 	/* Is it explicitly or implicitly ignored? */
@@ -1145,17 +1145,26 @@ int kill_pgrp_info(int sig, struct siginfo *info, struct pid *pgrp)
 
 int kill_pid_info(int sig, struct siginfo *info, struct pid *pid)
 {
-	int error;
+	int error = -ESRCH;
 	struct task_struct *p;
 
 	rcu_read_lock();
 	if (unlikely(sig_needs_tasklist(sig)))
 		read_lock(&tasklist_lock);
 
+retry:
 	p = pid_task(pid, PIDTYPE_PID);
-	error = -ESRCH;
-	if (p)
+	if (p) {
 		error = group_send_sig_info(sig, info, p);
+		if (unlikely(error == -ESRCH))
+			/*
+			 * The task was unhashed in between, try again.
+			 * If it is dead, pid_task() will return NULL,
+			 * if we race with de_thread() it will find the
+			 * new leader.
+			 */
+			goto retry;
+	}
 
 	if (unlikely(sig_needs_tasklist(sig)))
 		read_unlock(&tasklist_lock);
@@ -2365,15 +2374,6 @@ int do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
 	k = &current->sighand->action[sig-1];
 
 	spin_lock_irq(&current->sighand->siglock);
-	if (signal_pending(current)) {
-		/*
-		 * If there might be a fatal signal pending on multiple
-		 * threads, make sure we take it before changing the action.
-		 */
-		spin_unlock_irq(&current->sighand->siglock);
-		return -ERESTARTNOINTR;
-	}
-
 	if (oact)
 		*oact = *k;
 
