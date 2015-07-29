@@ -1223,8 +1223,11 @@ int dnssec_validate_ds(time_t now, struct dns_header *header, size_t plen, char 
     val = dnssec_validate_reply(now, header, plen, name, keyname, NULL, &neganswer, &nons);
   /* Note dnssec_validate_reply() will have cached positive answers */
   
-  if (val == STAT_NO_SIG || val == STAT_INSECURE)
+  if (val == STAT_INSECURE)
     val = STAT_BOGUS;
+  
+  if (val == STAT_NO_SIG)
+    return val;
   
   p = (unsigned char *)(header+1);
   extract_name(header, plen, &p, name, 1, 4);
@@ -1493,13 +1496,13 @@ static int prove_non_existence_nsec(struct dns_header *header, size_t plen, unsi
 	{
 	  /* Normal case, name falls between NSEC name and next domain name,
 	     wrap around case, name falls between NSEC name (rc == -1) and end */
-	  if (hostname_cmp(workspace2, name) == 1 || hostname_cmp(workspace1, workspace2) == 1)
+	  if (hostname_cmp(workspace2, name) >= 0 || hostname_cmp(workspace1, workspace2) >= 0)
 	    return STAT_SECURE;
 	}
       else 
 	{
 	  /* wrap around case, name falls between start and next domain name */
-	  if (hostname_cmp(workspace1, workspace2) == 1 && hostname_cmp(workspace2, name) == 1)
+	  if (hostname_cmp(workspace1, workspace2) >= 0 && hostname_cmp(workspace2, name) >=0 )
 	    return STAT_SECURE;
 	}
     }
@@ -1632,17 +1635,17 @@ static int check_nsec3_coverage(struct dns_header *header, size_t plen, int dige
 
 		return 1;
 	      }
-	    else if (rc <= 0)
+	    else if (rc < 0)
 	      {
 		/* Normal case, hash falls between NSEC3 name-hash and next domain name-hash,
 		   wrap around case, name-hash falls between NSEC3 name-hash and end */
-		if (memcmp(p, digest, digest_len) > 0 || memcmp(workspace2, p, digest_len) > 0)
+		if (memcmp(p, digest, digest_len) >= 0 || memcmp(workspace2, p, digest_len) >= 0)
 		  return 1;
 	      }
 	    else 
 	      {
 		/* wrap around case, name falls between start and next domain name */
-		if (memcmp(workspace2, p, digest_len) > 0 && memcmp(p, digest, digest_len) > 0)
+		if (memcmp(workspace2, p, digest_len) >= 0 && memcmp(p, digest, digest_len) >= 0)
 		  return 1;
 	      }
 	  }
@@ -1878,7 +1881,10 @@ int dnssec_validate_reply(time_t now, struct dns_header *header, size_t plen, ch
 
   /* No data, therefore no sigs */
   if (ntohs(header->ancount) + ntohs(header->nscount) == 0)
+    {
+      *keyname = 0;
     return STAT_NO_SIG;
+    }
   
   for (p1 = ans_start, i = 0; i < ntohs(header->ancount) + ntohs(header->nscount); i++)
     {
@@ -1948,6 +1954,19 @@ int dnssec_validate_reply(time_t now, struct dns_header *header, size_t plen, ch
 		{
 		  if (class)
 		    *class = class1; /* Class for DS or DNSKEY */
+
+		  if (rc == STAT_NO_SIG)
+		    {
+		      /* If we dropped off the end of a CNAME chain, return
+			 STAT_NO_SIG and the last name is keyname. This is used for proving non-existence
+			 if DS records in CNAME chains. */
+		      if (cname_count == CNAME_CHAIN || i < ntohs(header->ancount)) 
+			/* No CNAME chain, or no sig in answer section, return empty name. */
+			*keyname = 0;
+		      else if (!extract_name(header, plen, &qname, keyname, 1, 0))
+			return STAT_BOGUS;
+		    }
+ 
 		  return rc;
 		}
 	      
@@ -2060,8 +2079,17 @@ int dnssec_validate_reply(time_t now, struct dns_header *header, size_t plen, ch
   /* NXDOMAIN or NODATA reply, prove that (name, class1, type1) can't exist */
   /* First marshall the NSEC records, if we've not done it previously */
   if (!nsec_type && !(nsec_type = find_nsec_records(header, plen, &nsecs, &nsec_count, qclass)))
+    {
+      /* No NSEC records. If we dropped off the end of a CNAME chain, return
+	 STAT_NO_SIG and the last name is keyname. This is used for proving non-existence
+	 if DS records in CNAME chains. */
+      if (cname_count == CNAME_CHAIN) /* No CNAME chain, return empty name. */
+	*keyname = 0;
+      else if (!extract_name(header, plen, &qname, keyname, 1, 0))
+	return STAT_BOGUS;
     return STAT_NO_SIG; /* No NSECs, this is probably a dangling CNAME pointing into
 			   an unsigned zone. Return STAT_NO_SIG to cause this to be proved. */
+    }
    
   /* Get name of missing answer */
   if (!extract_name(header, plen, &qname, name, 1, 0))
@@ -2162,10 +2190,12 @@ int dnskey_keytag(int alg, int flags, unsigned char *key, int keylen)
     }
 }
 
-size_t dnssec_generate_query(struct dns_header *header, char *end, char *name, int class, int type, union mysockaddr *addr)
+size_t dnssec_generate_query(struct dns_header *header, char *end, char *name, int class, 
+			     int type, union mysockaddr *addr, int edns_pktsz)
 {
   unsigned char *p;
   char *types = querystr("dnssec-query", type);
+  size_t ret;
 
   if (addr->sa.sa_family == AF_INET) 
     log_query(F_NOEXTRA | F_DNSSEC | F_IPV4, name, (struct all_addr *)&addr->in.sin_addr, types);
@@ -2194,7 +2224,12 @@ size_t dnssec_generate_query(struct dns_header *header, char *end, char *name, i
   PUTSHORT(type, p);
   PUTSHORT(class, p);
 
-  return add_do_bit(header, p - (unsigned char *)header, end);
+  ret = add_do_bit(header, p - (unsigned char *)header, end);
+
+  if (find_pseudoheader(header, ret, NULL, &p, NULL))
+    PUTSHORT(edns_pktsz, p);
+
+  return ret;
 }
 
 /* Go through a domain name, find "pointers" and fix them up based on how many bytes

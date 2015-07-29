@@ -253,6 +253,7 @@ static int forward_query(int udpfd, union mysockaddr *udpaddr,
   void *hash = &crc;
 #endif
  unsigned int gotname = extract_request(header, plen, daemon->namebuff, NULL);
+ unsigned char *pheader;
 
  (void)do_bit;
 
@@ -261,6 +262,12 @@ static int forward_query(int udpfd, union mysockaddr *udpaddr,
     forward = NULL;
   else if (forward || (hash && (forward = lookup_frec_by_sender(ntohs(header->id), udpaddr, hash))))
     {
+      /* If we didn't get an answer advertising a maximal packet in EDNS,
+	 fall back to 1280, which should work everywhere on IPv6.
+	 If that generates an answer, it will become the new default
+	 for this server */
+      forward->flags |= FREC_TEST_PKTSZ;
+      
 #ifdef HAVE_DNSSEC
       /* If we've already got an answer to this query, but we're awaiting keys for validation,
 	 there's no point retrying the query, retry the key query instead...... */
@@ -268,12 +275,19 @@ static int forward_query(int udpfd, union mysockaddr *udpaddr,
 	{
 	  int fd;
 
+	  forward->flags &= ~FREC_TEST_PKTSZ;
+	  
 	  while (forward->blocking_query)
 	    forward = forward->blocking_query;
+	  
+	  forward->flags |= FREC_TEST_PKTSZ;
 	  
 	  blockdata_retrieve(forward->stash, forward->stash_len, (void *)header);
 	  plen = forward->stash_len;
 	  
+	  if (find_pseudoheader(header, plen, NULL, &pheader, NULL))
+	    PUTSHORT((forward->flags & FREC_TEST_PKTSZ) ? SAFE_PKTSZ : forward->sentto->edns_pktsz, pheader);
+
 	  if (forward->sentto->addr.sa.sa_family == AF_INET) 
 	    log_query(F_NOEXTRA | F_DNSSEC | F_IPV4, "retry", (struct all_addr *)&forward->sentto->addr.in.sin_addr, "dnssec");
 #ifdef HAVE_IPV6
@@ -464,6 +478,9 @@ static int forward_query(int udpfd, union mysockaddr *udpaddr,
 		    }
 #endif
 		}
+	      
+	      if (find_pseudoheader(header, plen, NULL, &pheader, NULL))
+		PUTSHORT((forward->flags & FREC_TEST_PKTSZ) ? SAFE_PKTSZ : start->edns_pktsz, pheader);
 	      
 	      if (retry_send(sendto(fd, (char *)header, plen, 0,
 				    &start->addr.sa,
@@ -752,7 +769,8 @@ void reply_query(int fd, int family, time_t now)
 	  header->arcount = htons(0);
 	  if ((nn = resize_packet(header, (size_t)n, pheader, plen)))
 	    {
-	      header->hb3 &= ~(HB3_QR | HB3_TC);
+	      header->hb3 &= ~(HB3_QR | HB3_AA | HB3_TC);
+	      header->hb4 &= ~(HB4_RA | HB4_RCODE);
 	      forward_query(-1, NULL, NULL, 0, header, nn, now, forward, 0, 0);
 	      return;
 	    }
@@ -782,6 +800,13 @@ void reply_query(int fd, int family, time_t now)
 	daemon->last_server = server;
     }
 
+  /* We tried resending to this server with a smaller maximum size and got an answer.
+     Make that permanent. To avoid reduxing the packet size for an single dropped packet,
+     only do this when we get a truncated answer, or one larger than the safe size. */
+  if (server && (forward->flags & FREC_TEST_PKTSZ) && 
+      ((header->hb3 & HB3_TC) || n >= SAFE_PKTSZ))
+    server->edns_pktsz = SAFE_PKTSZ;
+  
   /* If the answer is an error, keep the forward record in place in case
      we get a good reply from another server. Kill it when we've
      had replies from all to avoid filling the forwarding table when
@@ -827,7 +852,7 @@ void reply_query(int fd, int family, time_t now)
 		   Avoid caching a reply with sigs if there's a vaildated break in the 
 		   DS chain, so we don't return replies from cache missing sigs. */
 		status = STAT_INSECURE_DS;
-	      else if (status == STAT_NO_NS)
+	      else if (status == STAT_NO_NS || status == STAT_NO_SIG)
 		status = STAT_BOGUS;
 	    }
 	  else if (forward->flags & FREC_CHECK_NOSIGN)
@@ -890,7 +915,7 @@ void reply_query(int fd, int family, time_t now)
 		    {
 		      new->flags |= FREC_DNSKEY_QUERY; 
 		      nn = dnssec_generate_query(header, ((char *) header) + daemon->packet_buff_sz,
-						 daemon->keyname, forward->class, T_DNSKEY, &server->addr);
+						 daemon->keyname, forward->class, T_DNSKEY, &server->addr, server->edns_pktsz);
 		    }
 		  else 
 		    {
@@ -899,7 +924,7 @@ void reply_query(int fd, int family, time_t now)
 		      else
 			new->flags |= FREC_DS_QUERY;
 		      nn = dnssec_generate_query(header,((char *) header) + daemon->packet_buff_sz,
-						 daemon->keyname, forward->class, T_DS, &server->addr);
+						 daemon->keyname, forward->class, T_DS, &server->addr, server->edns_pktsz);
 		    }
 		  if ((hash = hash_questions(header, nn, daemon->namebuff)))
 		    memcpy(new->hash, hash, HASH_SIZE);
@@ -973,7 +998,7 @@ void reply_query(int fd, int family, time_t now)
 			   Avoid caching a reply with sigs if there's a vaildated break in the 
 			   DS chain, so we don't return replies from cache missing sigs. */
 			status = STAT_INSECURE_DS;
-		      else if (status == STAT_NO_NS)
+		      else if (status == STAT_NO_NS || status == STAT_NO_SIG)
 			status = STAT_BOGUS; 
 		    }
 		  else if (forward->flags & FREC_CHECK_NOSIGN)
@@ -1432,6 +1457,21 @@ static int do_check_sign(struct frec *forward, int status, time_t now, char *nam
       if (status == STAT_BOGUS)
 	return STAT_BOGUS;
 
+      if (status == STAT_NO_SIG && *keyname != 0)
+	{
+	  /* There is a validated CNAME chain that doesn't end in a DS record. Start 
+	     the search again in that domain. */
+	  blockdata_free(forward->orig_domain);
+	  forward->name_start = strlen(keyname);
+	  forward->name_len = forward->name_start + 1;
+	  if (!(forward->orig_domain = blockdata_alloc(keyname, forward->name_len)))
+	    return STAT_BOGUS;
+	  
+	  strcpy(name, keyname);
+	  status = 0; /* force to cache when we iterate. */
+	  continue;
+	}
+      
       /* There's a proven DS record, or we're within a zone, where there doesn't need
 	 to be a DS record. Add a name and try again. 
 	 If we've already tried the whole name, then fail */
@@ -1526,7 +1566,7 @@ static int  tcp_check_for_unsigned_zone(time_t now, struct dns_header *header, s
       
       /* Can't find it in the cache, have to send a query */
 
-      m = dnssec_generate_query(header, ((char *) header) + 65536, name_start, class, T_DS, &server->addr);
+      m = dnssec_generate_query(header, ((char *) header) + 65536, name_start, class, T_DS, &server->addr, server->edns_pktsz);
       
       *length = htons(m);
       
@@ -1546,6 +1586,21 @@ static int  tcp_check_for_unsigned_zone(time_t now, struct dns_header *header, s
 	      free(packet);
 	      blockdata_free(block);
 	      return STAT_INSECURE;
+	    }
+	  
+	  if (status == STAT_NO_SIG && *keyname != 0)
+	    {
+	      /* There is a validated CNAME chain that doesn't end in a DS record. Start 
+		 the search again in that domain. */
+	      blockdata_free(block);
+	      name_len = strlen(keyname) + 1;
+	      name_start = name + name_len - 1;
+	      
+	      if (!(block = blockdata_alloc(keyname, name_len)))
+		return STAT_BOGUS;
+	      
+	      strcpy(name, keyname);
+	      continue;
 	    }
 	  
 	  if (status == STAT_BOGUS)
@@ -1603,7 +1658,7 @@ static int tcp_key_recurse(time_t now, int status, struct dns_header *header, si
 	{
 	  if (new_status == STAT_NO_DS)
 	    new_status = STAT_INSECURE_DS;
-	  else if (new_status == STAT_NO_NS)
+	  else if (new_status == STAT_NO_NS || new_status == STAT_NO_SIG)
 	    new_status = STAT_BOGUS;
 	}
     }
@@ -1638,7 +1693,7 @@ static int tcp_key_recurse(time_t now, int status, struct dns_header *header, si
 
     another_tcp_key:
       m = dnssec_generate_query(new_header, ((char *) new_header) + 65536, keyname, class, 
-				new_status == STAT_NEED_KEY ? T_DNSKEY : T_DS, &server->addr);
+				new_status == STAT_NEED_KEY ? T_DNSKEY : T_DS, &server->addr, server->edns_pktsz);
       
       *length = htons(m);
       
@@ -1668,7 +1723,7 @@ static int tcp_key_recurse(time_t now, int status, struct dns_header *header, si
 		    {
 		      if (new_status == STAT_NO_DS)
 			new_status = STAT_INSECURE_DS;
-		      else if (new_status == STAT_NO_NS)
+		      else if (new_status == STAT_NO_NS || new_status == STAT_NO_SIG)
 			new_status = STAT_BOGUS; /* Validated no DS */
 		    }
 		}

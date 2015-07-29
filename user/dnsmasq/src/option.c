@@ -2699,6 +2699,8 @@ static int one_opt(int option, char *arg, char *errstr, char *gen_err, int comma
 		  new->flags |= CONTEXT_RA_ROUTER | CONTEXT_RA;
 		else if (strcmp(a[leasepos], "ra-stateless") == 0)
 		  new->flags |= CONTEXT_RA_STATELESS | CONTEXT_DHCP | CONTEXT_RA;
+		else if (strcmp(a[leasepos], "off-link") == 0)
+		  new->flags |= CONTEXT_RA_OFF_LINK;
 		else if (leasepos == 1 && inet_pton(AF_INET6, a[leasepos], &new->end6))
 		  new->flags |= CONTEXT_DHCP; 
 		else if (strstr(a[leasepos], "constructor:") == a[leasepos])
@@ -4498,6 +4500,9 @@ void read_opts(int argc, char **argv, char *compile_opts)
     {
       struct server *tmp;
       for (tmp = daemon->servers; tmp; tmp = tmp->next)
+	{
+	  tmp->edns_pktsz = daemon->edns_pktsz;
+	 
 	if (!(tmp->flags & SERV_HAS_SOURCE))
 	  {
 	    if (tmp->source_addr.sa.sa_family == AF_INET)
@@ -4507,6 +4512,7 @@ void read_opts(int argc, char **argv, char *compile_opts)
 	      tmp->source_addr.in6.sin6_port = htons(daemon->query_port);
 #endif 
 	  } 
+    }
     }
   
   if (daemon->if_addrs)
