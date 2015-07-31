@@ -36,6 +36,7 @@
 #define _PATH_PFW_FILE_VPN		_PATH_PFW "/portforward_vpn"
 #define _PATH_MACIP_FILE		_PATH_PFW "/macipfilter"
 #define _PATH_WEBS_FILE			_PATH_PFW "/websfilter"
+#define _PATH_HOSTS_FLTR		_PATH_PFW "/hosts_fltr"
 
 #ifndef IF_NAMESIZE
 #define IF_NAMESIZE IFNAMSIZ

@@ -1305,6 +1305,7 @@ static void iptablesWebsFilterRun(void)
 	char *cookies		= nvram_get(RT2860_NVRAM, "websFilterCookies");
 	char *url_filter	= nvram_get(RT2860_NVRAM, "websURLFilters");
 	char *host_filter	= nvram_get(RT2860_NVRAM, "websHostFilters");
+	FILE *fd;
 
 	if ((url_filter && strlen(url_filter) && getRuleNums(url_filter)) ||
 		(host_filter && strlen(host_filter) && getRuleNums(host_filter)) ||
@@ -1324,7 +1325,7 @@ static void iptablesWebsFilterRun(void)
 			content_filter += BLK_PROXY;
 
 		//Generate portforward script file
-		FILE *fd = fopen(_PATH_WEBS_FILE, "w");
+		fd = fopen(_PATH_WEBS_FILE, "w");
 
 		if (fd != NULL)
 		{
@@ -1370,22 +1371,31 @@ static void iptablesWebsFilterRun(void)
 				i++;
 			}
 
+			//closefile
+			fclose(fd);
+			chmod(_PATH_WEBS_FILE, S_IXGRP | S_IXUSR | S_IRUSR | S_IWUSR | S_IRGRP);
+		}
+
+
+		//Generate hosts filter file for dns server
+		fd = fopen(_PATH_HOSTS_FLTR, "w");
+
+		if (fd != NULL)
+		{
 			// HOST(Keyword) filter
 			i=0;
 			while ((i < getRuleNums(host_filter)) && (getNthValueSafe(i, host_filter, ';', entry, sizeof(entry)) != -1))
 			{
 				if (strlen(entry))
 				{
-					fprintf(fd, "iptables -A %s -p tcp -m tcp -m webstr --host %s -j REJECT --reject-with tcp-reset\n", WEB_FILTER_CHAIN, entry);
-					if (nat_ena)
-						fprintf(fd, "iptables -t nat -A %s -p tcp -m tcp -m webstr --host %s -j DROP\n", WEB_FILTER_PRE_CHAIN, entry);
+					fprintf(fd, "127.0.0.1 %s\n", entry);
 				}
 				i++;
 			}
 
 			//closefile
 			fclose(fd);
-			chmod(_PATH_WEBS_FILE, S_IXGRP | S_IXUSR | S_IRUSR | S_IWUSR | S_IRGRP);
+			//chmod(_PATH_HOSTS_FLTR, S_IXGRP | S_IXUSR | S_IRUSR | S_IWUSR | S_IRGRP);
 		}
 	}
 	else
@@ -1415,7 +1425,8 @@ void firewall_rebuild_etc(void)
 		iptablesIPPortFilterBuildScript();
 
 	// Web filtering
-	doSystem("rm -f " _PATH_WEBS_FILE);
+	doSystem("rm -f " _PATH_WEBS_FILE); // delete netfilter script
+	doSystem("rm -f " _PATH_HOSTS_FLTR); // delete hosts filter file
 	iptablesWebsFilterRun();
 }
 
@@ -1425,6 +1436,8 @@ void firewall_rebuild(void)
 	firewall_rebuild_etc();
 	//no backgroudn it!!!!
 	doSystem("service iptables restart");
+	// do not restart dnsserver in all case???
+	doSystem("service dnsserver reload");
 }
 
 static int showDMZIPAddressASP(int eid, webs_t wp, int argc, char_t **argv)
