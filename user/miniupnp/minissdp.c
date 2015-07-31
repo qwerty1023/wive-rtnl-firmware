@@ -1,4 +1,4 @@
-/* $Id: minissdp.c,v 1.75 2015/07/09 12:27:26 nanard Exp $ */
+/* $Id: minissdp.c,v 1.73 2015/01/17 11:26:05 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -185,7 +185,7 @@ OpenAndConfSSDPReceiveSocket(int ipv6)
 			{
 				syslog(LOG_WARNING,
 				       "Failed to add multicast membership for interface %s",
-				       strlen(lan_addr->str) ? lan_addr->str : "NULL");
+				       lan_addr->str ? lan_addr->str : "NULL");
 			}
 		}
 	}
@@ -1178,8 +1178,6 @@ SendSSDPGoodbye(int * sockets, int n_sockets)
 
 	for(j=0; j<n_sockets; j++)
 	{
-		if(sockets[j] < 0)
-			continue;
 #ifdef ENABLE_IPV6
 		ipv6 = j & 1;
 		if(ipv6) {
@@ -1246,7 +1244,6 @@ SubmitServicesToMiniSSDPD(const char * host, unsigned short port) {
 	}
 	addr.sun_family = AF_UNIX;
 	strncpy(addr.sun_path, minissdpdsocketpath, sizeof(addr.sun_path));
-	addr.sun_path[sizeof(addr.sun_path) - 1] = '\0';
 	if(connect(s, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) < 0) {
 		syslog(LOG_ERR, "connect(\"%s\"): %m", minissdpdsocketpath);
 		close(s);

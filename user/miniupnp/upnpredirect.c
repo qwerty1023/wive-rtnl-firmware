@@ -306,15 +306,13 @@ upnp_redirect(const char * rhost, unsigned short eport,
 		       eport, protocol);
 		return -2;
 #endif /* CHECK_PORTINUSE */
-	} else {
-		timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
-		syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
-			eport, iaddr, iport, protocol, desc);
-		return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
-		                              desc, timestamp);
 	}
 
-	return 0;
+	timestamp = (leaseduration > 0) ? time(NULL) + leaseduration : 0;
+	syslog(LOG_INFO, "redirecting port %hu to %s:%hu protocol %s for: %s",
+		eport, iaddr, iport, protocol, desc);
+	return upnp_redirect_internal(rhost, eport, iaddr, iport, proto,
+	                              desc, timestamp);
 }
 
 int
@@ -551,7 +549,7 @@ get_upnp_rules_state_list(int max_rules_number_target)
 	{
 		if(tmp->to_remove)
 		{
-			syslog(LOG_INFO, "remove port mapping %hu %s because it has expired",
+			syslog(LOG_NOTICE, "remove port mapping %hu %s because it has expired",
 			       tmp->eport, (tmp->proto==IPPROTO_TCP)?"TCP":"UDP");
 			_upnp_delete_redir(tmp->eport, tmp->proto);
 			*p = tmp->next;

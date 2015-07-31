@@ -26,7 +26,7 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-static DECLARE_BITMAP(irq_map, NR_IRQS);
+static unsigned long irq_map[NR_IRQS / BITS_PER_LONG];
 
 int __devinit allocate_irqno(void)
 {
