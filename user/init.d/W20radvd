@@ -155,11 +155,15 @@ start() {
 	    exit 0
 	fi
 
-	# read dnsservers reciverd from dhcp
+	# read dnsservers reciverd from dhcp or set router ip as dnsserver
 	if [ -f /etc/resolvipv6.conf ]; then
 	    DNSADRESSES=`echo $(cat /etc/resolvipv6.conf | grep nameserver | grep : |  sed -e 's/nameserver//g')`
 	    $LOG "Use DNS recived from ISP $DNSADRESSES"
+	else
+	    DNSADRESSES=`echo $(ip -6 -o addr show $lan_if scope global | cut -f1 -d/ | awk {' print $4'})`
+	    $LOG "Use router ip $DNSADRESSES as DNS"
 	fi
+
 	if [ "$DNSADRESSES" = "" ]; then
 	    DNSADRESSES="2001:4860:4860::8888 2001:4860:4860::8844"
 	    $LOG "Use public DNS $DNSADRESSES"
