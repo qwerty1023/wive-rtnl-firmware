@@ -937,8 +937,10 @@ csum_copy_err:
 #else
 	    UDP_INC_STATS_BH(UDP_MIB_INERRORS, 0);
 #endif
-	/* starting over for a new packet, but check if we need to yield */
-	cond_resched();
+	if (noblock)
+		return -EAGAIN;
+
+	/* starting over for a new packet */
 	msg->msg_flags &= ~MSG_TRUNC;
 	goto try_again;
 }

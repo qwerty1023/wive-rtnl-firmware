@@ -85,16 +85,8 @@ static int nf_ip6_reroute(struct sk_buff **pskb, const struct nf_info *info)
 
 static int nf_ip6_route(struct dst_entry **dst, struct flowi *fl)
 {
-	struct dst_entry *result;
-	int err;
-
-	result = ip6_route_output(NULL, fl);
-	err = result->error;
-	if (err)
-		dst_release(result);
-	else
-		*dst = result;
-	return err;
+	*dst = ip6_route_output(NULL, fl);
+	return (*dst)->error;
 }
 
 __sum16 nf_ip6_checksum(struct sk_buff *skb, unsigned int hook,
