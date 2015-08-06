@@ -25,26 +25,26 @@ gen_hosts() {
     echo "$HostName" > /etc/hostname
     hostname -F /etc/hostname
 
-    echo "127.0.0.1	localhost $HostName.$dhcpDomain"		> /etc/hosts
-    echo "$lan_ipaddr	$HostName.$dhcpDomain"			>> /etc/hosts
-    echo "$lan_ipaddr	gateway.$dhcpDomain"			>> /etc/hosts
+    echo "127.0.0.1 localhost $HostName.$dhcpDomain"		> /etc/hosts
+    echo "$lan_ipaddr $HostName.$dhcpDomain"			>> /etc/hosts
+    echo "$lan_ipaddr gateway.$dhcpDomain"			>> /etc/hosts
 
     if [ "$real_wan_ipaddr" != "" ]; then
 	# if dynamic dns and dmz enable - dnsmasq must set DDNS=DMZIP
 	# if dynamic dns and dmz disable - dnsmasq must set DDNS=WANIP
 	if [ "$DDNS" != "" ] && [ "$DDNSAccount" != "" ]; then
 	    if [ "$DMZEnable" = "1" ] && [ "$DMZIPAddress" != "" ]; then
-		echo "$DMZIPAddress		$DDNS"		>> /etc/hosts
+		echo "$DMZIPAddress $DDNS"		>> /etc/hosts
 	    else
-		echo "$real_wan_ipaddr	$DDNS"		>> /etc/hosts
+		echo "$real_wan_ipaddr $DDNS"		>> /etc/hosts
 	    fi
 	fi
 	WANDOMAINNAME="wan.$HostName.$dhcpDomain"
 
 	echo "$real_wan_ipaddr $WANDOMAINNAME"	>> /etc/hosts
 	if [ -d /proc/sys/net/ipv6 ] && [ "$IPv6OpMode" != "0" ]; then
-	    echo "::1	localhost lo6.$WANDOMAINNAME"	>> /etc/hosts
-	    ip -6 -o addr show scope global | cut -f1 -d/ | awk {' print $4"   ipv6."$2".Wive-NG-RTNL.lo"'} >> /etc/hosts
+	    echo "::1 localhost lo6.$WANDOMAINNAME"	>> /etc/hosts
+	    ip -6 -o addr show scope global | cut -f1 -d/ | awk {' print $4" ipv6."$2".Wive-NG-RTNL.lo"'} >> /etc/hosts
 	fi
     fi
 

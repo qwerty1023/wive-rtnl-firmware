@@ -1388,7 +1388,7 @@ static void iptablesWebsFilterRun(void)
 			{
 				if (strlen(entry))
 				{
-					fprintf(fd, "0.0.0.0 %s\n", entry);
+					fprintf(fd, "127.0.0.1 %s\n", entry);
 					fprintf(fd, "::1 %s\n", entry);
 				}
 				i++;
