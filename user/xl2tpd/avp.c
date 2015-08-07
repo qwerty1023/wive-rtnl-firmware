@@ -104,7 +104,6 @@ char *cdn_result_codes[] = {
     "Call failed due to lack of appropriate facilities being available (permanent condition)",
     "Invalid destination",
     "Call failed due to no carrier detected",
-    "Call failed due to detection of a busy signal",
     "Call failed due to lack of a dial tone",
     "Call was no established within time allotted by LAC",
     "Call was connected but no appropriate framing was detect"
@@ -1634,11 +1633,9 @@ int handle_avps (struct buffer *buf, struct tunnel *t, struct call *c)
     int hidlen = 0;
     char *data = buf->start + sizeof (struct control_hdr);
     avp = (struct avp_hdr *) data;
-    /* I had to comment out the following since Valgrind tells me it leaks like my bathroom faucet
     if (gconfig.debug_avp)
         l2tp_log (LOG_DEBUG, "%s: handling avp's for tunnel %d, call %d\n",
              __FUNCTION__, t->ourtid, c->ourcid);
-    */
     while (len > 0)
     {
         /* Go ahead and byte-swap the header */

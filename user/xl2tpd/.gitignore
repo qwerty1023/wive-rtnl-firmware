@@ -1,6 +1,4 @@
 *.o
 *~
 *.bak
-xl2tpd
-xl2tpd-control
-pfc
+l2tpd
