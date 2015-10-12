@@ -2,8 +2,8 @@
  * Copyright (c) 2002,2003 Matt Johnston
  * All rights reserved. See LICENSE for the license. */
 
-#ifndef _OPTIONS_H_
-#define _OPTIONS_H_
+#ifndef DROPBEAR_OPTIONS_H_
+#define DROPBEAR_OPTIONS_H_
 
 /* Define compile-time options below - the "#ifndef DROPBEAR_XXX .... #endif"
  * parts are to allow for commandline -DDROPBEAR_XXX options etc. */
@@ -107,9 +107,14 @@ much traffic. */
 #define DROPBEAR_ENABLE_CBC_MODE
 
 /* Enable "Counter Mode" for ciphers. This is more secure than normal
- * CBC mode against certain attacks. This adds around 1kB to binary 
- * size and is recommended for most cases */
+ * CBC mode against certain attacks. It is recommended for security
+ * and forwards compatibility */
 #define DROPBEAR_ENABLE_CTR_MODE
+
+/* Twofish counter mode is disabled by default because it 
+has not been tested for interoperability with other SSH implementations.
+If you test it please contact the Dropbear author */
+/* #define DROPBEAR_TWOFISH_CTR */
 
 /* You can compile with no encryption if you want. In some circumstances
  * this could be safe security-wise, though make sure you know what
@@ -176,7 +181,7 @@ much traffic. */
  * Both modes will use ~35kB for decompression (using windowBits=15 for
  * interoperability) */
 #ifndef DROPBEAR_ZLIB_WINDOW_BITS
-#define DROPBEAR_ZLIB_WINDOW_BITS 15 
+#define DROPBEAR_ZLIB_WINDOW_BITS 15
 #endif
 
 /* Server won't allow zlib compression until after authentication. Prevents
@@ -220,8 +225,8 @@ much traffic. */
 #define ENABLE_CLI_INTERACT_AUTH
 
 /* A default argument for dbclient -i <privatekey>. 
-   leading "~" is expanded */
-#define DROPBEAR_DEFAULT_CLI_AUTHKEY "~/.ssh/id_dropbear"
+Homedir is prepended unless path begins with / */
+#define DROPBEAR_DEFAULT_CLI_AUTHKEY ".ssh/id_dropbear"
 
 /* This variable can be used to set a password for client
  * authentication on the commandline. Beware of platforms
@@ -292,7 +297,7 @@ much traffic. */
 
 /* This is used by the scp binary when used as a client binary. If you're
  * not using the Dropbear client, you'll need to change it */
-#define _PATH_SSH_PROGRAM ""
+#define DROPBEAR_PATH_SSH_PROGRAM ""
 
 /* Whether to log commands executed by a client. This only logs the 
  * (single) command sent to the server, not what a user did in a 
@@ -330,14 +335,14 @@ for runtime configuration please mail the Dropbear list */
 #define DEFAULT_KEEPALIVE_LIMIT 3
 
 /* Ensure that data is received within IDLE_TIMEOUT seconds. This can
- be overridden at runtime with -I. 0 disables idle timeouts */
+be overridden at runtime with -I. 0 disables idle timeouts */
 #define DEFAULT_IDLE_TIMEOUT 360
 
 /* The default path. This will often get replaced by the shell */
-#define DEFAULT_PATH "/usr/bin:/bin"
+#define DEFAULT_PATH "/bin:/sbin:/usr/bin:/usr/sbin:/etc/scripts"
 
 /* Some other defines (that mostly should be left alone) are defined
  * in sysoptions.h */
 #include "sysoptions.h"
 
-#endif /* _OPTIONS_H_ */
+#endif /* DROPBEAR_OPTIONS_H_ */
