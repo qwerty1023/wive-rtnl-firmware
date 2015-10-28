@@ -124,8 +124,7 @@ int conf_read_simple(const char *name)
 		case S_INT:
 		case S_HEX:
 		case S_STRING:
-			if (sym->user.val)
-				free(sym->user.val);
+			free(sym->user.val);
 		default:
 			sym->user.val = NULL;
 			sym->user.tri = no;
@@ -477,7 +476,7 @@ int conf_write(const char *name)
 						fprintf(out_h, "#ifdef MAKE_SUID\n");
 						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
 						fprintf(out_h, "#else\n");
-						fprintf(out_h, "#define IF_%s(...) __VA_ARGS__\n", sym->name);
+						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
 						fprintf(out_h, "#endif\n");
 						fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 					}
@@ -513,7 +512,7 @@ int conf_write(const char *name)
 					fprintf(out_h, "#ifdef MAKE_SUID\n");
 					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
 					fprintf(out_h, "#else\n");
-					fprintf(out_h, "#define IF_%s(...) __VA_ARGS__\n", sym->name);
+					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
 					fprintf(out_h, "#endif\n");
 					fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 				}
@@ -529,7 +528,7 @@ int conf_write(const char *name)
 						fprintf(out_h, "#ifdef MAKE_SUID\n");
 						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
 						fprintf(out_h, "#else\n");
-						fprintf(out_h, "#define IF_%s(...) __VA_ARGS__\n", sym->name);
+						fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
 						fprintf(out_h, "#endif\n");
 						fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 					}
@@ -547,7 +546,7 @@ int conf_write(const char *name)
 					fprintf(out_h, "#ifdef MAKE_SUID\n");
 					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__ \"CONFIG_%s\"\n", sym->name, sym->name);
 					fprintf(out_h, "#else\n");
-					fprintf(out_h, "#define IF_%s(...) __VA_ARGS__\n", sym->name);
+					fprintf(out_h, "# define IF_%s(...) __VA_ARGS__\n", sym->name);
 					fprintf(out_h, "#endif\n");
 					fprintf(out_h, "#define IF_NOT_%s(...)\n", sym->name);
 				}

@@ -270,7 +270,7 @@ readdif_to_br() {
 
 # get params
 getFirstWlanIfName
-getSecWlanIfName
+#getSecWlanIfName
 getLanIfName
 getVpnIfName
 getWanIfName

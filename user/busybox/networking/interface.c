@@ -27,7 +27,7 @@
  * {1.34} - 19980630 - Arnaldo Carvalho de Melo <acme@conectiva.com.br>
  *                     - gettext instead of catgets for i18n
  *          10/1998  - Andi Kleen. Use interface list primitives.
- *	    20001008 - Bernd Eckenfels, Patch from RH for setting mtu
+ *          20001008 - Bernd Eckenfels, Patch from RH for setting mtu
  *			(default AF was wrong)
  */
 
@@ -89,13 +89,9 @@ struct in6_ifreq {
 /* Display an Internet socket address. */
 static const char* FAST_FUNC INET_sprint(struct sockaddr *sap, int numeric)
 {
-	static char *buff; /* defaults to NULL */
-
-	free(buff);
 	if (sap->sa_family == 0xFFFF || sap->sa_family == 0)
 		return "[NONE SET]";
-	buff = INET_rresolve((struct sockaddr_in *) sap, numeric, 0xffffff00);
-	return buff;
+	return auto_string(INET_rresolve((struct sockaddr_in *) sap, numeric, 0xffffff00));
 }
 
 #ifdef UNUSED_AND_BUGGY
@@ -171,13 +167,9 @@ static const struct aftype inet_aftype = {
 /* dirty! struct sockaddr usually doesn't suffer for inet6 addresses, fst. */
 static const char* FAST_FUNC INET6_sprint(struct sockaddr *sap, int numeric)
 {
-	static char *buff;
-
-	free(buff);
 	if (sap->sa_family == 0xFFFF || sap->sa_family == 0)
 		return "[NONE SET]";
-	buff = INET6_rresolve((struct sockaddr_in6 *) sap, numeric);
-	return buff;
+	return auto_string(INET6_rresolve((struct sockaddr_in6 *) sap, numeric));
 }
 
 #ifdef UNUSED
@@ -223,13 +215,11 @@ static const struct aftype inet6_aftype = {
 /* Display an UNSPEC address. */
 static char* FAST_FUNC UNSPEC_print(unsigned char *ptr)
 {
-	static char *buff;
-
+	char *buff;
 	char *pos;
 	unsigned int i;
 
-	if (!buff)
-		buff = xmalloc(sizeof(struct sockaddr) * 3 + 1);
+	buff = auto_string(xmalloc(sizeof(struct sockaddr) * 3 + 1));
 	pos = buff;
 	for (i = 0; i < sizeof(struct sockaddr); i++) {
 		/* careful -- not every libc's sprintf returns # bytes written */
@@ -712,14 +702,12 @@ static const struct hwtype loop_hwtype = {
 /* Display an Ethernet address in readable format. */
 static char* FAST_FUNC ether_print(unsigned char *ptr)
 {
-	static char *buff;
-
-	free(buff);
+	char *buff;
 	buff = xasprintf("%02X:%02X:%02X:%02X:%02X:%02X",
 			 (ptr[0] & 0377), (ptr[1] & 0377), (ptr[2] & 0377),
 			 (ptr[3] & 0377), (ptr[4] & 0377), (ptr[5] & 0377)
 		);
-	return buff;
+	return auto_string(buff);
 }
 
 static const struct hwtype ether_hwtype = {
@@ -897,8 +885,8 @@ static void ife_print6(struct interface *ptr)
 					  (struct sockaddr *) &sap.sin6_addr);
 			sap.sin6_family = AF_INET6;
 			printf("          inet6 addr: %s/%d",
-				   INET6_sprint((struct sockaddr *) &sap, 1),
-				   plen);
+				INET6_sprint((struct sockaddr *) &sap, 1),
+				plen);
 			printf(" Scope:");
 			switch (scope & IPV6_ADDR_SCOPE_MASK) {
 			case 0:
@@ -966,7 +954,7 @@ static void ife_print(struct interface *ptr)
 
 	if (ptr->has_ip) {
 		printf("          %s addr:%s ", ap->name,
-			   ap->sprint(&ptr->addr, 1));
+			ap->sprint(&ptr->addr, 1));
 		if (ptr->flags & IFF_POINTOPOINT) {
 			printf(" P-t-P:%s ", ap->sprint(&ptr->dstaddr, 1));
 		}
@@ -1049,17 +1037,17 @@ static void ife_print(struct interface *ptr)
 		printf("          ");
 
 		printf("RX packets:%llu errors:%lu dropped:%lu overruns:%lu frame:%lu\n",
-			   ptr->stats.rx_packets, ptr->stats.rx_errors,
-			   ptr->stats.rx_dropped, ptr->stats.rx_fifo_errors,
-			   ptr->stats.rx_frame_errors);
+			ptr->stats.rx_packets, ptr->stats.rx_errors,
+			ptr->stats.rx_dropped, ptr->stats.rx_fifo_errors,
+			ptr->stats.rx_frame_errors);
 		if (can_compress)
 			printf("             compressed:%lu\n",
-				   ptr->stats.rx_compressed);
+				ptr->stats.rx_compressed);
 		printf("          ");
 		printf("TX packets:%llu errors:%lu dropped:%lu overruns:%lu carrier:%lu\n",
-			   ptr->stats.tx_packets, ptr->stats.tx_errors,
-			   ptr->stats.tx_dropped, ptr->stats.tx_fifo_errors,
-			   ptr->stats.tx_carrier_errors);
+			ptr->stats.tx_packets, ptr->stats.tx_errors,
+			ptr->stats.tx_dropped, ptr->stats.tx_fifo_errors,
+			ptr->stats.tx_carrier_errors);
 		printf("          collisions:%lu ", ptr->stats.collisions);
 		if (can_compress)
 			printf("compressed:%lu ", ptr->stats.tx_compressed);
@@ -1078,10 +1066,10 @@ static void ife_print(struct interface *ptr)
 			printf("Interrupt:%d ", ptr->map.irq);
 		if (ptr->map.base_addr >= 0x100) /* Only print devices using it for I/O maps */
 			printf("Base address:0x%lx ",
-				   (unsigned long) ptr->map.base_addr);
+				(unsigned long) ptr->map.base_addr);
 		if (ptr->map.mem_start) {
 			printf("Memory:%lx-%lx ", ptr->map.mem_start,
-				   ptr->map.mem_end);
+				ptr->map.mem_end);
 		}
 		if (ptr->map.dma)
 			printf("DMA chan:%x ", ptr->map.dma);
@@ -1114,7 +1102,7 @@ static struct interface *lookup_interface(char *name)
 
 #ifdef UNUSED
 static int for_all_interfaces(int (*doit) (struct interface *, void *),
-							  void *cookie)
+							void *cookie)
 {
 	struct interface *ife;
 

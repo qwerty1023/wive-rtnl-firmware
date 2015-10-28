@@ -339,7 +339,7 @@ void death_handler (int signal)
     /* erase pid and control files */
     unlink (gconfig.pidfile);
     unlink (gconfig.controlfile);
-    free(dial_no_tmp);
+    //free(dial_no_tmp); /* double free, this allready freed in tunnel destroy */
     close(server_socket);
     close(control_fd);
     closelog();
@@ -475,7 +475,6 @@ int start_pppd (struct call *c, struct ppp_opts *opts)
         /* set fd opened above to not echo so we don't see read our own packets
            back of the file descriptor that we just wrote them to */
         tcgetattr (c->fd, &ptyconf);
-        *(c->oldptyconf) = ptyconf;
         ptyconf.c_cflag &= ~(ICANON | ECHO);
         ptyconf.c_lflag &= ~ECHO;
         tcsetattr (c->fd, TCSANOW, &ptyconf);
@@ -689,10 +688,7 @@ void destroy_tunnel (struct tunnel *t)
     if (t->udp_fd > -1 )
         close (t->udp_fd);
     free (t);
-	if(me->oldptyconf)
-		free(me->oldptyconf);
     free (me);
-    free (dial_no_tmp);
 }
 
 void schedule_redial(struct lac *lac)
@@ -1898,4 +1894,3 @@ int main (int argc, char *argv[])
     network_thread ();
     return 0;
 }
-

@@ -141,11 +141,11 @@ uuidcache_init(int scan_devices)
 	 * (Maybe add scanning of /sys/block/XXX/dev for devices
 	 * somehow not having their /dev/XXX entries created?) */
 	if (scan_devices)
-	recursive_action("/dev", ACTION_RECURSE,
-		uuidcache_check_device, /* file_action */
-		NULL, /* dir_action */
-		NULL, /* userData */
-		0 /* depth */);
+		recursive_action("/dev", ACTION_RECURSE,
+			uuidcache_check_device, /* file_action */
+			NULL, /* dir_action */
+			NULL, /* userData */
+			0 /* depth */);
 
 	return uuidCache;
 }
@@ -302,9 +302,9 @@ int resolve_mount_spec(char **fsname)
 {
 	char *tmp = *fsname;
 
-	if (strncmp(*fsname, "UUID=", 5) == 0)
+	if (is_prefixed_with(*fsname, "UUID="))
 		tmp = get_devname_from_uuid(*fsname + 5);
-	else if (strncmp(*fsname, "LABEL=", 6) == 0)
+	else if (is_prefixed_with(*fsname, "LABEL="))
 		tmp = get_devname_from_label(*fsname + 6);
 
 	if (tmp == *fsname)
