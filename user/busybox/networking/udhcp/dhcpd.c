@@ -28,7 +28,6 @@
 //usage:     "\n	-f	Run in foreground"
 //usage:     "\n	-S	Log to syslog too"
 //usage:     "\n	-I ADDR	Local address"
-//usage:     "\n	-a MSEC	Timeout for ARP ping (default 2000)"
 //usage:	IF_FEATURE_UDHCP_PORT(
 //usage:     "\n	-P N	Use port N (default 67)"
 //usage:	)
@@ -190,8 +189,7 @@ static uint32_t select_lease_time(struct dhcp_packet *packet)
 static NOINLINE void send_offer(struct dhcp_packet *oldpacket,
 		uint32_t static_lease_nip,
 		struct dyn_lease *lease,
-		uint8_t *requested_ip_opt,
-		unsigned arpping_ms)
+		uint8_t *requested_ip_opt)
 {
 	struct dhcp_packet packet;
 	uint32_t lease_time_sec;
@@ -232,7 +230,7 @@ static NOINLINE void send_offer(struct dhcp_packet *oldpacket,
 		}
 		else {
 			/* Otherwise, find a free IP */
-			packet.yiaddr = find_free_or_expired_nip(oldpacket->chaddr, arpping_ms);
+			packet.yiaddr = find_free_or_expired_nip(oldpacket->chaddr);
 		}
 
 		if (!packet.yiaddr) {
@@ -349,8 +347,6 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
 	unsigned opt;
 	struct option_set *option;
 	char *str_I = str_I;
-	const char *str_a = "2000";
-	unsigned arpping_ms;
 	IF_FEATURE_UDHCP_PORT(char *str_P;)
 
 #if ENABLE_FEATURE_UDHCP_PORT
@@ -361,10 +357,9 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
 #if defined CONFIG_UDHCP_DEBUG && CONFIG_UDHCP_DEBUG >= 1
 	opt_complementary = "vv";
 #endif
-	opt = getopt32(argv, "fSI:va:"
+	opt = getopt32(argv, "fSI:v"
 		IF_FEATURE_UDHCP_PORT("P:")
 		, &str_I
-		, &str_a
 		IF_FEATURE_UDHCP_PORT(, &str_P)
 		IF_UDHCP_VERBOSE(, &dhcp_verbose)
 		);
@@ -384,13 +379,11 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
 		free(lsa);
 	}
 #if ENABLE_FEATURE_UDHCP_PORT
-	if (opt & 32) { /* -P */
+	if (opt & 16) { /* -P */
 		SERVER_PORT = xatou16(str_P);
 		CLIENT_PORT = SERVER_PORT + 1;
 	}
 #endif
-	arpping_ms = xatou(str_a);
-
 	/* Would rather not do read_config before daemonization -
 	 * otherwise NOMMU machines will parse config twice */
 	read_config(argv[0] ? argv[0] : DHCPD_CONF_FILE);
@@ -459,8 +452,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
 
 		max_sock = udhcp_sp_fd_set(&rfds, server_socket);
 		if (server_config.auto_time) {
-			/* cast to signed is essential if tv_sec is wider than int */
-			tv.tv_sec = (int)(timeout_end - monotonic_sec());
+			tv.tv_sec = timeout_end - monotonic_sec();
 			tv.tv_usec = 0;
 		}
 		retval = 0;
@@ -558,7 +550,7 @@ int udhcpd_main(int argc UNUSED_PARAM, char **argv)
 		case DHCPDISCOVER:
 			bb_info_msg("Received DISCOVER from %02x:%02x:%02x:%02x:%02x:%02x", packet.chaddr[0], packet.chaddr[1], packet.chaddr[2], packet.chaddr[3], packet.chaddr[4], packet.chaddr[5]);
 
-			send_offer(&packet, static_lease_nip, lease, requested_ip_opt, arpping_ms);
+			send_offer(&packet, static_lease_nip, lease, requested_ip_opt);
 			break;
 
 		case DHCPREQUEST:

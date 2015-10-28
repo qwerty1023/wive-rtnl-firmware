@@ -672,20 +672,23 @@ static char *username_path_completion(char *ud)
  */
 static NOINLINE unsigned complete_username(const char *ud)
 {
-	struct passwd *pw;
+	/* Using _r function to avoid pulling in static buffers */
+	char line_buff[256];
+	struct passwd pwd;
+	struct passwd *result;
 	unsigned userlen;
 
 	ud++; /* skip ~ */
 	userlen = strlen(ud);
 
 	setpwent();
-	while ((pw = getpwent()) != NULL) {
+	while (!getpwent_r(&pwd, line_buff, sizeof(line_buff), &result)) {
 		/* Null usernames should result in all users as possible completions. */
-		if (/* !ud[0] || */ is_prefixed_with(pw->pw_name, ud)) {
-			add_match(xasprintf("~%s/", pw->pw_name));
+		if (/*!userlen || */ strncmp(ud, pwd.pw_name, userlen) == 0) {
+			add_match(xasprintf("~%s/", pwd.pw_name));
 		}
 	}
-	endpwent(); /* don't keep password file open */
+	endpwent();
 
 	return 1 + userlen;
 }
@@ -792,7 +795,7 @@ static NOINLINE unsigned complete_cmd_dir_file(const char *command, int type)
 			if (!pfind[0] && DOT_OR_DOTDOT(name_found))
 				continue;
 			/* match? */
-			if (!is_prefixed_with(name_found, pfind))
+			if (strncmp(name_found, pfind, pf_len) != 0)
 				continue; /* no */
 
 			found = concat_path_file(paths[i], name_found);
@@ -1543,7 +1546,7 @@ static void remember_in_history(char *str)
 	state->cur_history = i;
 	state->cnt_history = i;
 # if ENABLE_FEATURE_EDITING_SAVEHISTORY && !ENABLE_FEATURE_EDITING_SAVE_ON_EXIT
-	save_history(str);
+		save_history(str);
 # endif
 }
 
@@ -1843,7 +1846,7 @@ static void parse_and_put_prompt(const char *prmt_ptr)
 			cp = prmt_ptr;
 			c = *cp;
 			if (c != 't') /* don't treat \t as tab */
-				c = bb_process_escape_sequence(&prmt_ptr);
+			c = bb_process_escape_sequence(&prmt_ptr);
 			if (prmt_ptr == cp) {
 				if (*cp == '\0')
 					break;
@@ -1879,22 +1882,21 @@ static void parse_and_put_prompt(const char *prmt_ptr)
 						cwd_buf = xrealloc_getcwd_or_warn(NULL);
 						if (!cwd_buf)
 							cwd_buf = (char *)bb_msg_unknown;
-						else if (home_pwd_buf[0]) {
-							char *after_home_user;
-
-							/* /home/user[/something] -> ~[/something] */
-							after_home_user = is_prefixed_with(cwd_buf, home_pwd_buf);
-							if (after_home_user
-							 && (*after_home_user == '/' || *after_home_user == '\0')
-							) {
+						else {
+					/* /home/user[/something] -> ~[/something] */
+					l = strlen(home_pwd_buf);
+					if (l != 0
+					 && strncmp(home_pwd_buf, cwd_buf, l) == 0
+					 && (cwd_buf[l]=='/' || cwd_buf[l]=='\0')
+					) {
 								cwd_buf[0] = '~';
-								overlapping_strcpy(cwd_buf + 1, after_home_user);
+								overlapping_strcpy(cwd_buf + 1, cwd_buf + l);
 							}
 						}
 					}
 					pbuf = cwd_buf;
 					if (c == 'w')
-						break;
+					break;
 					cp = strrchr(pbuf, '/');
 					if (cp)
 						pbuf = (char*)cp + 1;
@@ -2254,13 +2256,9 @@ int FAST_FUNC read_line_input(line_input_t *st, const char *prompt, char *comman
 	INIT_S();
 
 	if (tcgetattr(STDIN_FILENO, &initial_settings) < 0
-	 || (initial_settings.c_lflag & (ECHO|ICANON)) == ICANON
+	 || !(initial_settings.c_lflag & ECHO)
 	) {
-		/* Happens when e.g. stty -echo was run before.
-		 * But if ICANON is not set, we don't come here.
-		 * (example: interactive python ^Z-backgrounded,
-		 * tty is still in "raw mode").
-		 */
+		/* Happens when e.g. stty -echo was run before */
 		parse_and_put_prompt(prompt);
 		/* fflush_all(); - done by parse_and_put_prompt */
 		if (fgets(command, maxsize, stdin) == NULL)
@@ -2609,7 +2607,7 @@ int FAST_FUNC read_line_input(line_input_t *st, const char *prompt, char *comman
 			 * standard readline bindings (IOW: bash) do.
 			 * Often, Alt-<key> generates ESC-<key>.
 			 */
-			ic = lineedit_read_key(read_key_buffer, 50);
+			ic = lineedit_read_key(read_key_buffer, timeout);
 			switch (ic) {
 				//case KEYCODE_LEFT: - bash doesn't do this
 				case 'b':

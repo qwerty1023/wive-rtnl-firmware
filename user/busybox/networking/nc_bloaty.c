@@ -634,12 +634,12 @@ static int readwrite(void)
 		if (rr == 0) {
 			if (!FD_ISSET(STDIN_FILENO, &ding1)) {
 				netretry--;                        /* we actually try a coupla times. */
-				if (!netretry) {
-					if (o_verbose > 1)         /* normally we don't care */
-						fprintf(stderr, "net timeout\n");
+			if (!netretry) {
+				if (o_verbose > 1)                /* normally we don't care */
+					fprintf(stderr, "net timeout\n");
 					/*close(netfd); - redundant, exit will do it */
-					return 0;                  /* not an error! */
-				}
+				return 0;                        /* not an error! */
+			}
 			}
 		} /* select timeout */
 	/* xxx: should we check the exception fds too?  The read fds seem to give
@@ -697,7 +697,7 @@ Debug("got %d from the net, errno %d", rr, errno);
 					oprint('<', (unsigned char *)np, rr);
 				np += rr;
 				rnleft -= rr;
-				wrote_out += rr; /* global count */
+				wrote_out += rr;                /* global count */
 			}
 Debug("wrote %d to stdout, errno %d", rr, errno);
 		} /* rnleft */
@@ -712,7 +712,7 @@ Debug("wrote %d to stdout, errno %d", rr, errno);
 					oprint('>', (unsigned char *)zp, rr);
 				zp += rr;
 				rzleft -= rr;
-				wrote_net += rr; /* global count */
+				wrote_net += rr;                /* global count */
 			}
 Debug("wrote %d to net, errno %d", rr, errno);
 		} /* rzleft */
@@ -863,8 +863,8 @@ int nc_main(int argc UNUSED_PARAM, char **argv)
 		xbind(netfd, &ouraddr->u.sa, ouraddr->len);
 	}
 #if 0
-	setsockopt_SOL_SOCKET_int(netfd, SO_RCVBUF, o_rcvbuf);
-	setsockopt_SOL_SOCKET_int(netfd, SO_SNDBUF, o_sndbuf);
+	setsockopt(netfd, SOL_SOCKET, SO_RCVBUF, &o_rcvbuf, sizeof o_rcvbuf);
+	setsockopt(netfd, SOL_SOCKET, SO_SNDBUF, &o_sndbuf, sizeof o_sndbuf);
 #endif
 
 #ifdef BLOAT

@@ -14,6 +14,7 @@
  *
  * Licensed under GPLv2 or later, see file LICENSE in this source tree.
  */
+
 /*
  * known difference between busybox dpkg and the official dpkg that i don't
  * consider important, its worth keeping a note of differences anyway, just to
@@ -1038,8 +1039,8 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
 			if (package_edge->type == EDGE_CONFLICTS) {
 				const unsigned package_num =
 					search_package_hashtable(package_edge->name,
-								package_edge->version,
-								package_edge->operator);
+								 package_edge->version,
+								 package_edge->operator);
 				int result = 0;
 				if (package_hashtable[package_num] != NULL) {
 					status_num = search_status_hashtable(name_hashtable[package_hashtable[package_num]->name]);
@@ -1126,7 +1127,7 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
 				 */
 				if (root_of_alternatives && package_edge->type != root_of_alternatives->type - 1)
 					bb_error_msg_and_die("fatal error, package dependencies corrupt: %d != %d - 1",
-							package_edge->type, root_of_alternatives->type);
+							     package_edge->type, root_of_alternatives->type);
 
 				if (package_hashtable[package_num] != NULL)
 					result = !package_satisfies_dependency(package_num, package_edge->type);
@@ -1151,13 +1152,13 @@ static int check_deps(deb_file_t **deb_file, int deb_start /*, int dep_max_count
 				if (result && number_of_alternatives == 0) {
 					if (root_of_alternatives)
 						bb_error_msg_and_die(
-							"package %s %sdepends on %s, which %s",
+							"package %s %sdepends on %s, "
+							"which cannot be satisfied",
 							name_hashtable[package_node->name],
 							package_edge->type == EDGE_PRE_DEPENDS ? "pre-" : "",
-							name_hashtable[root_of_alternatives->name],
-							"cannot be satisfied");
+							name_hashtable[root_of_alternatives->name]);
 					bb_error_msg_and_die(
-						"package %s %sdepends on %s, which %s",
+						"package %s %sdepends on %s, which %s\n",
 						name_hashtable[package_node->name],
 						package_edge->type == EDGE_PRE_DEPENDS ? "pre-" : "",
 						name_hashtable[package_edge->name],
@@ -1472,15 +1473,11 @@ static void init_archive_deb_control(archive_handle_t *ar_handle)
 	tar_handle->src_fd = ar_handle->src_fd;
 
 	/* We don't care about data.tar.* or debian-binary, just control.tar.* */
-	llist_add_to(&(ar_handle->accept), (char*)"control.tar");
 #if ENABLE_FEATURE_SEAMLESS_GZ
 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.gz");
 #endif
 #if ENABLE_FEATURE_SEAMLESS_BZ2
 	llist_add_to(&(ar_handle->accept), (char*)"control.tar.bz2");
-#endif
-#if ENABLE_FEATURE_SEAMLESS_XZ
-	llist_add_to(&(ar_handle->accept), (char*)"control.tar.xz");
 #endif
 
 	/* Assign the tar handle as a subarchive of the ar handle */
@@ -1496,18 +1493,11 @@ static void init_archive_deb_data(archive_handle_t *ar_handle)
 	tar_handle->src_fd = ar_handle->src_fd;
 
 	/* We don't care about control.tar.* or debian-binary, just data.tar.* */
-	llist_add_to(&(ar_handle->accept), (char*)"data.tar");
 #if ENABLE_FEATURE_SEAMLESS_GZ
 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.gz");
 #endif
 #if ENABLE_FEATURE_SEAMLESS_BZ2
 	llist_add_to(&(ar_handle->accept), (char*)"data.tar.bz2");
-#endif
-#if ENABLE_FEATURE_SEAMLESS_LZMA
-	llist_add_to(&(ar_handle->accept), (char*)"data.tar.lzma");
-#endif
-#if ENABLE_FEATURE_SEAMLESS_XZ
-	llist_add_to(&(ar_handle->accept), (char*)"data.tar.xz");
 #endif
 
 	/* Assign the tar handle as a subarchive of the ar handle */

@@ -387,11 +387,11 @@ print_named_ascii(size_t n_bytes, const char *block,
 		" sp"
 	};
 	// buf[N] pos:  01234 56789
-	char buf[12] = "   x\0 xxx\0";
+	char buf[12] = "   x\0 0xx\0";
+	// actually "   x\0 xxx\0", but want to share string with print_ascii.
 	// [12] because we take three 32bit stack slots anyway, and
 	// gcc is too dumb to initialize with constant stores,
 	// it copies initializer from rodata. Oh well.
-	// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=65410
 
 	while (n_bytes--) {
 		unsigned masked_c = *(unsigned char *) block++;
@@ -419,7 +419,7 @@ print_ascii(size_t n_bytes, const char *block,
 		const char *unused_fmt_string UNUSED_PARAM)
 {
 	// buf[N] pos:  01234 56789
-	char buf[12] = "   x\0 xxx\0";
+	char buf[12] = "   x\0 0xx\0";
 
 	while (n_bytes--) {
 		const char *s;
@@ -455,9 +455,11 @@ print_ascii(size_t n_bytes, const char *block,
 		case '\v':
 			s = "  \\v";
 			break;
-		default:
-			buf[6] = (c >> 6 & 3) + '0';
-			buf[7] = (c >> 3 & 7) + '0';
+		case '\x7f':
+			s = " 177";
+			break;
+		default: /* c is never larger than 040 */
+			buf[7] = (c >> 3) + '0';
 			buf[8] = (c & 7) + '0';
 			s = buf + 5;
 		}
@@ -1019,12 +1021,12 @@ dump(off_t current_offset, off_t end_offset)
 		l_c_m = get_lcm();
 
 		/* Make bytes_to_write the smallest multiple of l_c_m that
-		   is at least as large as n_bytes_read.  */
+			 is at least as large as n_bytes_read.  */
 		bytes_to_write = l_c_m * ((n_bytes_read + l_c_m - 1) / l_c_m);
 
 		memset(block[idx] + n_bytes_read, 0, bytes_to_write - n_bytes_read);
 		write_block(current_offset, bytes_to_write,
-				block[idx ^ 1], block[idx]);
+				   block[idx ^ 1], block[idx]);
 		current_offset += n_bytes_read;
 	}
 

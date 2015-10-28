@@ -25,22 +25,20 @@
 #include "libbb.h"
 
 /* Turn on nonblocking I/O on a fd */
-int FAST_FUNC ndelay_on(int fd)
+void FAST_FUNC ndelay_on(int fd)
 {
 	int flags = fcntl(fd, F_GETFL);
 	if (flags & O_NONBLOCK)
-		return flags;
+		return;
 	fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-	return flags;
 }
 
-int FAST_FUNC ndelay_off(int fd)
+void FAST_FUNC ndelay_off(int fd)
 {
 	int flags = fcntl(fd, F_GETFL);
 	if (!(flags & O_NONBLOCK))
-		return flags;
+		return;
 	fcntl(fd, F_SETFL, flags & ~O_NONBLOCK);
-	return flags;
 }
 
 void FAST_FUNC close_on_exec_on(int fd)
@@ -207,6 +205,7 @@ off_t FAST_FUNC fdlength(int fd)
 			else bottom = pos;
 
 		// If we can't, it's smaller.
+
 		} else {
 			if (bottom == top) {
 				if (!top) return 0;

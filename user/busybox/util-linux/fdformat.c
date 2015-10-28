@@ -93,7 +93,7 @@ int fdformat_main(int argc UNUSED_PARAM, char **argv)
 	}
 
 	xioctl(fd, FDFMTEND, NULL);
-	puts("Done");
+	printf("done\n");
 
 	/* VERIFY */
 	if (verify) {
@@ -116,7 +116,7 @@ int fdformat_main(int argc UNUSED_PARAM, char **argv)
 			/* Check backwards so we don't need a counter */
 			while (--read_bytes >= 0) {
 				if (data[read_bytes] != FD_FILL_BYTE) {
-					printf("bad data in cyl %d\nContinuing... ", cyl);
+					 printf("bad data in cyl %d\nContinuing... ", cyl);
 				}
 			}
 		}
@@ -126,7 +126,7 @@ int fdformat_main(int argc UNUSED_PARAM, char **argv)
 
 		if (ENABLE_FEATURE_CLEAN_UP) free(data);
 
-		puts("Done");
+		printf("done\n");
 	}
 
 	if (ENABLE_FEATURE_CLEAN_UP) close(fd);

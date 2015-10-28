@@ -73,7 +73,7 @@ static unsigned get_hz(void)
 		fclose(fp);
 	}
 	if (!hz_internal)
-		hz_internal = bb_clk_tck();
+		hz_internal = sysconf(_SC_CLK_TCK);
 	return hz_internal;
 }
 
@@ -87,6 +87,7 @@ static int FAST_FUNC print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 	inet_prefix dst;
 	inet_prefix src;
 	int host_len = -1;
+	SPRINT_BUF(b1);
 
 	if (n->nlmsg_type != RTM_NEWROUTE && n->nlmsg_type != RTM_DELROUTE) {
 		fprintf(stderr, "Not a route: %08x %08x %08x\n",
@@ -235,7 +236,7 @@ static int FAST_FUNC print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 		printf("Deleted ");
 	}
 	if (r->rtm_type != RTN_UNICAST /* && !G_filter.type - always 0 */) {
-		printf("%s ", rtnl_rtntype_n2a(r->rtm_type));
+		printf("%s ", rtnl_rtntype_n2a(r->rtm_type, b1));
 	}
 
 	if (tb[RTA_DST]) {
@@ -297,19 +298,6 @@ static int FAST_FUNC print_route(const struct sockaddr_nl *who UNUSED_PARAM,
 	if (tb[RTA_PRIORITY]) {
 		printf(" metric %d ", *(uint32_t*)RTA_DATA(tb[RTA_PRIORITY]));
 	}
-	if (r->rtm_flags & RTNH_F_DEAD) {
-		printf("dead ");
-	}
-	if (r->rtm_flags & RTNH_F_ONLINK) {
-		printf("onlink ");
-	}
-	if (r->rtm_flags & RTNH_F_PERVASIVE) {
-		printf("pervasive ");
-	}
-	if (r->rtm_flags & RTM_F_NOTIFY) {
-		printf("notify ");
-	}
-
 	if (r->rtm_family == AF_INET6) {
 		struct rta_cacheinfo *ci = NULL;
 		if (tb[RTA_CACHEINFO]) {
@@ -342,7 +330,7 @@ static int iproute_modify(int cmd, unsigned flags, char **argv)
 {
 	static const char keywords[] ALIGN1 =
 		"src\0""via\0""mtu\0""lock\0""protocol\0"IF_FEATURE_IP_RULE("table\0")
-		"dev\0""oif\0""to\0""metric\0""onlink\0";
+		"dev\0""oif\0""to\0""metric\0";
 	enum {
 		ARG_src,
 		ARG_via,
@@ -353,7 +341,6 @@ IF_FEATURE_IP_RULE(ARG_table,)
 		ARG_oif,
 		ARG_to,
 		ARG_metric,
-		ARG_onlink,
 	};
 	enum {
 		gw_ok = 1 << 0,
@@ -444,8 +431,6 @@ IF_FEATURE_IP_RULE(ARG_table,)
 			NEXT_ARG();
 			metric = get_u32(*argv, "metric");
 			addattr32(&req.n, sizeof(req), RTA_PRIORITY, metric);
-		} else if (arg == ARG_onlink) {
-			req.r.rtm_flags |= RTNH_F_ONLINK;
 		} else {
 			int type;
 			inet_prefix dst;

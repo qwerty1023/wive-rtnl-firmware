@@ -219,7 +219,7 @@ static void action_execute(const struct devfsd_notify_struct *, const struct con
 							const regmatch_t *, unsigned);
 static void action_modload(const struct devfsd_notify_struct *info, const struct config_entry_struct *entry);
 static void action_copy(const struct devfsd_notify_struct *, const struct config_entry_struct *,
-						const regmatch_t *, unsigned);
+						 const regmatch_t *, unsigned);
 static void action_compat(const struct devfsd_notify_struct *, unsigned);
 static void free_config(void);
 static void restore(char *spath, struct stat source_stat, int rootlen);
@@ -229,12 +229,12 @@ static void signal_handler(int);
 static const char *get_variable(const char *, void *);
 static int make_dir_tree(const char *);
 static int expand_expression(char *, unsigned, const char *, const char *(*)(const char *, void *), void *,
-							const char *, const regmatch_t *, unsigned);
+							 const char *, const regmatch_t *, unsigned);
 static void expand_regexp(char *, size_t, const char *, const char *, const regmatch_t *, unsigned);
 static const char *expand_variable(	char *, unsigned, unsigned *, const char *,
 									const char *(*)(const char *, void *), void *);
 static const char *get_variable_v2(const char *, const char *(*)(const char *, void *), void *);
-static char get_old_ide_name(unsigned, unsigned);
+static char get_old_ide_name(unsigned , unsigned);
 static char *write_old_sd_name(char *, unsigned, unsigned, const char *);
 
 /* busybox functions */
@@ -580,9 +580,9 @@ static void process_config_line(const char *line, unsigned long *event_mask)
 			/*This  action will pass "/dev/$devname"(i.e. "/dev/" prefixed to
 			the device name) to the module loading  facility.  In  addition,
 			the /etc/modules.devfs configuration file is used.*/
-			if (ENABLE_DEVFSD_MODLOAD)
+			 if (ENABLE_DEVFSD_MODLOAD)
 				new->action.what = AC_MODLOAD;
-			break;
+			 break;
 		case 6: /* EXECUTE */
 			new->action.what = AC_EXECUTE;
 			num_args -= 3;
@@ -750,7 +750,7 @@ static void action_permissions(const struct devfsd_notify_struct *info,
 }   /*  End Function action_permissions  */
 
 static void action_modload(const struct devfsd_notify_struct *info,
-			const struct config_entry_struct *entry UNUSED_PARAM)
+			    const struct config_entry_struct *entry UNUSED_PARAM)
 /*  [SUMMARY] Load a module.
     <info> The devfs change.
     <entry> The config file entry.
@@ -771,8 +771,8 @@ static void action_modload(const struct devfsd_notify_struct *info,
 }  /*  End Function action_modload  */
 
 static void action_execute(const struct devfsd_notify_struct *info,
-			const struct config_entry_struct *entry,
-			const regmatch_t *regexpr, unsigned int numexpr)
+			    const struct config_entry_struct *entry,
+			    const regmatch_t *regexpr, unsigned int numexpr)
 /*  [SUMMARY] Execute a programme.
     <info> The devfs change.
     <entry> The config file entry.
@@ -803,8 +803,8 @@ static void action_execute(const struct devfsd_notify_struct *info,
 
 
 static void action_copy(const struct devfsd_notify_struct *info,
-			const struct config_entry_struct *entry,
-			const regmatch_t *regexpr, unsigned int numexpr)
+			 const struct config_entry_struct *entry,
+			 const regmatch_t *regexpr, unsigned int numexpr)
 /*  [SUMMARY] Copy permissions.
     <info> The devfs change.
     <entry> The config file entry.
@@ -1085,7 +1085,7 @@ static int get_uid_gid(int flag, const char *string)
 	struct group *grp_ent;
 	const char *msg;
 
-	if (isdigit(string[0]) || ((string[0] == '-') && isdigit(string[1])))
+	if (isdigit(string[0]) ||((string[0] == '-') && isdigit(string[1])))
 		return atoi(string);
 
 	if (flag == UID && (pw_ent = getpwnam(string)) != NULL)
@@ -1096,9 +1096,9 @@ static int get_uid_gid(int flag, const char *string)
 
 	if (flag == GID) {
 		if ((grp_ent = getgrnam(string)) != NULL)
-			return grp_ent->gr_gid;
+		return grp_ent->gr_gid;
 		if (ENABLE_DEVFSD_VERBOSE)
-			msg = "group";
+		msg = "group";
 	}
 
 	if (ENABLE_DEVFSD_VERBOSE)
@@ -1142,19 +1142,19 @@ static void signal_handler(int sig)
 
 static const char *get_variable(const char *variable, void *info)
 {
+	static char sbuf[sizeof(int)*3 + 2]; /* sign and NUL */
 	static char *hostname;
 
 	struct get_variable_info *gv_info = info;
 	const char *field_names[] = {
-			"hostname", "mntpt", "devpath", "devname", "uid", "gid", "mode",
-			NULL, mount_point, gv_info->devpath, gv_info->devname, NULL
+			"hostname", "mntpt", "devpath", "devname",
+			"uid", "gid", "mode", hostname, mount_point,
+			gv_info->devpath, gv_info->devname, NULL
 	};
 	int i;
 
 	if (!hostname)
 		hostname = safe_gethostname();
-	field_names[7] = hostname;
-
 	/* index_in_str_array returns i>=0  */
 	i = index_in_str_array(field_names, variable);
 
@@ -1164,11 +1164,12 @@ static const char *get_variable(const char *variable, void *info)
 		return field_names[i + 7];
 
 	if (i == 4)
-		return auto_string(xasprintf("%u", gv_info->info->uid));
-	if (i == 5)
-		return auto_string(xasprintf("%u", gv_info->info->gid));
-	/* i == 6 */
-	return auto_string(xasprintf("%o", gv_info->info->mode));
+		sprintf(sbuf, "%u", gv_info->info->uid);
+	else if (i == 5)
+		sprintf(sbuf, "%u", gv_info->info->gid);
+	else if (i == 6)
+		sprintf(sbuf, "%o", gv_info->info->mode);
+	return sbuf;
 }   /*  End Function get_variable  */
 
 static void service(struct stat statbuf, char *path)
@@ -1260,11 +1261,11 @@ static int make_dir_tree(const char *path)
 } /*  End Function make_dir_tree  */
 
 static int expand_expression(char *output, unsigned int outsize,
-			const char *input,
-			const char *(*get_variable_func)(const char *variable, void *info),
-			void *info,
-			const char *devname,
-			const regmatch_t *ex, unsigned int numexp)
+			      const char *input,
+			      const char *(*get_variable_func)(const char *variable, void *info),
+			      void *info,
+			      const char *devname,
+			      const regmatch_t *ex, unsigned int numexp)
 /*  [SUMMARY] Expand environment variables and regular subexpressions in string.
     <output> The output expanded expression is written here.
     <length> The size of the output buffer.
@@ -1289,8 +1290,8 @@ static int expand_expression(char *output, unsigned int outsize,
 }   /*  End Function expand_expression  */
 
 static void expand_regexp(char *output, size_t outsize, const char *input,
-			const char *devname,
-			const regmatch_t *ex, unsigned int numex)
+			   const char *devname,
+			   const regmatch_t *ex, unsigned int numex)
 /*  [SUMMARY] Expand all occurrences of the regular subexpressions \0 to \9.
     <output> The output expanded expression is written here.
     <outsize> The size of the output buffer.
@@ -1386,7 +1387,7 @@ static struct translate_struct translate_table[] =
 };
 
 const char *get_old_name(const char *devname, unsigned int namelen,
-			char *buffer, unsigned int major, unsigned int minor)
+			  char *buffer, unsigned int major, unsigned int minor)
 /*  [SUMMARY] Translate a kernel-supplied name into an old name.
     <devname> The device name provided by the kernel.
     <namelen> The length of the name.
@@ -1404,6 +1405,7 @@ const char *get_old_name(const char *devname, unsigned int namelen,
 	int indexx;
 	const char *pty1;
 	const char *pty2;
+	size_t len;
 	/* 1 to 5  "scsi/" , 6 to 9 "ide/host", 10 sbp/, 11 vcc/, 12 pty/ */
 	static const char *const fmt[] = {
 		NULL ,
@@ -1423,11 +1425,12 @@ const char *get_old_name(const char *devname, unsigned int namelen,
 	};
 
 	for (trans = translate_table; trans->match != NULL; ++trans) {
-		char *after_match = is_prefixed_with(devname, trans->match);
-		if (after_match) {
+		 len = strlen(trans->match);
+
+		if (strncmp(devname, trans->match, len) == 0) {
 			if (trans->format == NULL)
-				return after_match;
-			sprintf(buffer, trans->format, after_match);
+				return devname + len;
+			sprintf(buffer, trans->format, devname + len);
 			return buffer;
 		}
 	}
@@ -1548,9 +1551,9 @@ static char *write_old_sd_name(char *buffer,
 /*EXPERIMENTAL_FUNCTION*/
 
 int st_expr_expand(char *output, unsigned int length, const char *input,
-		const char *(*get_variable_func)(const char *variable,
-						void *info),
-		void *info)
+		     const char *(*get_variable_func)(const char *variable,
+						  void *info),
+		     void *info)
 /*  [SUMMARY] Expand an expression using Borne Shell-like unquoted rules.
     <output> The output expanded expression is written here.
     <length> The size of the output buffer.
@@ -1640,10 +1643,10 @@ st_expr_expand_out:
 /*  Private functions follow  */
 
 static const char *expand_variable(char *buffer, unsigned int length,
-				unsigned int *out_pos, const char *input,
-				const char *(*func)(const char *variable,
-							void *info),
-				void *info)
+				    unsigned int *out_pos, const char *input,
+				    const char *(*func)(const char *variable,
+							 void *info),
+				    void *info)
 /*  [SUMMARY] Expand a variable.
     <buffer> The buffer to write to.
     <length> The length of the output buffer.
@@ -1785,8 +1788,8 @@ expand_variable_out:
 
 
 static const char *get_variable_v2(const char *variable,
-				const char *(*func)(const char *variable, void *info),
-				void *info)
+				  const char *(*func)(const char *variable, void *info),
+				 void *info)
 /*  [SUMMARY] Get a variable from the environment or .
     <variable> The variable name.
     <func> A function which will be used to get the variable. If this returns

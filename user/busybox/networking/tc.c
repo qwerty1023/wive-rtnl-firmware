@@ -65,7 +65,7 @@ struct globals {
 } FIX_ALIASING;
 #define G (*(struct globals*)&bb_common_bufsiz1)
 struct BUG_G_too_big {
-	char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
+        char BUG_G_too_big[sizeof(G) <= COMMON_BUFSIZE ? 1 : -1];
 };
 #define filter_ifindex (G.filter_ifindex)
 #define filter_qdisc (G.filter_qdisc)
@@ -151,17 +151,17 @@ static void print_rate(char *buf, int len, uint32_t rate)
 	double tmp = (double)rate*8;
 
 	if (use_iec) {
-		if (tmp >= 1000*1024*1024)
-			snprintf(buf, len, "%.0fMibit", tmp/(1024*1024));
-		else if (tmp >= 1000*1024)
+		if (tmp >= 1000.0*1024.0*1024.0)
+			snprintf(buf, len, "%.0fMibit", tmp/1024.0*1024.0);
+		else if (tmp >= 1000.0*1024)
 			snprintf(buf, len, "%.0fKibit", tmp/1024);
 		else
 			snprintf(buf, len, "%.0fbit", tmp);
 	} else {
-		if (tmp >= 1000*1000000)
-			snprintf(buf, len, "%.0fMbit", tmp/1000000);
-		else if (tmp >= 1000*1000)
-			snprintf(buf, len, "%.0fKbit", tmp/1000);
+		if (tmp >= 1000.0*1000000.0)
+			snprintf(buf, len, "%.0fMbit", tmp/1000000.0);
+		else if (tmp >= 1000.0 * 1000.0)
+			snprintf(buf, len, "%.0fKbit", tmp/1000.0);
 		else
 			snprintf(buf, len, "%.0fbit",  tmp);
 	}
@@ -391,7 +391,7 @@ static int print_class(const struct sockaddr_nl *who UNUSED_PARAM,
 		printf("root ");
 	else if (msg->tcm_parent) {
 		classid = print_tc_classid(filter_qdisc ?
-				TC_H_MIN(msg->tcm_parent) : msg->tcm_parent);
+								   TC_H_MIN(msg->tcm_parent) : msg->tcm_parent);
 		printf("parent %s ", classid);
 		if (ENABLE_FEATURE_CLEAN_UP)
 			free(classid);

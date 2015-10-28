@@ -133,7 +133,7 @@
 # include <security/pam_appl.h>
 # include <security/pam_misc.h>
 #endif
-#if ENABLE_FEATURE_USE_SENDFILE
+#if ENABLE_FEATURE_HTTPD_USE_SENDFILE
 # include <sys/sendfile.h>
 #endif
 /* amount of buffering in a pipe */
@@ -697,7 +697,7 @@ static void parse_conf(const char *path, int flag)
 				goto config_error;
 			}
 			*host_port++ = '\0';
-			if (is_prefixed_with(host_port, "http://"))
+			if (strncmp(host_port, "http://", 7) == 0)
 				host_port += 7;
 			if (*host_port == '\0') {
 				goto config_error;
@@ -796,9 +796,9 @@ static void parse_conf(const char *path, int flag)
 		/* the line is not recognized */
  config_error:
 		bb_error_msg("config error '%s' in '%s'", buf, filename);
-	} /* while (fgets) */
+	 } /* while (fgets) */
 
-	fclose(f);
+	 fclose(f);
 }
 
 #if ENABLE_FEATURE_HTTPD_ENCODE_URL_STR
@@ -967,30 +967,19 @@ static void send_headers(int responseNum)
 	}
 #endif
 	if (responseNum == HTTP_MOVED_TEMPORARILY) {
-		/* Responding to "GET /dir" with
-		 * "HTTP/1.0 302 Found" "Location: /dir/"
-		 * - IOW, asking them to repeat with a slash.
-		 * Here, overflow IS possible, can't use sprintf:
-		 * mkdir test
-		 * python -c 'print("get /test?" + ("x" * 8192))' | busybox httpd -i -h .
-		 */
-		len += snprintf(iobuf + len, IOBUF_SIZE-3 - len,
-				"Location: %s/%s%s\r\n",
+		len += sprintf(iobuf + len, "Location: %s/%s%s\r\n",
 				found_moved_temporarily,
 				(g_query ? "?" : ""),
 				(g_query ? g_query : ""));
-		if (len > IOBUF_SIZE-3)
-			len = IOBUF_SIZE-3;
 	}
 
 #if ENABLE_FEATURE_HTTPD_ERROR_PAGES
 	if (error_page && access(error_page, R_OK) == 0) {
-		iobuf[len++] = '\r';
-		iobuf[len++] = '\n';
-		if (DEBUG) {
-			iobuf[len] = '\0';
+		strcat(iobuf, "\r\n");
+		len += 2;
+
+		if (DEBUG)
 			fprintf(stderr, "headers: '%s'\n", iobuf);
-		}
 		full_write(STDOUT_FILENO, iobuf, len);
 		if (DEBUG)
 			fprintf(stderr, "writing error page: '%s'\n", error_page);
@@ -1032,10 +1021,8 @@ static void send_headers(int responseNum)
 				responseNum, responseString,
 				responseNum, responseString, infoString);
 	}
-	if (DEBUG) {
-		iobuf[len] = '\0';
+	if (DEBUG)
 		fprintf(stderr, "headers: '%s'\n", iobuf);
-	}
 	if (full_write(STDOUT_FILENO, iobuf, len) != len) {
 		if (verbose > 1)
 			bb_perror_msg("error");
@@ -1117,15 +1104,15 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
 
 	/* NB: breaking out of this loop jumps to log_and_exit() */
 	out_cnt = 0;
-	pfd[FROM_CGI].fd = fromCgi_rd;
-	pfd[FROM_CGI].events = POLLIN;
-	pfd[TO_CGI].fd = toCgi_wr;
+		pfd[FROM_CGI].fd = fromCgi_rd;
+		pfd[FROM_CGI].events = POLLIN;
+			pfd[TO_CGI].fd = toCgi_wr;
 	while (1) {
 		/* Note: even pfd[0].events == 0 won't prevent
 		 * revents == POLLHUP|POLLERR reports from closed stdin.
 		 * Setting fd to -1 works: */
 		pfd[0].fd = -1;
-		pfd[0].events = POLLIN;
+				pfd[0].events = POLLIN;
 		pfd[0].revents = 0; /* probably not needed, paranoia */
 
 		/* We always poll this fd, thus kernel always sets revents: */
@@ -1235,12 +1222,12 @@ static NOINLINE void cgi_io_loop_and_exit(int fromCgi_rd, int toCgi_wr, int post
 				out_cnt += count;
 				count = 0;
 				/* "Status" header format is: "Status: 302 Redirected\r\n" */
-				if (out_cnt >= 7 && memcmp(rbuf, "Status:", 7) == 0) {
+				if (out_cnt >= 8 && memcmp(rbuf, "Status: ", 8) == 0) {
 					/* send "HTTP/1.0 " */
 					if (full_write(STDOUT_FILENO, HTTP_200, 9) != 9)
 						break;
-					rbuf += 7; /* skip "Status:" */
-					count = out_cnt - 7;
+					rbuf += 8; /* skip "Status: " */
+					count = out_cnt - 8;
 					out_cnt = -1; /* buffering off */
 				} else if (out_cnt >= 4) {
 					/* Did CGI add "HTTP"? */
@@ -1333,7 +1320,7 @@ static void send_cgi_and_exit(
 		int dir;
 		*script = '\0';
 		dir = is_directory(url + 1, /*followlinks:*/ 1);
-		*script = '/';
+			*script = '/';
 		if (!dir) {
 			/* not directory, found script.cgi/PATH_INFO */
 			break;
@@ -1637,7 +1624,7 @@ static NOINLINE void send_file_and_exit(const char *url, int what)
 #endif
 	if (what & SEND_HEADERS)
 		send_headers(HTTP_OK);
-#if ENABLE_FEATURE_USE_SENDFILE
+#if ENABLE_FEATURE_HTTPD_USE_SENDFILE
 	{
 		off_t offset = range_start;
 		while (1) {
@@ -1667,7 +1654,7 @@ static NOINLINE void send_file_and_exit(const char *url, int what)
 			break;
 	}
 	if (count < 0) {
- IF_FEATURE_USE_SENDFILE(fin:)
+ IF_FEATURE_HTTPD_USE_SENDFILE(fin:)
 		if (verbose > 1)
 			bb_perror_msg("error");
 	}
@@ -1734,9 +1721,9 @@ static int pam_talker(int num_msg,
 		case PAM_PROMPT_ECHO_OFF:
 			s = userinfo->pw;
 			break;
-		case PAM_ERROR_MSG:
-		case PAM_TEXT_INFO:
-			s = "";
+	        case PAM_ERROR_MSG:
+        	case PAM_TEXT_INFO:
+        		s = "";
 			break;
 		default:
 			free(response);
@@ -1863,7 +1850,7 @@ static int check_user_passwd(const char *path, char *user_and_passwd)
 				 */
 				goto check_encrypted;
 # endif /* ENABLE_PAM */
-			}
+				}
 			/* Else: passwd is from httpd.conf, it is either plaintext or encrypted */
 
 			if (passwd[0] == '$' && isdigit(passwd[1])) {
@@ -1907,7 +1894,7 @@ static Htaccess_Proxy *find_proxy_entry(const char *url)
 {
 	Htaccess_Proxy *p;
 	for (p = proxy; p; p = p->next) {
-		if (is_prefixed_with(url, p->url_from))
+		if (strncmp(url, p->url_from, strlen(p->url_from)) == 0)
 			return p;
 	}
 	return NULL;
@@ -2062,7 +2049,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
 			}
 			if (*tptr == '.') {
 				if (tptr[1] == '.' && (tptr[2] == '/' || tptr[2] == '\0')) {
-					/* "..": be careful */
+				/* "..": be careful */
 					/* protect root */
 					if (urlp == urlcopy)
 						send_headers_and_exit(HTTP_BAD_REQUEST);
@@ -2196,7 +2183,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
 			if (STRNCASECMP(iobuf, "Range:") == 0) {
 				/* We know only bytes=NNN-[MMM] */
 				char *s = skip_whitespace(iobuf + sizeof("Range:")-1);
-				if (is_prefixed_with(s, "bytes=") == 0) {
+				if (strncmp(s, "bytes=", 6) == 0) {
 					s += sizeof("bytes=")-1;
 					range_start = BB_STRTOOFF(s, &s, 10);
 					if (s[0] != '-' || range_start < 0) {
@@ -2282,7 +2269,7 @@ static void handle_incoming_and_exit(const len_and_sockaddr *fromAddr)
 	tptr = urlcopy + 1;      /* skip first '/' */
 
 #if ENABLE_FEATURE_HTTPD_CGI
-	if (is_prefixed_with(tptr, "cgi-bin/")) {
+	if (strncmp(tptr, "cgi-bin/", 8) == 0) {
 		if (tptr[8] == '\0') {
 			/* protect listing "cgi-bin/" */
 			send_headers_and_exit(HTTP_FORBIDDEN);
@@ -2365,7 +2352,7 @@ static void mini_httpd(int server_socket)
 			continue;
 
 		/* set the KEEPALIVE option to cull dead connections */
-		setsockopt_keepalive(n);
+		setsockopt(n, SOL_SOCKET, SO_KEEPALIVE, &const_int_1, sizeof(const_int_1));
 
 		if (fork() == 0) {
 			/* child */
@@ -2408,7 +2395,7 @@ static void mini_httpd_nommu(int server_socket, int argc, char **argv)
 			continue;
 
 		/* set the KEEPALIVE option to cull dead connections */
-		setsockopt_keepalive(n);
+		setsockopt(n, SOL_SOCKET, SO_KEEPALIVE, &const_int_1, sizeof(const_int_1));
 
 		if (vfork() == 0) {
 			/* child */

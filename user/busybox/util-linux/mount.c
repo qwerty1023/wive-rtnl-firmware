@@ -17,103 +17,8 @@
 // mount_it_now() does the actual mount.
 //
 
-//config:config MOUNT
-//config:	bool "mount"
-//config:	default y
-//config:	select PLATFORM_LINUX
-//config:	help
-//config:	  All files and filesystems in Unix are arranged into one big directory
-//config:	  tree. The 'mount' utility is used to graft a filesystem onto a
-//config:	  particular part of the tree. A filesystem can either live on a block
-//config:	  device, or it can be accessible over the network, as is the case with
-//config:	  NFS filesystems. Most people using BusyBox will also want to enable
-//config:	  the 'mount' utility.
-//config:
-//config:config FEATURE_MOUNT_FAKE
-//config:	bool "Support option -f"
-//config:	default y
-//config:	depends on MOUNT
-//config:	help
-//config:	  Enable support for faking a file system mount.
-//config:
-//config:config FEATURE_MOUNT_VERBOSE
-//config:	bool "Support option -v"
-//config:	default y
-//config:	depends on MOUNT
-//config:	help
-//config:	  Enable multi-level -v[vv...] verbose messages. Useful if you
-//config:	  debug mount problems and want to see what is exactly passed
-//config:	  to the kernel.
-//config:
-//config:config FEATURE_MOUNT_HELPERS
-//config:	bool "Support mount helpers"
-//config:	default n
-//config:	depends on MOUNT
-//config:	help
-//config:	  Enable mounting of virtual file systems via external helpers.
-//config:	  E.g. "mount obexfs#-b00.11.22.33.44.55 /mnt" will in effect call
-//config:	  "obexfs -b00.11.22.33.44.55 /mnt"
-//config:	  Also "mount -t sometype [-o opts] fs /mnt" will try
-//config:	  "sometype [-o opts] fs /mnt" if simple mount syscall fails.
-//config:	  The idea is to use such virtual filesystems in /etc/fstab.
-//config:
-//config:config FEATURE_MOUNT_LABEL
-//config:	bool "Support specifying devices by label or UUID"
-//config:	default y
-//config:	depends on MOUNT
-//config:	select VOLUMEID
-//config:	help
-//config:	  This allows for specifying a device by label or uuid, rather than by
-//config:	  name. This feature utilizes the same functionality as blkid/findfs.
-//config:	  This also enables label or uuid support for swapon.
-//config:
-//config:config FEATURE_MOUNT_NFS
-//config:	bool "Support mounting NFS file systems on Linux < 2.6.23"
-//config:	default n
-//config:	depends on MOUNT
-//config:	select FEATURE_HAVE_RPC
-//config:	select FEATURE_SYSLOG
-//config:	help
-//config:	  Enable mounting of NFS file systems on Linux kernels prior
-//config:	  to version 2.6.23. Note that in this case mounting of NFS
-//config:	  over IPv6 will not be possible.
-//config:
-//config:	  Note that this option links in RPC support from libc,
-//config:	  which is rather large (~10 kbytes on uclibc).
-//config:
-//config:config FEATURE_MOUNT_CIFS
-//config:	bool "Support mounting CIFS/SMB file systems"
-//config:	default y
-//config:	depends on MOUNT
-//config:	help
-//config:	  Enable support for samba mounts.
-//config:
-//config:config FEATURE_MOUNT_FLAGS
-//config:	depends on MOUNT
-//config:	bool "Support lots of -o flags in mount"
-//config:	default y
-//config:	help
-//config:	  Without this, mount only supports ro/rw/remount. With this, it
-//config:	  supports nosuid, suid, dev, nodev, exec, noexec, sync, async, atime,
-//config:	  noatime, diratime, nodiratime, loud, bind, move, shared, slave,
-//config:	  private, unbindable, rshared, rslave, rprivate, and runbindable.
-//config:
-//config:config FEATURE_MOUNT_FSTAB
-//config:	depends on MOUNT
-//config:	bool "Support /etc/fstab and -a"
-//config:	default y
-//config:	help
-//config:	  Support mount all and looking for files in /etc/fstab.
-//config:
-//config:config FEATURE_MOUNT_OTHERTAB
-//config:	depends on FEATURE_MOUNT_FSTAB
-//config:	bool "Support -T <alt_fstab>"
-//config:	default y
-//config:	help
-//config:	  Support mount -T (specifying an alternate fstab)
-
 //usage:#define mount_trivial_usage
-//usage:       "[OPTIONS] [-o OPT] DEVICE NODE"
+//usage:       "[OPTIONS] [-o OPTS] DEVICE NODE"
 //usage:#define mount_full_usage "\n\n"
 //usage:       "Mount a filesystem. Filesystem autodetection requires /proc.\n"
 //usage:     "\n	-a		Mount all filesystems in fstab"
@@ -136,11 +41,8 @@
 //usage:	)
 ////usage:   "\n	-s		Sloppy (ignored)"
 //usage:     "\n	-r		Read-only mount"
-////usage:     "\n	-w		Read-write mount (default)"
+//usage:     "\n	-w		Read-write mount (default)"
 //usage:     "\n	-t FSTYPE[,...]	Filesystem type(s)"
-//usage:	IF_FEATURE_MOUNT_OTHERTAB(
-//usage:     "\n	-T FILE		Read FILE instead of /etc/fstab"
-//usage:	)
 //usage:     "\n	-O OPT		Mount only filesystems with option OPT (-a only)"
 //usage:     "\n-o OPT:"
 //usage:	IF_FEATURE_MOUNT_LOOP(
@@ -162,7 +64,7 @@
 //usage:     "\n	move		Relocate an existing mount point"
 //usage:	)
 //usage:     "\n	remount		Remount a mounted filesystem, changing flags"
-//usage:     "\n	ro		Same as -r"
+//usage:     "\n	ro/rw		Same as -r/-w"
 //usage:     "\n"
 //usage:     "\nThere are filesystem-specific -o flags."
 //usage:
@@ -265,7 +167,7 @@ enum {
 };
 
 
-#define OPTION_STR "o:t:rwanfvsiO:" IF_FEATURE_MOUNT_OTHERTAB("T:")
+#define OPTION_STR "o:t:rwanfvsiO:"
 enum {
 	OPT_o = (1 << 0),
 	OPT_t = (1 << 1),
@@ -278,7 +180,6 @@ enum {
 	OPT_s = (1 << 8),
 	OPT_i = (1 << 9),
 	OPT_O = (1 << 10),
-	OPT_T = (1 << 11),
 };
 
 #if ENABLE_FEATURE_MTAB_SUPPORT
@@ -641,7 +542,7 @@ static llist_t *get_block_backed_filesystems(void)
 		if (!f) continue;
 
 		while ((buf = xmalloc_fgetline(f)) != NULL) {
-			if (is_prefixed_with(buf, "nodev") && isspace(buf[5]))
+			if (strncmp(buf, "nodev", 5) == 0 && isspace(buf[5]))
 				goto next;
 			fs = skip_whitespace(buf);
 			if (*fs == '#' || *fs == '*' || !*fs)
@@ -940,31 +841,31 @@ enum {
  */
 
 struct nfs2_fh {
-	char            data[32];
+	char                    data[32];
 };
 struct nfs3_fh {
-	unsigned short  size;
-	unsigned char   data[64];
+	unsigned short          size;
+	unsigned char           data[64];
 };
 
 struct nfs_mount_data {
-	int		version;	/* 1 */
-	int		fd;		/* 1 */
-	struct nfs2_fh	old_root;	/* 1 */
-	int		flags;		/* 1 */
-	int		rsize;		/* 1 */
-	int		wsize;		/* 1 */
-	int		timeo;		/* 1 */
-	int		retrans;	/* 1 */
-	int		acregmin;	/* 1 */
-	int		acregmax;	/* 1 */
-	int		acdirmin;	/* 1 */
-	int		acdirmax;	/* 1 */
-	struct sockaddr_in addr;	/* 1 */
-	char		hostname[256];	/* 1 */
-	int		namlen;		/* 2 */
-	unsigned int	bsize;		/* 3 */
-	struct nfs3_fh	root;		/* 4 */
+	int		version;		/* 1 */
+	int		fd;			/* 1 */
+	struct nfs2_fh	old_root;		/* 1 */
+	int		flags;			/* 1 */
+	int		rsize;			/* 1 */
+	int		wsize;			/* 1 */
+	int		timeo;			/* 1 */
+	int		retrans;		/* 1 */
+	int		acregmin;		/* 1 */
+	int		acregmax;		/* 1 */
+	int		acdirmin;		/* 1 */
+	int		acdirmax;		/* 1 */
+	struct sockaddr_in addr;		/* 1 */
+	char		hostname[256];		/* 1 */
+	int		namlen;			/* 2 */
+	unsigned int	bsize;			/* 3 */
+	struct nfs3_fh	root;			/* 4 */
 };
 
 /* bits in the flags field */
@@ -1033,7 +934,7 @@ static bool_t xdr_fhandle(XDR *xdrs, fhandle objp)
 static bool_t xdr_fhstatus(XDR *xdrs, fhstatus *objp)
 {
 	if (!xdr_u_int(xdrs, &objp->fhs_status))
-		return FALSE;
+		 return FALSE;
 	if (objp->fhs_status == 0)
 		return xdr_fhandle(xdrs, objp->fhstatus_u.fhs_fhandle);
 	return TRUE;
@@ -1047,8 +948,8 @@ static bool_t xdr_dirpath(XDR *xdrs, dirpath *objp)
 static bool_t xdr_fhandle3(XDR *xdrs, fhandle3 *objp)
 {
 	return xdr_bytes(xdrs, (char **)&objp->fhandle3_val,
-			(unsigned int *) &objp->fhandle3_len,
-			FHSIZE3);
+			   (unsigned int *) &objp->fhandle3_len,
+			   FHSIZE3);
 }
 
 static bool_t xdr_mountres3_ok(XDR *xdrs, mountres3_ok *objp)
@@ -1056,10 +957,10 @@ static bool_t xdr_mountres3_ok(XDR *xdrs, mountres3_ok *objp)
 	if (!xdr_fhandle3(xdrs, &objp->fhandle))
 		return FALSE;
 	return xdr_array(xdrs, &(objp->auth_flavours.auth_flavours_val),
-			&(objp->auth_flavours.auth_flavours_len),
-			~0,
-			sizeof(int),
-			(xdrproc_t) xdr_int);
+			   &(objp->auth_flavours.auth_flavours_len),
+			   ~0,
+			   sizeof(int),
+			   (xdrproc_t) xdr_int);
 }
 
 static bool_t xdr_mountstat3(XDR *xdrs, mountstat3 *objp)
@@ -1364,9 +1265,9 @@ static NOINLINE int nfsmount(struct mntent *mp, unsigned long vfsflags, char *fi
 						strcspn(opteq, " \t\n\r,"));
 				continue;
 			case 18: // "proto"
-				if (is_prefixed_with(opteq, "tcp"))
+				if (!strncmp(opteq, "tcp", 3))
 					tcp = 1;
-				else if (is_prefixed_with(opteq, "udp"))
+				else if (!strncmp(opteq, "udp", 3))
 					tcp = 0;
 				else
 					bb_error_msg("warning: unrecognized proto= option");
@@ -1459,7 +1360,7 @@ static NOINLINE int nfsmount(struct mntent *mp, unsigned long vfsflags, char *fi
 				"rdirplus\0"
 				"acl\0";
 			int val = 1;
-			if (is_prefixed_with(opt, "no")) {
+			if (!strncmp(opt, "no", 2)) {
 				val = 0;
 				opt += 2;
 			}
@@ -1628,19 +1529,19 @@ static NOINLINE int nfsmount(struct mntent *mp, unsigned long vfsflags, char *fi
 		switch (pm_mnt.pm_prot) {
 		case IPPROTO_UDP:
 			mclient = clntudp_create(&mount_server_addr,
-						pm_mnt.pm_prog,
-						pm_mnt.pm_vers,
-						retry_timeout,
-						&msock);
+						 pm_mnt.pm_prog,
+						 pm_mnt.pm_vers,
+						 retry_timeout,
+						 &msock);
 			if (mclient)
 				break;
 			mount_server_addr.sin_port = htons(pm_mnt.pm_port);
 			msock = RPC_ANYSOCK;
 		case IPPROTO_TCP:
 			mclient = clnttcp_create(&mount_server_addr,
-						pm_mnt.pm_prog,
-						pm_mnt.pm_vers,
-						&msock, 0, 0);
+						 pm_mnt.pm_prog,
+						 pm_mnt.pm_vers,
+						 &msock, 0, 0);
 			break;
 		default:
 			mclient = NULL;
@@ -1661,18 +1562,18 @@ static NOINLINE int nfsmount(struct mntent *mp, unsigned long vfsflags, char *fi
 
 			if (pm_mnt.pm_vers == 3)
 				clnt_stat = clnt_call(mclient, MOUNTPROC3_MNT,
-						(xdrproc_t) xdr_dirpath,
-						(caddr_t) &pathname,
-						(xdrproc_t) xdr_mountres3,
-						(caddr_t) &status,
-						total_timeout);
+					      (xdrproc_t) xdr_dirpath,
+					      (caddr_t) &pathname,
+					      (xdrproc_t) xdr_mountres3,
+					      (caddr_t) &status,
+					      total_timeout);
 			else
 				clnt_stat = clnt_call(mclient, MOUNTPROC_MNT,
-						(xdrproc_t) xdr_dirpath,
-						(caddr_t) &pathname,
-						(xdrproc_t) xdr_fhstatus,
-						(caddr_t) &status,
-						total_timeout);
+					      (xdrproc_t) xdr_dirpath,
+					      (caddr_t) &pathname,
+					      (xdrproc_t) xdr_fhstatus,
+					      (caddr_t) &status,
+					      total_timeout);
 
 			if (clnt_stat == RPC_SUCCESS)
 				goto prepare_kernel_data; /* we're done */
@@ -1955,8 +1856,8 @@ static int singlemount(struct mntent *mp, int ignore_busy)
 				len, share,
 				share + len + 1  /* "dir1/dir2" */
 			);
-			parse_mount_options(unc, &filteropts);
-			if (ENABLE_FEATURE_CLEAN_UP) free(unc);
+ 			parse_mount_options(unc, &filteropts);
+ 			if (ENABLE_FEATURE_CLEAN_UP) free(unc);
 		}
 
 		lsa = host2sockaddr(hostname, 0);
@@ -1979,7 +1880,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
 	}
 
 	// Might this be an NFS filesystem?
-	if ((!mp->mnt_type || is_prefixed_with(mp->mnt_type, "nfs"))
+	if ((!mp->mnt_type || strncmp(mp->mnt_type, "nfs", 3) == 0)
 	 && strchr(mp->mnt_fsname, ':') != NULL
 	) {
 		if (!mp->mnt_type)
@@ -2020,7 +1921,7 @@ static int singlemount(struct mntent *mp, int ignore_busy)
 			next = mp->mnt_type ? strchr(mp->mnt_type, ',') : NULL;
 			if (next)
 				*next = '\0';
-			rc = mount_it_now(mp, vfsflags, filteropts);
+		rc = mount_it_now(mp, vfsflags, filteropts);
 			if (rc == 0 || !next)
 				break;
 			mp->mnt_type = next + 1;
@@ -2133,7 +2034,7 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
 	char *O_optmatch = NULL;
 	char *storage_path;
 	llist_t *lst_o = NULL;
-	const char *fstabname = "/etc/fstab";
+	const char *fstabname;
 	FILE *fstab;
 	int i, j;
 	int rc = EXIT_SUCCESS;
@@ -2160,7 +2061,6 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
 	// Max 2 params; -o is a list, -v is a counter
 	opt_complementary = "?2o::" IF_FEATURE_MOUNT_VERBOSE("vv");
 	opt = getopt32(argv, OPTION_STR, &lst_o, &fstype, &O_optmatch
-			IF_FEATURE_MOUNT_OTHERTAB(, &fstabname)
 			IF_FEATURE_MOUNT_VERBOSE(, &verbose));
 	while (lst_o) append_mount_options(&cmdopts, llist_pop(&lst_o)); // -o
 	if (opt & OPT_r) append_mount_options(&cmdopts, "ro"); // -r
@@ -2228,10 +2128,8 @@ int mount_main(int argc UNUSED_PARAM, char **argv)
 		return rc;
 	}
 
-	// A malicious user could overmount /usr without this.
-	if (ENABLE_FEATURE_MOUNT_OTHERTAB && nonroot)
-		fstabname = "/etc/fstab";
 	// Open either fstab or mtab
+	fstabname = "/etc/fstab";
 	if (cmdopt_flags & MS_REMOUNT) {
 		// WARNING. I am not sure this matches util-linux's
 		// behavior. It's possible util-linux does not

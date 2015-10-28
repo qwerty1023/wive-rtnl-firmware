@@ -56,12 +56,6 @@ enum { STACK_SIZE = (COMMON_BUFSIZE - offsetof(struct globals, stack)) / sizeof(
 } while (0)
 
 
-static void check_under(void)
-{
-	if (pointer == 0)
-		bb_error_msg_and_die("stack underflow");
-}
-
 static void push(double a)
 {
 	if (pointer >= STACK_SIZE)
@@ -71,7 +65,8 @@ static void push(double a)
 
 static double pop(void)
 {
-	check_under();
+	if (pointer == 0)
+		bb_error_msg_and_die("stack underflow");
 	return stack[--pointer];
 }
 
@@ -192,7 +187,6 @@ static void print_stack_no_pop(void)
 
 static void print_no_pop(void)
 {
-	check_under();
 	print_base(stack[pointer-1]);
 }
 
@@ -202,6 +196,14 @@ struct op {
 };
 
 static const struct op operators[] = {
+	{"+",   add},
+	{"add", add},
+	{"-",   sub},
+	{"sub", sub},
+	{"*",   mul},
+	{"mul", mul},
+	{"/",   divide},
+	{"div", divide},
 #if ENABLE_FEATURE_DC_LIBM
 	{"**",  power},
 	{"exp", power},
@@ -214,47 +216,28 @@ static const struct op operators[] = {
 	{"not", not},
 	{"eor", eor},
 	{"xor", eor},
-	{"+",   add},
-	{"add", add},
-	{"-",   sub},
-	{"sub", sub},
-	{"*",   mul},
-	{"mul", mul},
-	{"/",   divide},
-	{"div", divide},
 	{"p", print_no_pop},
 	{"f", print_stack_no_pop},
 	{"o", set_output_base},
 };
 
-/* Feed the stack machine */
 static void stack_machine(const char *argument)
 {
 	char *end;
-	double number;
+	double d;
 	const struct op *o;
 
- next:
-	number = strtod(argument, &end);
-	if (end != argument) {
-		argument = end;
-		push(number);
-		goto next;
-	}
-
-	/* We might have matched a digit, eventually advance the argument */
-	argument = skip_whitespace(argument);
-
-	if (*argument == '\0')
+	d = strtod(argument, &end);
+	if (end != argument && *end == '\0') {
+		push(d);
 		return;
+	}
 
 	o = operators;
 	do {
-		char *after_name = is_prefixed_with(argument, o->name);
-		if (after_name) {
-			argument = after_name;
+		if (strcmp(o->name, argument) == 0) {
 			o->function();
-			goto next;
+			return;
 		}
 		o++;
 	} while (o != operators + ARRAY_SIZE(operators));
@@ -271,11 +254,25 @@ int dc_main(int argc UNUSED_PARAM, char **argv)
 	if (!argv[0]) {
 		/* take stuff from stdin if no args are given */
 		char *line;
+		char *cursor;
+		char *token;
 		while ((line = xmalloc_fgetline(stdin)) != NULL) {
-			stack_machine(line);
+			cursor = line;
+			while (1) {
+				token = skip_whitespace(cursor);
+				if (*token == '\0')
+					break;
+				cursor = skip_non_whitespace(token);
+				if (*cursor != '\0')
+					*cursor++ = '\0';
+				stack_machine(token);
+			}
 			free(line);
 		}
 	} else {
+		// why? it breaks "dc -2 2 + p"
+		//if (argv[0][0] == '-')
+		//	bb_show_usage();
 		do {
 			stack_machine(*argv);
 		} while (*++argv);

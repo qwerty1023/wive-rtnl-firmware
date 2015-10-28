@@ -374,7 +374,7 @@ static void print_it(const char *masterformat,
 {
 	/* Create a working copy of the format string */
 	char *format = xstrdup(masterformat);
-	/* Add 2 to accommodate our conversion of the stat '%s' format string
+	/* Add 2 to accomodate our conversion of the stat '%s' format string
 	 * to the printf '%llu' one.  */
 	char *dest = xmalloc(strlen(format) + 2 + 1);
 	char *b;
@@ -598,34 +598,34 @@ static bool do_stat(const char *filename, const char *format)
 		} else {
 			if (S_ISBLK(statbuf.st_mode) || S_ISCHR(statbuf.st_mode)) {
 				format = (option_mask32 & OPT_SELINUX ?
-					"  File: %N\n"
-					"  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
-					"Device: %Dh/%dd\tInode: %-10i  Links: %-5h"
-					" Device type: %t,%T\n"
-					"Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
-					"   S_Context: %C\n"
+					  "  File: %N\n"
+					  "  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
+					  "Device: %Dh/%dd\tInode: %-10i  Links: %-5h"
+					  " Device type: %t,%T\n"
+					  "Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
+					  "   S_Context: %C\n"
 					"Access: %x\n" "Modify: %y\n" "Change: %z\n"
 					:
-					"  File: %N\n"
-					"  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
-					"Device: %Dh/%dd\tInode: %-10i  Links: %-5h"
-					" Device type: %t,%T\n"
-					"Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
+					  "  File: %N\n"
+					  "  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
+					  "Device: %Dh/%dd\tInode: %-10i  Links: %-5h"
+					  " Device type: %t,%T\n"
+					  "Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
 					"Access: %x\n" "Modify: %y\n" "Change: %z\n"
 					);
 			} else {
 				format = (option_mask32 & OPT_SELINUX ?
-					"  File: %N\n"
-					"  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
-					"Device: %Dh/%dd\tInode: %-10i  Links: %h\n"
-					"Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
-					"S_Context: %C\n"
+					  "  File: %N\n"
+					  "  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
+					  "Device: %Dh/%dd\tInode: %-10i  Links: %h\n"
+					  "Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
+					  "S_Context: %C\n"
 					"Access: %x\n" "Modify: %y\n" "Change: %z\n"
 					:
-					"  File: %N\n"
-					"  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
-					"Device: %Dh/%dd\tInode: %-10i  Links: %h\n"
-					"Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
+					  "  File: %N\n"
+					  "  Size: %-10s\tBlocks: %-10b IO Block: %-6o %F\n"
+					  "Device: %Dh/%dd\tInode: %-10i  Links: %h\n"
+					  "Access: (%04a/%10.10A)  Uid: (%5u/%8U)   Gid: (%5g/%8G)\n"
 					"Access: %x\n" "Modify: %y\n" "Change: %z\n"
 					);
 			}
@@ -655,7 +655,7 @@ static bool do_stat(const char *filename, const char *format)
 		);
 # if ENABLE_SELINUX
 		if (option_mask32 & OPT_SELINUX)
-			printf(" %s\n", scontext);
+			printf(" %lc\n", *scontext);
 		else
 			bb_putchar('\n');
 # endif
@@ -700,8 +700,7 @@ static bool do_stat(const char *filename, const char *format)
 		       (unsigned long) statbuf.st_gid,
 		       (gw_ent != NULL) ? gw_ent->gr_name : "UNKNOWN");
 # if ENABLE_SELINUX
-		if (option_mask32 & OPT_SELINUX)
-			printf("   S_Context: %s\n", scontext);
+		printf("   S_Context: %lc\n", *scontext);
 # endif
 		printf("Access: %s\n", human_time(statbuf.st_atime));
 		printf("Modify: %s\n", human_time(statbuf.st_mtime));
