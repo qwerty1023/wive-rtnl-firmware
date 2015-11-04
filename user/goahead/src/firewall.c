@@ -1439,6 +1439,8 @@ void firewall_rebuild(void)
 	doSystem("service iptables restart");
 	// do not restart dnsserver in all case???
 	doSystem("service dnsserver reload");
+	// перезапуск vpnserver после перезапуска iptables
+	doSystem("service vpnserver restart");
 }
 
 static int showDMZIPAddressASP(int eid, webs_t wp, int argc, char_t **argv)
