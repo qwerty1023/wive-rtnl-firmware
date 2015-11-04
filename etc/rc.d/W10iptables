@@ -502,8 +502,8 @@ get_param() {
     if [ "$wan_ipaddr" = "" ]; then
 	use_snat=0
     fi
-    # in pppoe pure mode no need add MASQ rules to uplink localnet
-    if [ "$vpnPurePPPOE" = "1" ]; then
+    # in pppoe pure mode no need add MASQ rules to uplink localnet only if vpn ON
+    if [ "$vpnPurePPPOE" = "1" ] && [ "$vpnEnabled" = "on" ]; then
 	natEnabled=0
     fi
     # calculate ip ranges for accounting
