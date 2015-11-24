@@ -88,30 +88,33 @@ void add_payload_hdr (struct tunnel *t, struct call *c, struct buffer *buf)
 /*	c->rbit=0; */
 }
 
-int read_packet (struct call *c)
+int read_packet (struct buffer *buf, int fd, int convert)
 {
-    struct buffer *buf = c->ppp_buf;
-    unsigned char ch;
+    unsigned char c;
     unsigned char escape = 0;
     unsigned char *p;
+    static unsigned char rbuf[MAX_RECV_SIZE];
+    static int pos = 0;
+    static int max = 0;
     int res;
     int errors = 0;
 
-    p = buf->start + buf->len;
+    /* Read a packet, doing async->sync conversion if necessary */
+    p = buf->start;
     while (1)
     {
-        if (c->rbuf_pos >= c->rbuf_max)
+        if (pos >= max)
         {
-            c->rbuf_max = read(c->fd, c->rbuf, sizeof (c->rbuf));
-            res = c->rbuf_max;
-            c->rbuf_pos = 0;
+            max = read(fd, rbuf, sizeof (rbuf));
+            res = max;
+            pos = 0;
         }
         else
         {
             res = 1;
         }
 
-        ch = c->rbuf[c->rbuf_pos++];
+        c = rbuf[pos++];
 
 	/* if there was a short read, then see what is about */
         if (res < 1)
@@ -142,25 +145,27 @@ int read_packet (struct call *c)
                 l2tp_log (LOG_DEBUG,
                      "%s: Too many errors.  Declaring call dead.\n",
                      __FUNCTION__);
-                c->rbuf_pos = 0;
-                c->rbuf_max = 0;
+		pos=0;
+		max=0;
                 return -errno;
             }
             continue;
         }
 
-        switch (ch)
+        switch (c)
         {
         case PPP_FLAG:
             if (escape)
             {
                 l2tp_log (LOG_DEBUG, "%s: got an escaped PPP_FLAG\n",
                      __FUNCTION__);
-                c->rbuf_pos = 0;
-                c->rbuf_max = 0;
+		pos=0;
+		max=0;
                 return -EINVAL;
             }
 
+            if (convert)
+            {
 	      if (buf->len >= 2) {
 		/* must be the end, drop the FCS */
 		buf->len -= 2;
@@ -174,27 +179,41 @@ int read_packet (struct call *c)
 		 */
 		break;
 	      }
+	    }
+            else
+            {
+		/* if there is space, then insert the byte */
+                if (buf->len < buf->maxlen)
+                {
+                    *p = c;
+                    p++;
+                    buf->len++;
+                }
+            }
 
 	    /* return what we have now */
             return buf->len;
 
         case PPP_ESCAPE:
             escape = PPP_TRANS;
+            if (convert)
                 break;
 
+	    /* fall through */
         default:
-            ch ^= escape;
+            if (convert)
+                c ^= escape;
             escape = 0;
             if (buf->len < buf->maxlen)
             {
-                *p = ch;
+                *p = c;
                 p++;
                 buf->len++;
                 break;
             }
             l2tp_log (LOG_WARNING, "%s: read overrun\n", __FUNCTION__);
-            c->rbuf_pos = 0;
-            c->rbuf_max = 0;
+	    pos=0;
+	    max=0;
             return -EINVAL;
         }
     }
@@ -389,14 +408,10 @@ void destroy_call (struct call *c)
      * Close the tty
      */
     if (c->fd > 0)
-    {
         close (c->fd);
-        c->fd = -1;
-    }
 /*	if (c->dethrottle) deschedule(c->dethrottle); */
     if (c->zlb_xmit)
         deschedule (c->zlb_xmit);
-    toss(c->ppp_buf);
 
 #ifdef IP_ALLOCATION
     if (c->addr)
@@ -468,13 +483,15 @@ void destroy_call (struct call *c)
             c->lac->rsched = schedule (tv, magic_lac_dial, c->lac);
         }
     }
+
     free (c);
 }
+
 
 struct call *new_call (struct tunnel *parent)
 {
     unsigned char entropy_buf[2] = "\0";
-    struct call *tmp = calloc (1,sizeof (struct call));
+    struct call *tmp = malloc (sizeof (struct call));
 
     if (!tmp)
         return NULL;
@@ -526,9 +543,7 @@ struct call *new_call (struct tunnel *parent)
     tmp->container = parent;
 /*	tmp->rws = -1; */
     tmp->fd = -1;
-    tmp->rbuf_pos = 0;
-    tmp->rbuf_max = 0;
-    tmp->ppp_buf = new_payload (parent->peer);
+    tmp->oldptyconf = malloc (sizeof (struct termios));
     tmp->pnu = 0;
     tmp->cnu = 0;
     tmp->needclose = 0;

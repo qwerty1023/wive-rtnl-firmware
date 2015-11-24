@@ -1142,7 +1142,7 @@ int control_finish (struct tunnel *t, struct call *c)
     return 0;
 }
 
-inline int check_control (const struct buffer *buf, struct tunnel *t,
+static inline int check_control (const struct buffer *buf, struct tunnel *t,
                           struct call *c)
 {
     /*
@@ -1282,7 +1282,7 @@ inline int check_control (const struct buffer *buf, struct tunnel *t,
     return 0;
 }
 
-inline int check_payload (struct buffer *buf, struct tunnel *t,
+static inline int check_payload (struct buffer *buf, struct tunnel *t,
                           struct call *c)
 {
     /*
@@ -1388,7 +1388,7 @@ inline int check_payload (struct buffer *buf, struct tunnel *t,
 #endif
     return 0;
 }
-inline int expand_payload (struct buffer *buf, struct tunnel *t,
+static inline int expand_payload (struct buffer *buf, struct tunnel *t,
                            struct call *c)
 {
     /*
@@ -1568,7 +1568,7 @@ void send_zlb (void *data)
     toss (buf);
 }
 
-inline int write_packet (struct buffer *buf, struct tunnel *t, struct call *c,
+static inline int write_packet (struct buffer *buf, struct tunnel *t, struct call *c,
                          int convert)
 {
     /*
@@ -1716,7 +1716,7 @@ int handle_special (struct buffer *buf, struct call *c, _u16 call)
     struct tunnel *t = c->container;
     /* Don't do anything unless it's a control packet */
     if (!CTBIT (*((_u16 *) buf->start)))
-        return -EINVAL;
+        return 0;
     /* Temporarily, we make the tunnel have cid of call instead of 0,
        but we need to stop any scheduled events (like Hello's in
        particular) which might use this value */
@@ -1730,7 +1730,7 @@ int handle_special (struct buffer *buf, struct call *c, _u16 call)
                 l2tp_log (LOG_DEBUG, "%s: ZLB for closed call\n", __FUNCTION__);
             t->control_rec_seq_num--;
             c->cid = 0;
-            return 1;
+            return 0;
         }
         /* Make a packet with the specified call number */
         /* FIXME: If I'm not a CDN, I need to send a CDN */
@@ -1740,7 +1740,7 @@ int handle_special (struct buffer *buf, struct call *c, _u16 call)
         udp_xmit (buf, t);
 #endif
         toss (buf);
-        return 0;
+        return 1;
     }
     else
     {
@@ -1749,7 +1749,7 @@ int handle_special (struct buffer *buf, struct call *c, _u16 call)
             l2tp_log (LOG_DEBUG, "%s: invalid control packet\n", __FUNCTION__);
     }
 
-    return -EINVAL;
+    return 0;
 }
 
 inline int handle_packet (struct buffer *buf, struct tunnel *t,
