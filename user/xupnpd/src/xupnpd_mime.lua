@@ -1,4 +1,4 @@
--- Copyright (C) 2011-2013 Anton Burdinuk
+-- Copyright (C) 2011-2015 Anton Burdinuk
 -- clark15b@gmail.com
 -- https://tsdemuxer.googlecode.com/svn/trunk/xupnpd
 
@@ -13,7 +13,7 @@ upnp_class=
 {
     ['video']     = 'object.item.videoItem',
     ['audio']     = 'object.item.audioItem.musicTrack'
-}                
+}
 
 
 upnp_proto=

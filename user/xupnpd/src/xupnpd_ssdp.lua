@@ -1,4 +1,4 @@
--- Copyright (C) 2011-2013 Anton Burdinuk
+-- Copyright (C) 2011-2015 Anton Burdinuk
 -- clark15b@gmail.com
 -- https://tsdemuxer.googlecode.com/svn/trunk/xupnpd
 
@@ -87,7 +87,7 @@ ssdp.init(cfg.ssdp_interface,1,cfg.ssdp_loop,cfg.debug)   -- interface, ttl, all
 
 www_location='http://'..ssdp.interface()..':'..cfg.http_port
 
-ssdp_location=www_location..'/dev.xml'
+    ssdp_location=www_location..'/dev.xml'
 
 if not cfg.uuid or cfg.uuid=='' then ssdp_uuid=core.uuid() else ssdp_uuid=cfg.uuid end
 

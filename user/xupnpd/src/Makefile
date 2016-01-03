@@ -3,13 +3,16 @@ LUA     = lua-5.2.x
 STATIC  = false
 CFLAGS  += -fno-exceptions -fno-rtti -I$(LUA) -L$(LUA) -I$(ROOTDIR)/lib/include
 SRC     = main.cpp soap.cpp mem.cpp mcast.cpp luaxlib.cpp luaxcore.cpp luajson.cpp luajson_parser.cpp
-STAGING_DIR = /u01/home/shocker/staff/openwrt/staging_dir
 LUAMYCFLAGS = -DLUA_USE_LINUX
 
 CFLAGS  += -ffunction-sections -fdata-sections
 CPPFLAGS += -ffunction-sections -fdata-sections
 LUAMYCFLAGS += -ffunction-sections -fdata-sections
 LDFLAGS += -Wl,--gc-sections
+
+SDK_8_09 = /u01/home/shocker_old/staff/openwrt_8_09/staging_dir
+SDK_BACKFIRE = /u01/home/shocker_old/staff/openwrt/staging_dir
+SDK_BBREAKER = /home/shocker/staff/openwrt/staging_dir
 
 ifeq ($(STATIC),true)
 CFLAGS+=-static
