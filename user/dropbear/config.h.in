@@ -65,7 +65,7 @@
 #define HAVE_CONST_GAI_STRERROR_PROTO 1
 
 /* crypt() function */
-#undef HAVE_CRYPT
+#define HAVE_CRYPT 1
 
 /* Define to 1 if you have the <crypt.h> header file. */
 #define HAVE_CRYPT_H 1
@@ -104,7 +104,7 @@
 #define HAVE_GETNAMEINFO 1
 
 /* Define to 1 if you have the `getpass' function. */
-#undef HAVE_GETPASS
+#define HAVE_GETPASS 1
 
 /* Define to 1 if you have the `getspnam' function. */
 #define HAVE_GETSPNAM 1
