@@ -312,7 +312,7 @@ static void unix_write_space(struct sock *sk)
 	read_lock(&sk->sk_callback_lock);
 	if (unix_writable(sk)) {
 		if (sk->sk_sleep && waitqueue_active(sk->sk_sleep))
-			wake_up_interruptible(sk->sk_sleep);
+			wake_up_interruptible_sync(sk->sk_sleep);
 		sk_wake_async(sk, SOCK_WAKE_SPACE, POLL_OUT);
 	}
 	read_unlock(&sk->sk_callback_lock);
@@ -1689,7 +1689,7 @@ static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
 		goto out_unlock;
 	}
 
-	wake_up_interruptible(&u->peer_wait);
+	wake_up_interruptible_sync(&u->peer_wait);
 
 	if (msg->msg_name)
 		unix_copy_addr(msg, skb->sk);
@@ -1818,14 +1818,7 @@ static int unix_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
 		memset(&tmp_scm, 0, sizeof(tmp_scm));
 	}
 
-	err = mutex_lock_interruptible(&u->readlock);
-	if (unlikely(err)) {
-		/* recvmsg() in non blocking mode is supposed to return -EAGAIN
-		 * sk_rcvtimeo is not honored by mutex_lock_interruptible()
-		 */
-		err = noblock ? -EAGAIN : -ERESTARTSYS;
-		goto out;
-	}
+	mutex_lock(&u->readlock);
 
 	do
 	{
@@ -1860,12 +1853,12 @@ static int unix_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 			timeo = unix_stream_data_wait(sk, timeo);
 
-			if (signal_pending(current)
-			    ||  mutex_lock_interruptible(&u->readlock)) {
+			if (signal_pending(current)) {
 				err = sock_intr_errno(timeo);
 				goto out;
 			}
 
+			mutex_lock(&u->readlock);
 			continue;
  unlock:
 			unix_state_unlock(sk);
