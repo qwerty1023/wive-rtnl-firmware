@@ -1,4 +1,4 @@
-/* dnsmasq is Copyright (c) 2000-2015 Simon Kelley
+/* dnsmasq is Copyright (c) 2000-2016 Simon Kelley
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,11 +28,12 @@
 
 struct ra_param {
   time_t now;
-  int ind, managed, other, found_context, first, adv_router;
+  int ind, managed, other, first, adv_router;
   char *if_name;
   struct dhcp_netid *tags;
   struct in6_addr link_local, link_global, ula;
   unsigned int glob_pref_time, link_pref_time, ula_pref_time, adv_interval, prio;
+  struct dhcp_context *found_context;
 };
 
 struct search_param {
@@ -228,8 +229,8 @@ void icmp6_packet(time_t now)
       /* If the incoming interface wasn't an alias, send an RA using
 	 the context of the incoming interface. */
       if (!bridge)
-      /* source address may not be valid in solicit request. */
-      send_ra(now, if_index, interface, !IN6_IS_ADDR_UNSPECIFIED(&from.sin6_addr) ? &from.sin6_addr : NULL);
+	/* source address may not be valid in solicit request. */
+	send_ra(now, if_index, interface, !IN6_IS_ADDR_UNSPECIFIED(&from.sin6_addr) ? &from.sin6_addr : NULL);
     }
 }
 
@@ -251,7 +252,7 @@ static void send_ra_alias(time_t now, int iface, char *iface_name, struct in6_ad
   parm.ind = iface;
   parm.managed = 0;
   parm.other = 0;
-  parm.found_context = 0;
+  parm.found_context = NULL;
   parm.adv_router = 0;
   parm.if_name = iface_name;
   parm.first = 1;
@@ -310,6 +311,12 @@ static void send_ra_alias(time_t now, int iface, char *iface_name, struct in6_ad
 	  if (old > context->saved_valid)
 	    {
 	      /* We've advertised this enough, time to go */
+	     
+	      /* If this context held the timeout, and there's another context in use
+		 transfer the timeout there. */
+	      if (context->ra_time != 0 && parm.found_context && parm.found_context->ra_time == 0)
+		new_timeout(parm.found_context, iface_name, now);
+	      
 	      *up = context->next;
 	      free(context);
 	    }
@@ -637,7 +644,9 @@ static int add_prefixes(struct in6_addr *local,  int prefix,
 		  }
 
 		param->first = 0;	
-		param->found_context = 1;
+		/* found_context is the _last_ one we found, so if there's 
+		   more than one, it's not the first. */
+		param->found_context = context;
 	      }
 
 	  /* configured time is ceiling */
@@ -781,7 +790,7 @@ time_t periodic_ra(time_t now)
 	      break;
 	  if (!tmp)
             {
-	    send_ra(now, param.iface, param.name, NULL); 
+              send_ra(now, param.iface, param.name, NULL); 
 
               /* Also send on all interfaces that are aliases of this
                  one. */
@@ -835,7 +844,7 @@ time_t periodic_ra(time_t now)
     }      
   return next_event;
 }
-  
+
 static int send_ra_to_aliases(int index, unsigned int type, char *mac, size_t maclen, void *parm)
 {
   struct alias_param *aparam = (struct alias_param *)parm;
