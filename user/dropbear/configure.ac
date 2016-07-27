@@ -92,7 +92,7 @@ AC_CHECK_LIB(crypt, crypt,
 	found_crypt_func=here
 	])
 AC_SUBST(CRYPTLIB)	
-if test "t$found_crypt_func" == there; then
+if test "t$found_crypt_func" = there; then
 AC_DEFINE(HAVE_CRYPT, 1, [crypt() function])
 fi
 
@@ -374,6 +374,9 @@ AC_CHECK_FUNCS(logout updwtmp logwtmp)
 # OS X monotonic time
 AC_CHECK_HEADERS([mach/mach_time.h])
 AC_CHECK_FUNCS(mach_absolute_time)
+
+AC_CHECK_FUNCS(explicit_bzero memset_s)
+
 
 AC_ARG_ENABLE(bundled-libtom,
 [  --enable-bundled-libtom       Force using bundled libtomcrypt/libtommath even if a system version exists.

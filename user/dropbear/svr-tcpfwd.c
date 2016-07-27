@@ -46,8 +46,8 @@ void recv_msg_global_request_remotetcp() {
 /* */
 #endif /* !ENABLE_SVR_REMOTETCPFWD */
 
-static int svr_cancelremotetcp();
-static int svr_remotetcpreq();
+static int svr_cancelremotetcp(void);
+static int svr_remotetcpreq(void);
 static int newtcpdirect(struct Channel * channel);
 
 #ifdef ENABLE_SVR_REMOTETCPFWD
@@ -269,8 +269,9 @@ static int newtcpdirect(struct Channel * channel) {
 		goto out;
 	}
 
-	snprintf(portstring, sizeof(portstring), "%d", destport);
-	channel->conn_pending = connect_remote(desthost, portstring, channel_connect_done, channel);
+	snprintf(portstring, sizeof(portstring), "%u", destport);
+	channel->conn_pending = connect_remote(AF_UNSPEC, desthost, portstring,
+					channel_connect_done, channel);
 
 	channel->prio = DROPBEAR_CHANNEL_PRIO_UNKNOWABLE;
 	

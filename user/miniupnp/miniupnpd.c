@@ -1,4 +1,4 @@
-/* $Id: miniupnpd.c,v 1.212 2015/11/05 10:56:23 nanard Exp $ */
+/* $Id: miniupnpd.c,v 1.216 2016/03/07 12:26:00 nanard Exp $ */
 /* MiniUPnP project
  * http://miniupnp.free.fr/ or http://miniupnp.tuxfamily.org/
  * (c) 2006-2015 Thomas Bernard
@@ -182,14 +182,14 @@ tomato_load(void)
 		current_time = time(NULL);
 		s[sizeof(s) - 1] = 0;
 		while (fgets(s, sizeof(s) - 1, f)) {
-			if (sscanf(s, "%3s %hu %31s %hu [%*s] %u", proto, &eport, iaddr, &iport, &timestamp) >= 4)
+			if (sscanf(s, "%3s %hu %31s %hu [%*[^]]] %u", proto, &eport, iaddr, &iport, &timestamp) >= 4) {
 			{
 				if (((a = strchr(s, '[')) != NULL) && ((b = strrchr(a, ']')) != NULL))
 				{
 					if (timestamp > 0)
 					{
 						if (timestamp > current_time)
-							leaseduration = current_time - timestamp;
+							leaseduration = timestamp - current_time;
 						else
 							continue;
 					}
@@ -199,6 +199,8 @@ tomato_load(void)
 					}
 					*b = 0;
 					rhost = NULL;
+					syslog(LOG_DEBUG, "Read redirection [%s] from file: %s port %hu to %s port %hu, timestamp: %u (%u)",
+						a + 1, proto, eport, iaddr, iport, timestamp, leaseduration);
 					upnp_redirect(rhost, eport, iaddr, iport, proto, a + 1, leaseduration);
 				}
 			}
@@ -454,7 +456,9 @@ ProcessIncomingHTTP(int shttpl, const char * protocol)
 		char addr_str[64];
 
 		sockaddr_to_string((struct sockaddr *)&clientname, addr_str, sizeof(addr_str));
-		syslog(LOG_INFO, "%s connection from %s", protocol, addr_str);
+#ifdef DEBUG
+		syslog(LOG_DEBUG, "%s connection from %s", protocol, addr_str);
+#endif /* DEBUG */
 		if(get_lan_for_peer((struct sockaddr *)&clientname) == NULL)
 		{
 			/* The peer is not a LAN ! */
@@ -495,6 +499,7 @@ ProcessIncomingHTTP(int shttpl, const char * protocol)
 #else
 				tmp->clientaddr = clientname.sin_addr;
 #endif
+				memcpy(tmp->clientaddr_str, addr_str, sizeof(tmp->clientaddr_str));
 				return tmp;
 			}
 			else
@@ -1190,6 +1195,9 @@ init(int argc, char * * argv, struct runtime_vars * v)
 			case UPNPNATCHAIN:
 				miniupnpd_nat_chain = ary_options[i].value;
 				break;
+			case UPNPNATPOSTCHAIN:
+				miniupnpd_nat_postrouting_chain = ary_options[i].value;
+				break;
 #endif	/* USE_NETFILTER */
 			case UPNPNOTIFY_INTERVAL:
 				v->notify_interval = atoi(ary_options[i].value);
@@ -1500,7 +1508,7 @@ init(int argc, char * * argv, struct runtime_vars * v)
 #else	/* #ifndef MULTIPLE_EXTERNAL_IP */
 			if(i+2 < argc)
 			{
-				char *val=calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + 1), sizeof(char));
+				char *val = calloc((strlen(argv[i+1]) + strlen(argv[i+2]) + 2), sizeof(char));
 				if (val == NULL)
 				{
 					fprintf(stderr, "memory allocation error for listen address storage\n");
@@ -1890,7 +1898,7 @@ main(int argc, char * * argv)
 			shttpl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 		if(shttpl_v4 < 0)
 		{
-			syslog(LOG_ERR, "Failed to open socket for HTTP on port %hu (IPv4). EXITING", v.port);
+			syslog(LOG_ERR, "Failed to open socket for HTTP on port %d (IPv4). EXITING", v.port);
 			return 1;
 		}
 		}
@@ -1914,7 +1922,7 @@ main(int argc, char * * argv)
 		shttpsl_v4 =  OpenAndConfHTTPSocket(&listen_port, 0);
 		if(shttpsl_v4 < 0)
 		{
-			syslog(LOG_ERR, "Failed to open socket for HTTPS on port %hu (IPv4). EXITING", v.https_port);
+			syslog(LOG_ERR, "Failed to open socket for HTTPS on port %d (IPv4). EXITING", v.https_port);
 			return 1;
 		}
 #endif /* V6SOCKETS_ARE_V6ONLY */
