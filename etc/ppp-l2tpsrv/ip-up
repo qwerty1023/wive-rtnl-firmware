@@ -3,6 +3,8 @@
 #include global config
 . /etc/scripts/global.sh
 
+LOG="logger -t vpn-server"
+
 PPP_IFACE="$1"
 PPP_TTY="$2"
 PPP_SPEED="$3"
@@ -10,10 +12,9 @@ PPP_LOCAL="$4"
 PPP_REMOTE="$5"
 PPP_IPPARAM="$6"
 PPP_NUM=`echo $PPP_IFACE | sed 's/[^0-65535]//g'`
-LOG="logger -t L2TP server"
 
 # get some variables
-eval `nvram_buf_get 2860 l2tp_srv_nat_enabled l2tp_srv_proxyarp parproutedEnabled RemoteSSH RemoteSSHPort RemoteFTP FtpPort TransmissionEnabled TransRPCPort`
+eval `nvram_buf_get 2860 l2tp_srv_nat_enabled l2tp_srv_proxyarp parproutedEnabled RemoteSSH RemoteSSHPort RemoteFTP FtpPort TransmissionEnabled TransRPCPort natEnabled vpnNAT`
 
 if [ "$l2tp_srv_proxyarp" != "1" ] && [ "$parproutedEnabled" != "1" ]; then
     #disable multicast on $PPP_IFACE interface
@@ -22,38 +23,54 @@ if [ "$l2tp_srv_proxyarp" != "1" ] && [ "$parproutedEnabled" != "1" ]; then
 fi
 
 #add rules
-if [ "$l2tp_srv_nat_enabled" != "" ] && [ "$l2tp_srv_nat_enabled" != "0" ]; then
-    $LOG "Add masqrade for client $PPP_REMOTE"
-    iptables -A l2tpsrvfwd -i $PPP_IFACE -j ACCEPT
-    iptables -A l2tpsrvfwd -o $PPP_IFACE -j ACCEPT
-    iptables -A POSTROUTING -t nat ! -o $PPP_IFACE -j MASQUERADE
+
+$LOG "Allow forward for $PPP_IFACE interface"
+iptables -A l2tpsrvfwd -i $PPP_IFACE -j ACCEPT
+iptables -A l2tpsrvfwd -o $PPP_IFACE -j ACCEPT
+
+if [ "$l2tp_srv_nat_enabled" = "1" ]; then
+    if [ "$vpnEnabled" = "on" ] && [ "$vpnNAT" != "off" ]; then
+	$LOG "Add masqrade for client $PPP_REMOTE to VPN client net over any ppp interfaces"
+	iptables -t nat -A POSTROUTING -s $PPP_REMOTE -o ppp+ -j MASQUERADE
+    fi
+    if [ "$natEnabled" = "1" ]; then
+	$LOG "Add masqrade for client $PPP_REMOTE to WAN net over $phys_wan_if"
+	iptables -t nat -A POSTROUTING -s $PPP_REMOTE -o $phys_wan_if -j MASQUERADE
+    fi
+    $LOG "Add masqrade for client $PPP_REMOTE to LAN net over $lan_if"
+    iptables -t nat -A POSTROUTING -s $PPP_REMOTE -o $lan_if -j MASQUERADE
+fi
+
+# allow dns for l2tp clients
+if [ "$dnsPEnabled" = "1" ]; then
+    $LOG "Dnsproxy allow from $PPP_IFACE"
+    iptables -A servicelimit -i $PPP_IFACE -p udp --dport 53 -j ACCEPT
+    iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport 53 -j ACCEPT
 fi
 
 # allow udpxy for l2tp clients
 if [ "$UDPXYMode" != "0" ]; then
+    $LOG "Udpxy allow from $PPP_IFACE"
     iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $UDPXYPort -j ACCEPT
 fi
 
 # allow SSH for l2tp clients
 if [ "$RemoteSSH" != "0" ]; then
+    $LOG "SSH allow from $PPP_IFACE"
     iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $RemoteSSHPort -j ACCEPT
 fi
 
 # allow FTP for l2tp clients
 if [ "$RemoteFTP" != "0" ]; then
+    $LOG "FTP allow from $PPP_IFACE"
     iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $FtpPort -j ACCEPT
 fi
 
-# allow DNS for l2tp clients
-iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p udp --dport 53 -j ACCEPT
-
 # allow TransmissionUI for l2tp clients
 if [ "$TransmissionEnabled" == "1" ]; then
+    $LOG "Transmission allow from $PPP_IFACE"
     iptables -A servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $TransRPCPort -j ACCEPT
 fi
-
-$LOG "Add low prio route to client $PPP_REMOTE network metric 100$PPP_NUM."
-ip -4 route replace default dev $PPP_IFACE metric 100$PPP_NUM via $PPP_REMOTE > /dev/null 2>&1
 
 $LOG "Enable forwarding for $PPP_IFACE interface"
 sysctl -wq net.ipv4.conf.$PPP_IFACE.forwarding=1

@@ -3,6 +3,8 @@
 #include global config
 . /etc/scripts/global.sh
 
+LOG="logger -t vpn-server"
+
 PPP_IFACE="$1"
 PPP_TTY="$2"
 PPP_SPEED="$3"
@@ -10,15 +12,11 @@ PPP_LOCAL="$4"
 PPP_REMOTE="$5"
 PPP_IPPARAM="$6"
 PPP_NUM=`echo $PPP_IFACE | sed 's/[^0-65535]//g'`
-LOG="logger -t L2TP server"
 
-eval `nvram_buf_get 2860 l2tp_srv_proxyarp parproutedEnabled RemoteSSHPort FtpPort TransRPCPort`
+eval `nvram_buf_get 2860 RemoteSSHPort FtpPort TransRPCPort`
 
 # disable proxyarp
-if [ "$l2tp_srv_proxyarp" = "1" ] || [ "$parproutedEnabled" = "1" ]; then
-    $LOG "Enable proxyarp for $PPP_IFACE"
-    sysctl -wq net.ipv4.conf.$PPP_IFACE.proxy_arp=0
-fi
+sysctl -wq net.ipv4.conf.$PPP_IFACE.proxy_arp=0
 
 # disable forward
 sysctl -wq net.ipv4.conf.$PPP_IFACE.forwarding=0
@@ -26,7 +24,13 @@ sysctl -wq net.ipv4.conf.$PPP_IFACE.forwarding=0
 # del rules
 iptables -D l2tpsrvfwd -i $PPP_IFACE -j ACCEPT > /dev/null 2>&1
 iptables -D l2tpsrvfwd -o $PPP_IFACE -j ACCEPT > /dev/null 2>&1
-iptables -D POSTROUTING -t nat ! -o $PPP_IFACE -j MASQUERADE > /dev/null 2>&1
+iptables -t nat -D POSTROUTING -i $PPP_IFACE -o ppp+ -j MASQUERADE > /dev/null 2>&1
+iptables -t nat -D POSTROUTING -i $PPP_IFACE -o $wan_if -j MASQUERADE > /dev/null 2>&1
+iptables -t nat -D POSTROUTING -i $PPP_IFACE -o $lan_if -j MASQUERADE > /dev/null 2>&1
+
+# dns
+iptables -D servicelimit -i $PPP_IFACE -p udp --dport 53 -j ACCEPT > /dev/null 2>&1
+iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport 53 -j ACCEPT > /dev/null 2>&1
 
 # udpxy
 iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $UDPXYPort -j ACCEPT > /dev/null 2>&1
@@ -37,11 +41,7 @@ iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $Remo
 # FTP
 iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $FtpPort -j ACCEPT > /dev/null 2>&1
 
-# DNS
-iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p udp --dport 53 -j ACCEPT > /dev/null 2>&1
-
 # TransmissionUI
 iptables -D servicelimit -i $PPP_IFACE -m state --state NEW -p tcp --dport $TransRPCPort -j ACCEPT > /dev/null 2>&1
-
 
 export PPP_IFACE PPP_TTY PPP_SPEED PPP_LOCAL PPP_REMOTE PPP_IPPARAM

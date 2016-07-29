@@ -231,8 +231,6 @@ start() {
 	    if [ "$parproutedEnabled" != "1" ]; then
 		# enable forward only from local network to wan/ppp
 		iptables -A FORWARD -i $lan_if -s $lan_ipaddr/$lan_netmask -j ACCEPT
-		iptables -A FORWARD -o $wan_if -s $lan_ipaddr/$lan_netmask -j ACCEPT
-		iptables -A FORWARD ! -o $lan_if -s $lan_ipaddr/$lan_netmask -j ACCEPT
 		if [ "$OperationMode" = "4" ]; then
 		    iptables -A FORWARD -o $wan_if -s $chilli_net -j ACCEPT
 		    iptables -t nat -A POSTROUTING -o $phys_wan_if -s $chilli_net -j MASQUERADE
@@ -266,20 +264,21 @@ start() {
 	fi
 ###########################################NAT-NAPTM#######################################
 	if [ "$natEnabled" = "1" ] || [ "$vpnNAT" != "off" ]; then
-	    $LOG "Add NAT rules"
 	    ####################PORTFORWARD#############################
-	    if [ -f /etc/portforward ] && [ "$PortForwardEnable" = "1" ]; then
-		if [ "$IPPortFilterEnable" != "1" ] && [ ! -f /etc/macipfilter ]; then
-		    iptables -A FORWARD -i $wan_if -o $lan_if -d $lan_ipaddr/$lan_netmask -j ACCEPT
-		    if [ "$PPP_CONNECT" = "on" ] && [ "$real_wan_if" != "" ]; then
-			iptables -A FORWARD -i $real_wan_if -o $lan_if -d $lan_ipaddr/$lan_netmask -j ACCEPT
-		    fi
-		fi
-		if  [ "$wan_ipaddr" != "" ]; then
-		    $LOG "Add portforward rules"
+	    # allow forward packets for portfw rules only if nat enabled
+	    # and portforward rules really generated
+	    if [ "$PortForwardEnable" = "1" ]; then
+		if [ -e /etc/portforward ] && [ "$wan_ipaddr" != "" ]; then
+		    $LOG "Add portforward NAT rules over $wan_ipaddr"
 		    /etc/portforward "$wan_ipaddr"
 		fi
+		# allways add allow forward rules at portforward enabled
+		if [ -e /etc/portforward_access ]; then
+		    $LOG "Add portforward FORWARD rules"
+		    /etc/portforward_access
+		fi
 	    fi
+	    $LOG "Add NAT rules"
 	    #######################NAT##################################
 	    if [ "$ROUTE_MODE" = "on" ] && [ "$natEnabled" = "1" ]; then
 		if [ "$OperationMode" != "4" ]; then
@@ -326,21 +325,21 @@ start() {
 		# nat rules
     		iptables -t nat -N MINIUPNPD
     		iptables -t nat -F MINIUPNPD
-    		iptables -t nat -N MINIUPNPD-PCP-PEER
-    		iptables -t nat -F MINIUPNPD-PCP-PEER
+    		iptables -t nat -N MINIUPNPD-POSTROUTING
+    		iptables -t nat -F MINIUPNPD-POSTROUTING
 		if [ "$igmpEnabled" != "0" ] || [ "$UDPXYMode" != "0" ]; then
 		    # multicast no need forward to upnp chain
     		    iptables -t nat -A PREROUTING -i $wan_if ! -s $mcast_net -j MINIUPNPD
-    		    iptables -t nat -A POSTROUTING -o $wan_if ! -d $mcast_net -j MINIUPNPD-PCP-PEER
+    		    iptables -t nat -A POSTROUTING -o $wan_if ! -d $mcast_net -j MINIUPNPD-POSTROUTING
 		else
 		    # all packets join to UPNP
     		    iptables -t nat -A PREROUTING -i $wan_if -j MINIUPNPD
-    		    iptables -t nat -A POSTROUTING -o $wan_if -j MINIUPNPD-PCP-PEER
+    		    iptables -t nat -A POSTROUTING -o $wan_if -j MINIUPNPD-POSTROUTING
 		fi
 		# all packets from join redirect to UPNP
 		if [ "$vpnNAT" != "off" ] && [ "$real_wan_if" != "" ]; then
 		    iptables -t nat -A PREROUTING -i $real_wan_if -j MINIUPNPD
-    		    iptables -t nat -A POSTROUTING -o $real_wan_if -j MINIUPNPD-PCP-PEER
+    		    iptables -t nat -A POSTROUTING -o $real_wan_if -j MINIUPNPD-POSTROUTING
 		fi
 		# filter rules
     		iptables -t filter -N MINIUPNPD
@@ -434,12 +433,6 @@ startv6() {
 	    ip6tables -A INPUT -i $lan_if -p udp --dport 5350:5351 -j ACCEPT
 	fi
 
-	if [ "$dnsPEnabled" = "1" ]; then
-	    $LOG "dnsproxy"
-	    ip6tables -A INPUT -i $lan_if -p udp --dport 53 -j ACCEPT
-	    ip6tables -A INPUT -i $lan_if $STATE_NEW -p tcp --dport 53 -j ACCEPT
-	fi
-
 	if [ "$LOCAL_PRT" != "" ]; then
 	    $LOG "allow local port range $LOCAL_PRT from LAN, need for some local service"
 	    ip6tables -A INPUT -i $lan_if -p udp --dport "$LOCAL_PRT" -j ACCEPT
@@ -486,7 +479,7 @@ get_param() {
     else
 	ROUTE_MODE="off"
     fi
-    # if ppp enabled and not pure pppoe mode (type6 is lanauth not real ppp)
+    # if ppp enabled and not lanauth mode (type6 is lanauth not real ppp)
     if [ "$MODEMENABLED" = "1" ] || [ "$vpnEnabled" = "on" -a "$vpnType" != "6" ]; then
 	PPP_CONNECT="on"
     else
@@ -502,8 +495,8 @@ get_param() {
     if [ "$wan_ipaddr" = "" ]; then
 	use_snat=0
     fi
-    # in pppoe pure mode no need add MASQ rules to uplink localnet only if vpn ON
-    if [ "$vpnPurePPPOE" = "1" ] && [ "$vpnEnabled" = "on" ]; then
+    # in pppoe pure mode no need add MASQ rules to uplink localnet
+    if [ "$vpnPurePPPOE" = "1" ]; then
 	natEnabled=0
     fi
     # calculate ip ranges for accounting

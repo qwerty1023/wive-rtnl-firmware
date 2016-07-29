@@ -154,30 +154,27 @@ get_param() {
     fi
     # final options compile
     gen_configs
-    full_l2tpd_opts="-c $ppp/l2tpd.conf -s $ppp/chap-secrets -p $var/l2tpd.pid -C $var/l2tp-control $l2tp_srv_debug"
+    full_l2tpd_opts="-c $ppp/l2tpd.conf -s $ppp/chap-secrets -p $var/l2tpd.pid -C $var/l2tp-control $l2tp_srv_debug -l"
 }
 
 stop() {
     $LOG "Stop l2tp vpn server"
-    # try firt disconnect all clients
-    if [ -e $var/l2tp-control ] && [ -f $var/l2tpd.pid ]; then
-	echo "d default" > $var/l2tp-control
-	usleep 500000
-    fi
+    pid=`pidof xl2tpd-srv`
     # stop vpn server
-    if [ -f $var/l2tpd.pid ]; then
-	pid=`cat $var/l2tpd.pid`
-	count=0
-	# try 3 times for correct shutdown
-	while kill "$pid" > /dev/null 2>&1; do
+    if [ "$pid" != "" ]; then
+	if [ -e $var/l2tp-control ]; then
+	    # try firt disconnect all clients
+	    echo "d default" > $var/l2tp-control
 	    usleep 500000
-	    count="$(($count+1))"
-	    if [ "$count" = "5" ]; then
-		break
-	    fi
+	fi
+	# terminate xl2tp-srv daemon
+	while killall -q xl2tpd-srv; do
+	    usleep 500000
+	    killall -q -SIGKILL xl2tpd-srv
 	done
-	# if not correct terminate need kill
-	kill -SIGKILL "$pid" > /dev/null 2>&1
+	# remove server control socket
+	rm -f $var/l2tp-control
+	# remove server pidfile
 	rm -f $var/l2tpd.pid
     fi
 }

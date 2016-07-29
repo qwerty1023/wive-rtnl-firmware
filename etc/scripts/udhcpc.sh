@@ -158,12 +158,15 @@ case "$1" in
 		    while ip -4 route del default dev $interface ; do
 		        :
 		    done
+		    # low cost stub for all default not replaced routes to WAN
+		    ip route replace default dev $interface metric 100
 		fi
 		# always parse router variable
 		metric=0
 		for i in $router ; do
-		    # add route $i/32:0.0.0.0 dev $interface metric $metric to route list
-		    ROUTELIST_FGW="$ROUTELIST_FGW $i/32:0.0.0.0:$interface:"
+		    # add route stubs $i/32:0.0.0.0 dev $interface metric 100 to route list
+		    # this stubs need add with low cost
+		    ROUTELIST_FGW="$ROUTELIST_FGW $i/32:0.0.0.0:$interface:100"
 		    if [ "$REPLACE_DGW" = "1" ]; then
 		        # add default $i dev $interface metric $metric to route dgw list
 		        ROUTELIST_DGW="$ROUTELIST_DGW default:$i:$interface:$metric"
@@ -182,14 +185,15 @@ case "$1" in
 		for i in $routes; do
 		    NW=`echo $i | sed 's,/.*,,'`
 		    GW=`echo $i | sed 's,.*/,,'`
+		    if [ ! -z "$NW" ] && [ -z "$GW" ]; then
+			GW="0.0.0.0"
+                    fi
 		    shift 1
 		    MASK=`echo $NW | awk '{w=32; split($0,a,"."); \
 			for (i=4; i>0; i--) {if (a[i]==0) w-=8; else {\
 			while (a[i]%2==0) {w--; a[i]=a[i]/2}; break}\
 			}; print w }'`
-		    if [ "$GW" = "0.0.0.0" ] || [ -z "$GW" ]; then
-			ip -4 route replace $NW/$MASK dev $interface
-		    else
+		    if [ ! -z "$NW" ] && [ ! -z "$GW" ]; then
 			ROUTELIST_CS="$ROUTELIST_CS $NW/$MASK:$GW:$interface:"
 		    fi
 		done
@@ -201,10 +205,11 @@ case "$1" in
 		while [ -n "$1" ]; do
 		    NW="$1"
 		    GW="$2"
+		    if [ ! -z "$NW" ] && [ -z "$GW" ]; then
+			GW="0.0.0.0"
+                    fi
 		    shift 2
-		    if [ "$GW" = "0.0.0.0" ] || [ -z "$GW" ]; then
-			ip -4 route replace $NW dev $interface
-		    else
+		    if [ ! -z "$NW" ] && [ ! -z "$GW" ]; then
 			ROUTELIST_ST="$ROUTELIST_ST $NW:$GW:$interface:"
 		    fi
 		done
@@ -229,7 +234,7 @@ case "$1" in
 	    done
 	    # workaround for some buggy ISP
 	    if [ "$REPLACE_DGW" = "1" ] && [ "$FULL_RENEW" = "1" ] && [ "$first_dgw" != "" ]; then
-		$LOG "Set fist default gateway to $first_dgw dev $interface metric 0"
+		$LOG "Set fist default gateway to $first_dgw dev $interface via "$first_dgw" metric 0"
 		ip -4 route replace default dev "$interface" via "$first_dgw" metric 0
 	    fi
 	    # add route to multicast subnet
@@ -242,6 +247,10 @@ case "$1" in
 		$LOG "Apply user routes."
 		/etc/routes_replace replace $lan_if $interface
 	    fi
+
+	    $LOG "Flush route cache"
+	    ip route flush cache
+
 	    # set routes applied flag
 	    touch /tmp/routes_applied
 	fi
