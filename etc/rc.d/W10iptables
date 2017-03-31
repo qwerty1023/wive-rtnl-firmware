@@ -15,9 +15,9 @@ LOG="logger -t iptables"
 
 start() {
   $LOG "Starting IPTABLES"
-    get_param
-    stop
 	$LOG "Add netfiler rules for ipv4"
+	get_param
+	stop
 #########################################DEFAULTRULES###################################
 	# default filters
 	$LOG "Set default filters"
@@ -401,9 +401,10 @@ start() {
 
 startv6() {
     if [ -d /proc/sys/net/ipv6 ] && [ "$IPv6OpMode" != "0" ]; then
-	get_param
-
         $LOG "Add netfiler rules for ipv6"
+	get_param
+	stopv6
+
         # default rules
         ip6tables -A INPUT -i lo -j ACCEPT
         ip6tables -A INPUT $STATE_EST -j ACCEPT
@@ -431,6 +432,12 @@ startv6() {
 	    ip6tables -A INPUT -i $lan_if $STATE_NEW -p tcp --dport 8666 -j ACCEPT
 	    ip6tables -A INPUT -i $lan_if -p udp --dport 1900 -j ACCEPT
 	    ip6tables -A INPUT -i $lan_if -p udp --dport 5350:5351 -j ACCEPT
+	fi
+
+	if [ "$dnsPEnabled" = "1" ]; then
+	    $LOG "dnsproxy"
+	    ip6tables -A INPUT -i $lan_if -p udp --dport 53 -j ACCEPT
+	    ip6tables -A INPUT -i $lan_if $STATE_NEW -p tcp --dport 53 -j ACCEPT
 	fi
 
 	if [ "$LOCAL_PRT" != "" ]; then
@@ -552,6 +559,7 @@ clamp_mss() {
 }
 
 stop() {
+    $LOG "Clear iptables rules fo ipv4 and set default actions."
     # drop all rules
     iptables -F > /dev/null 2>&1
     iptables -t nat -F > /dev/null 2>&1
