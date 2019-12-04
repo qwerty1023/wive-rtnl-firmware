@@ -399,8 +399,11 @@ int main(int argc, char** argv)
 	openlog("goahead", LOG_PID|LOG_NDELAY, LOG_USER);
 	syslog(LOG_INFO, "version %s started", WEBS_VERSION);
 
-	/* Boot = GREEN OFF */
+	/* Boot = All Orange ON */
 	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_POWER_LED_ORANGE, LED_ON);	//Turn on orange LED
+	ledAlways(GPIO_LED_WAN_GREEN, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_LED_WAN_ORANGE, LED_ON);		//Turn on orange LED
 
 	/* Set flag goahead run to scripts */
 	if (writeGoPid() < 0)
@@ -443,7 +446,10 @@ int main(int argc, char** argv)
 	    doSystem("[ ! -f /etc/backup/nvram_backup.dat ] && (sleep 20 && fs backup_nvram && fs save) &");
 
 	    /* Work - All Green ON */
+	    ledAlways(GPIO_POWER_LED_ORANGE, LED_OFF);	//Turn off power LED
         ledAlways(GPIO_POWER_LED, LED_ON);		//Turn on power LED
+        ledAlways(GPIO_LED_WAN_ORANGE, LED_OFF);	//Turn off orange LED
+	    ledAlways(GPIO_LED_WAN_GREEN, LED_ON);	//Turn on green LED
 
 	    if (writeGoStarted() < 0) syslog(LOG_WARNING, T("write start flag file fail!"));
 	}
@@ -479,8 +485,11 @@ int main(int argc, char** argv)
 #ifdef B_STATS
 	memLeaks();
 #endif
-	/* Exit - GREN OFF */
+	/* Exit - Orange ON */
 	ledAlways(GPIO_POWER_LED, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_POWER_LED_ORANGE, LED_ON);	//Turn on orange LED
+	ledAlways(GPIO_LED_WAN_GREEN, LED_OFF);		//Turn off green LED
+	ledAlways(GPIO_LED_WAN_ORANGE, LED_ON);		//Turn on orange LED
 
 	bclose();
 	return 0;

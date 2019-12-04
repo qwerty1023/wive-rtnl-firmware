@@ -54,7 +54,6 @@
 #endif
 #define GPIO_BTN_WPS		0
 /* LEDS GPIO */
-#define GPIO_POWER_LED_ORANGE	8
 #define GPIO_POWER_LED		9
 
 #define GPIO_LED_WAN_GREEN      12
