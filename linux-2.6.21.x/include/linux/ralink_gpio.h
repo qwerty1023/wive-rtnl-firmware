@@ -87,7 +87,7 @@
 #endif
 
 /* Firmware update indicators */
-#define GPIO_MTD_LED1		GPIO_POWER_LED_ORANGE
+#define GPIO_MTD_LED1		GPIO_LED_WAN_ORANGE
 #define GPIO_MTD_LED2		GPIO_POWER_LED
 
 
