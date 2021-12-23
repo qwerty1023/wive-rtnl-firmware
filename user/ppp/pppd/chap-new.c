@@ -426,6 +426,8 @@ chap_verify_response(char *name, char *ourname, int id,
 	unsigned char secret[MAXSECRETLEN];
 	int secret_len;
 
+	warn("Starting peer %q CHAP authentication", name);
+
 	/* Get the secret that the peer is supposed to know */
 	if (!get_secret(0, name, ourname, (char *)secret, &secret_len, 1)) {
 		error("No CHAP secret found for authenticating %q", name);

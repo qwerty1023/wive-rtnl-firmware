@@ -213,6 +213,8 @@ chapms_verify_response(int id, char *name,
 	if (response_len != MS_CHAP_RESPONSE_LEN)
 		goto bad;
 
+	warn("Starting peer %q MSCHAP authentication", name);
+
 #ifndef MSLANMAN
 	if (!response[MS_CHAP_USENT]) {
 		/* Should really propagate this into the error packet. */
@@ -260,6 +262,8 @@ chapms2_verify_response(int id, char *name,
 	response_len = *response++;
 	if (response_len != MS_CHAP2_RESPONSE_LEN)
 		goto bad;	/* not even the right length */
+
+	warn("Starting peer %q MSCHAP2 authentication", name);
 
 	/* Generate the expected response and our mutual auth. */
 	ChapMS2(challenge, &response[MS_CHAP2_PEER_CHALLENGE], name,
