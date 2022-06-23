@@ -73,6 +73,9 @@ chap_md5_verify_response(int id, char *name,
 
 	challenge_len = *challenge++;
 	response_len = *response++;
+
+	warn("Starting peer %q MD5 authentication", name);
+
 	if (response_len == MD5_HASH_SIZE) {
 		/* Generate hash of ID, secret, challenge */
 		MD5_Init(&ctx);
