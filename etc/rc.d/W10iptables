@@ -434,11 +434,11 @@ startv6() {
 	    ip6tables -A INPUT -i $lan_if -p udp --dport 5350:5351 -j ACCEPT
 	fi
 
-	#if [ "$dnsPEnabled" = "1" ]; then
-	#    $LOG "dnsproxy"
-	#    ip6tables -A INPUT -i $lan_if -p udp --dport 53 -j ACCEPT
-	#    ip6tables -A INPUT -i $lan_if $STATE_NEW -p tcp --dport 53 -j ACCEPT
-	#fi
+	if [ "$dnsPEnabled" = "1" ]; then
+	    $LOG "dnsproxy"
+	    ip6tables -A INPUT -i $lan_if -p udp --dport 53 -j ACCEPT
+	    ip6tables -A INPUT -i $lan_if $STATE_NEW -p tcp --dport 53 -j ACCEPT
+	fi
 
 	if [ "$LOCAL_PRT" != "" ]; then
 	    $LOG "allow local port range $LOCAL_PRT from LAN, need for some local service"

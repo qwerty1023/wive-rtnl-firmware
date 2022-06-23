@@ -294,9 +294,9 @@ case "$1" in
 			    $LOG "Add ISP ipv6 servers for local resolv"
 			    cat /etc/resolvipv6.conf | grep "nameserver" >> $RESOLV_CONF
 			else
-			    $LOG "Add google ipv6 servers for local resolv"
-			    echo "nameserver 2001:4860:4860::8888" >> $RESOLV_CONF
-			    echo "nameserver 2001:4860:4860::8844" >> $RESOLV_CONF
+			    $LOG "Add ipv6 servers for local resolv"
+			    echo "nameserver 2602:fcbc::ad" >> $RESOLV_CONF
+			    echo "nameserver 2602:fcbc:2::ad" >> $RESOLV_CONF
 			fi
 		    fi
 		    # read for all write by root

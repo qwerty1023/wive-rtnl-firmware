@@ -36,9 +36,9 @@ if [ ! -f /tmp/bootgood ] || [ "$wan_static_dns" = "on" ]; then
 	    $LOG "Add ISP ipv6 servers for local resolv"
 	    cat /etc/resolvipv6.conf | grep "nameserver" >> $fname
 	else
-	    $LOG "Add google ipv6 servers for local resolv"
-	    echo "nameserver 2001:4860:4860::8888" >> $fname
-	    echo "nameserver 2001:4860:4860::8844" >> $fname
+	    $LOG "Add ipv6 servers for local resolv"
+	    echo "nameserver 2602:fcbc::ad" >> $fname
+	    echo "nameserver 2602:fcbc:2::ad" >> $fname
 	fi
     fi
     # read for all write by root
