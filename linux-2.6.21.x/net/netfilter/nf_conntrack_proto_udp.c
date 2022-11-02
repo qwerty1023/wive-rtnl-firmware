@@ -32,8 +32,8 @@ static int udp_pkt_to_tuple(const struct sk_buff *skb,
 {
 	struct udphdr _hdr, *hp;
 
-	/* Actually only need first 8 bytes. */
-	hp = skb_header_pointer(skb, dataoff, sizeof(_hdr), &_hdr);
+	/* Actually only need first 4 bytes. */
+	hp = skb_header_pointer(skb, dataoff, 4, &_hdr);
 	if (hp == NULL)
 		return 0;
 

@@ -154,8 +154,8 @@ static int sctp_pkt_to_tuple(const struct sk_buff *skb,
 	DEBUGP(__FUNCTION__);
 	DEBUGP("\n");
 
-	/* Actually only need first 8 bytes. */
-	hp = skb_header_pointer(skb, dataoff, 8, &_hdr);
+	/* Actually only need first 4 bytes. */
+	hp = skb_header_pointer(skb, dataoff, 4, &_hdr);
 	if (hp == NULL)
 		return 0;
 
@@ -191,16 +191,7 @@ static int sctp_print_tuple(struct seq_file *s,
 static int sctp_print_conntrack(struct seq_file *s,
 				const struct nf_conn *conntrack)
 {
-	enum sctp_conntrack state;
-
-	DEBUGP(__FUNCTION__);
-	DEBUGP("\n");
-
-	read_lock_bh(&sctp_lock);
-	state = conntrack->proto.sctp.state;
-	read_unlock_bh(&sctp_lock);
-
-	return seq_printf(s, "%s ", sctp_conntrack_names[state]);
+	return seq_printf(s, "%s ", sctp_conntrack_names[conntrack->proto.sctp.state]);
 }
 
 #define for_each_sctp_chunk(skb, sch, _sch, offset, dataoff, count)	\

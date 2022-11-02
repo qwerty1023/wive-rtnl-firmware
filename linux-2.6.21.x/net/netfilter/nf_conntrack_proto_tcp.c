@@ -297,8 +297,8 @@ static int tcp_pkt_to_tuple(const struct sk_buff *skb,
 {
 	struct tcphdr _hdr, *hp;
 
-	/* Actually only need first 8 bytes. */
-	hp = skb_header_pointer(skb, dataoff, 8, &_hdr);
+	/* Actually only need first 4 bytes. */
+	hp = skb_header_pointer(skb, dataoff, 4, &_hdr);
 	if (hp == NULL)
 		return 0;
 
@@ -329,13 +329,7 @@ static int tcp_print_tuple(struct seq_file *s,
 static int tcp_print_conntrack(struct seq_file *s,
 			       const struct nf_conn *conntrack)
 {
-	enum tcp_conntrack state;
-
-	read_lock_bh(&tcp_lock);
-	state = conntrack->proto.tcp.state;
-	read_unlock_bh(&tcp_lock);
-
-	return seq_printf(s, "%s ", tcp_conntrack_names[state]);
+	return seq_printf(s, "%s ", tcp_conntrack_names[conntrack->proto.tcp.state]);
 }
 
 static unsigned int get_conntrack_index(const struct tcphdr *tcph)
@@ -426,6 +420,8 @@ static void tcp_options(const struct sk_buff *skb,
 			length--;
 			continue;
 		default:
+			if (length < 2)
+				return;
 			opsize=*ptr++;
 			if (opsize < 2) /* "silly options" */
 				return;
@@ -487,6 +483,8 @@ static void tcp_sack(const struct sk_buff *skb, unsigned int dataoff,
 			length--;
 			continue;
 		default:
+			if (length < 2)
+				return;
 			opsize = *ptr++;
 			if (opsize < 2) /* "silly options" */
 				return;
