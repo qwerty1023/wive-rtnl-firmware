@@ -654,15 +654,9 @@ static int tcp_in_window(struct nf_conn *ct,
 		if (ack == receiver->td_end)
 			receiver->flags &= ~IP_CT_TCP_FLAG_DATA_UNACKNOWLEDGED;
 
-	if (seq == end
-	    && (!tcph->rst
-		|| (seq == 0 && state->state == TCP_CONNTRACK_SYN_SENT)))
+	if (tcph->rst && seq == 0 && state->state == TCP_CONNTRACK_SYN_SENT)
 		/*
-		 * Packets contains no data: we assume it is valid
-		 * and check the ack value only.
-		 * However RST segments are always validated by their
-		 * SEQ number, except when seq == 0 (reset sent answering
-		 * SYN.
+		 * RST sent answering SYN.
 		 */
 		seq = end = sender->td_end;
 
@@ -722,6 +716,8 @@ static int tcp_in_window(struct nf_conn *ct,
 			if (win == 0)
 				receiver->td_maxend++;
 		}
+		if (ack == receiver->td_end)
+			receiver->flags &= ~IP_CT_TCP_FLAG_DATA_UNACKNOWLEDGED;
 
 		/*
 		 * Check retransmissions.
@@ -1037,7 +1033,7 @@ in_window:
 
 	conntrack->proto.tcp.state = new_state;
 	if (old_state != new_state
-	    && new_state == TCP_CONNTRACK_CLOSE)
+	    && new_state == TCP_CONNTRACK_FIN_WAIT)
 		conntrack->proto.tcp.seen[dir].flags |= IP_CT_TCP_FLAG_CLOSE_INIT;
 	if (conntrack->proto.tcp.retrans >= nf_ct_tcp_max_retrans &&
 	    *tcp_timeouts[new_state] > nf_ct_tcp_timeout_max_retrans)
