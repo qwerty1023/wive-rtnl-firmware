@@ -2821,6 +2821,8 @@ void tcp_parse_options(struct sk_buff *skb, struct tcp_options_received *opt_rx,
 				length--;
 				continue;
 			default:
+				if (length < 2)
+					return;
 				opsize=*ptr++;
 				if (opsize < 2) /* "silly options" */
 					return;
@@ -3720,6 +3722,9 @@ static int tcp_prune_queue(struct sock *sk)
 		tcp_clamp_window(sk);
 	else if (tcp_memory_pressure)
 		tp->rcv_ssthresh = min(tp->rcv_ssthresh, 4U * tp->advmss);
+
+	if (atomic_read(&sk->sk_rmem_alloc) <= sk->sk_rcvbuf)
+		return 0;
 
 	tcp_collapse_ofo_queue(sk);
 	tcp_collapse(sk, &sk->sk_receive_queue,

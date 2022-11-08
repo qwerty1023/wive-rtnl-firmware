@@ -1218,6 +1218,8 @@ static int tcp_v4_inbound_md5_hash(struct sock *sk, struct sk_buff *skb)
 			length--;
 			continue;
 		default:
+			if (length < 2)
+				goto done_opts;
 			opsize = *ptr++;
 			if (opsize < 2)
 				goto done_opts;

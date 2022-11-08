@@ -404,7 +404,8 @@ static void tcp_options(const struct sk_buff *skb,
 
 	ptr = skb_header_pointer(skb, dataoff + sizeof(struct tcphdr),
 				 length, buff);
-	BUG_ON(ptr == NULL);
+	if (!ptr)
+		return;
 
 	state->td_scale =
 	state->flags = 0;
@@ -461,7 +462,8 @@ static void tcp_sack(const struct sk_buff *skb, unsigned int dataoff,
 
 	ptr = skb_header_pointer(skb, dataoff + sizeof(struct tcphdr),
 				 length, buff);
-	BUG_ON(ptr == NULL);
+	if (!ptr)
+		return;
 
 	/* Fast path for timestamp-only option */
 	if (length == TCPOLEN_TSTAMP_ALIGNED
@@ -850,7 +852,8 @@ static int tcp_packet(struct nf_conn *conntrack,
 	unsigned int index;
 
 	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
+	if (th == NULL)
+		return -NF_ACCEPT;
 
 	write_lock_bh(&tcp_lock);
 	old_state = conntrack->proto.tcp.state;
