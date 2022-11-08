@@ -1609,7 +1609,8 @@ static inline void *skb_header_pointer(const struct sk_buff *skb, int offset,
 	if (hlen - offset >= len)
 		return skb->data + offset;
 
-	if (skb_copy_bits(skb, offset, buffer, len) < 0)
+	if (!skb ||
+	    skb_copy_bits(skb, offset, buffer, len) < 0)
 		return NULL;
 
 	return buffer;
