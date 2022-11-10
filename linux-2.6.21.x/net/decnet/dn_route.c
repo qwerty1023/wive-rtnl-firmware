@@ -176,7 +176,7 @@ static void dn_dst_check_expire(unsigned long dummy)
 		}
 		spin_unlock(&dn_rt_hash_table[i].lock);
 
-		if ((jiffies - now) > 0)
+		if (jiffies != now)
 			break;
 	}
 
