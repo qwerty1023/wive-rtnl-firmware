@@ -38,7 +38,7 @@ ntp_start() {
     eval `nvram_buf_get 2860 NTPEnabled NTPServerIP`
     if [ "$NTPEnabled" = "on" ] && [ "$NTPServerIP" != "" ]; then
 	$LOG "Starting NTPD"
-	ntpd -p "$NTPServerIP" &
+	ntpd -g -p "$NTPServerIP" &
     fi
 }
 
