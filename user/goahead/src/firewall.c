@@ -1390,7 +1390,7 @@ static void iptablesWebsFilterRun(void)
 				{
 					//fprintf(fd, "127.0.0.1 %s\n", entry);
 					//fprintf(fd, "::1 %s\n", entry);
-					fprintf(fd, "address=/%s/172.17.0.1\n", entry);
+					fprintf(fd, "address=/%s/127.0.0.1\n", entry);
 					fprintf(fd, "address=/%s/::1\n", entry);
 				}
 				i++;
