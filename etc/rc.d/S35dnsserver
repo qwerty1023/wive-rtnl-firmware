@@ -70,12 +70,30 @@ get_param() {
 reload() {
     get_param
     gen_hosts
-    is_run=`pidof dnsmasq`
-    if [ "$is_run" != "" ]; then
-	$LOG "Send HUP to dnsmasq."
-	killall -q -SIGHUP dnsmasq
-    else
-	start
+    if [ -f /var/run/dnsmasq.pid ]; then
+	$LOG "Restarting DNSMASQ"
+	pid=`pidof dnsmasq`
+	count=0
+	# try 3 times for correct shutdown
+	while kill "$pid" > /dev/null 2>&1; do
+	    pid=`pidof dnsmasq`
+	    count="$(($count+1))"
+	    if [ "$count" = "3" ] || [ "$pid" = "" ]; then
+		break
+	    fi
+	    usleep 500000
+	done
+	# if not correct terminate need kill
+	if [ "$pid" != "" ]; then
+	    kill -SIGKILL "$pid" > /dev/null 2>&1
+	    if [ -f /var/run/dnsmasq.pid ]; then
+		rm -f /var/run/dnsmasq.pid
+	    fi
+	fi
+    fi
+    if [ "$dnsPEnabled" = "1" ] && [ -f $cname ]; then
+	nice -n -10 dnsmasq -N -c 256 --dns-forward-max=128 --no-poll --all-servers --clear-on-reload --leasefile-ro \
+	    -C "$cname" -r "$fname" -H "$hname" &
     fi
 }
 
