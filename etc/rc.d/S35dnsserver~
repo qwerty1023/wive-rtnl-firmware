@@ -49,8 +49,8 @@ gen_hosts() {
     fi
 
     if [ -f $hname_fltr ]; then
-	$LOG "Add hosts filter records to config."
-	cat $hname_fltr >> $cname
+	$LOG "Add hosts filter records."
+	cat $hname_fltr >> /etc/hosts
     fi
 
     # read for all write by root
