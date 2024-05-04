@@ -50,7 +50,7 @@ gen_hosts() {
 
     if [ -f $hname_fltr ]; then
 	$LOG "Add hosts filter records to config."
-	cat $hname_fltr >> $cname
+	cat $hname_fltr > $cname
     fi
 
     # read for all write by root
